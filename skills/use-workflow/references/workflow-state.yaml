@@ -1,0 +1,47 @@
+# Workflow State Schema
+# Location: {OUTPUT_FOLDER}/{workflow-name}/{run-id}/workflow-state.yaml
+
+# Identity
+workflow: agentic:workflow:{workflow-name} # Or "custom" if informal workflow launched by user
+run_id: "{YYYYMMDD}-{HHMMSS}-{random4hex}"
+topic: "{topic-slug}"
+output_path: "{OUTPUT_FOLDER}/{workflow-name}/{run-id}"
+
+# Timing
+started_at: "2026-05-27T10:00:00Z"
+updated_at: "2026-05-27T10:15:00Z"
+completed_at: null
+
+# Skills
+technical_skills_prompt: |
+  # Technical Skills
+  Load: agentic:skill:typescript-engineer
+  Confirm: "Skills loaded: typescript-engineer"
+
+# Status
+status: "in_progress" # pending | in_progress | completed | failed
+current_step: 2
+
+# Steps
+steps_completed:
+  - step: 1
+    name: "gather-context"
+    completed_at: "2026-05-27T10:05:00Z"
+  - step: 2
+    name: "grill-requirements"
+    completed_at: "2026-05-27T10:15:00Z"
+    output: "{output_path}/technical-context.md"
+
+# Decisions
+decisions:
+  - step: gather-context
+    decision: "Focused on auth module"
+    reason: "User spec mentions login flow and session management"
+  - step: grill-requirements
+    decision: "JWT over session cookies"
+    reason: "User confirmed stateless API requirement"
+
+# Artifacts
+artifacts:
+  technical_context: "{output_path}/technical-context.md"
+  technical_plan: null

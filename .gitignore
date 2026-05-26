@@ -1,0 +1,12 @@
+# Agents / Editors
+.agents
+.claude
+.cursor
+.codex
+
+# Skills
+skills-lock.json
+
+# Local only
+.local
+.tmp

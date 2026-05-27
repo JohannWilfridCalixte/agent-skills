@@ -11,6 +11,10 @@ Sub-workflow. Runs review skills in parallel, fixes issues, re-reviews until cle
 
 Inherits from calling workflow: `output_path`, `technical_skills_prompt`, `workflow-state.yaml`.
 
+If `output_path`, `technical_skills_prompt` and `workflow-state.yaml` not found, you **MUST** load these before proceeding:
+- `/agentic:skill:use-agentic` — config + constants
+- `/agentic:skill:use-workflow` — state tracking + step sequencing
+
 ## Parameters
 
 The calling workflow **MUST** provide:

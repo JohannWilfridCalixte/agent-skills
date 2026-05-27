@@ -8,12 +8,12 @@ Write a FAILING test that reproduces the bug. This test captures the bugged beha
 
 You **MUST** delegate this to a subagent. You **MUST NOT** write tests yourself.
 
-Spawn a subagent with:
+Spawn a subagent per `agentic:skill:delegate-work`:
 
-- **Persona**: `agentic:agent:software-engineer` — the subagent **MUST** read this file first
-- **Skills**: pass `technical_skills_prompt` from workflow state — subagent **MUST** load all skills first
-- **Agent Type**: general purpose or default
-- **Model**: CODE_WRITING_MODEL from agentic config
+- **Persona**: `agentic:agent:software-engineer`
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: general purpose
+- **Model**: `CODE_WRITING_MODEL`
 - **Input**: `{output_path}/bug-report.md` + `{output_path}/investigation-report.md`
 - **Instructions**:
   1. Read the investigation report to understand failure point and data flow

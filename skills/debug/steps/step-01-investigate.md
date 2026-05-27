@@ -8,12 +8,12 @@ Gather evidence about the bug. Delegate codebase exploration to architect subage
 
 You **MUST** delegate this to 1 or multiple subagents. You **MUST NOT** investigate yourself.
 
-Spawn subagent(s) with:
+Spawn subagent(s) per `agentic:skill:delegate-work`:
 
-- **Persona**: `agentic:agent:architect` — the subagent **MUST** read this file first
-- **Skills**: pass `technical_skills_prompt` from workflow state — subagent **MUST** load all skills first
-- **Agent Type**: general purpose or default
-- **Model**: You **MUST** use asking question tool (if available) to ask the developer whether to use CODE_WRITING_MODEL or HIGH_THINKING_MODEL from agentic config
+- **Persona**: `agentic:agent:architect`
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: general purpose
+- **Model**: ask developer (question tool if available) whether to use `CODE_WRITING_MODEL` or `HIGH_THINKING_MODEL`
 - **Input**: `{output_path}/bug-report.md`
 - **Output**: `{output_path}/investigation-report.md` following the template in `references/investigation-report.md`
 

@@ -26,14 +26,14 @@ Every decision from `technical-decisions.md` **MUST** be reflected in the plan. 
 
 ## If Delegating to Subagent
 
-Spawn with:
+Spawn per `agentic:skill:delegate-work`:
 
 - **Persona**: `agentic:agent:architect`
 - **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose or default
-- **Model**: use `HIGH_THINKING_MODEL` constant from agentic config
-- **All artifact paths** listed above
-- **Template**: `references/technical-plan.md`
+- **Agent Type**: general purpose
+- **Model**: `HIGH_THINKING_MODEL`
+- **Input**: all artifact paths listed above + template `references/technical-plan.md`
+- **Output**: `{output_path}/technical-plan.md`
 
 Validate output exists and contains task breakdown + verification approach.
 

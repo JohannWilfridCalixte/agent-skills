@@ -2,6 +2,7 @@
   "dependencies": [
     { "name": "agentic:skill:use-agentic", "type": "skill", "path": "skills/use-agentic" },
     { "name": "agentic:skill:use-workflow", "type": "skill", "path": "skills/use-workflow" },
+    { "name": "agentic:skill:delegate-work", "type": "skill", "path": "skills/delegate-work" },
     { "name": "agentic:skill:review-loop", "type": "skill", "path": "skills/review-loop" },
     { "name": "agentic:agent:architect", "type": "agent", "path": "agents" }
   ]

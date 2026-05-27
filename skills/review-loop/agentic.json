@@ -2,6 +2,7 @@
   "dependencies": [
     { "name": "agentic:skill:use-agentic", "type": "skill", "path": "skills/use-agentic" },
     { "name": "agentic:skill:use-workflow", "type": "skill", "path": "skills/use-workflow" },
+    { "name": "agentic:skill:delegate-work", "type": "skill", "path": "skills/delegate-work" },
     { "name": "agentic:skill:review-code", "type": "skill", "path": "skills/review-code" },
     { "name": "agentic:skill:review-tests", "type": "skill", "path": "skills/review-tests" },
     { "name": "agentic:skill:review-security", "type": "skill", "path": "skills/review-security" },

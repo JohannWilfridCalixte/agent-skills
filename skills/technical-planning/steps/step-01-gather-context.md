@@ -8,12 +8,12 @@ Delegate codebase exploration to architect subagent(s). It reads the input, expl
 
 You **MUST** delegate this to 1 or multiple subagents. You **MUST NOT** explore the codebase yourself.
 
-Spawn 1 or multiple subagents with:
+Spawn 1 or multiple subagents per `agentic:skill:delegate-work`:
 
-- **Persona**: `agentic:agent:architect` — the subagent **MUST** read this file first
-- **Skills**: pass `technical_skills_prompt` from workflow state (resolved language/framework skills)
-- **Agent Type**: explorer / explore
-- **Model**: automatic, defined by agent type otherwise default to fast model type haiku, composer or thinking intensity medium
+- **Persona**: `agentic:agent:architect`
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: explorer
+- **Model**: automatic — defined by agent type, otherwise default to fast model
 - **Input**: `{output_path}/input.md`
 - **Output**: `{output_path}/technical-context.md` following the template in `references/technical-context.md`
 

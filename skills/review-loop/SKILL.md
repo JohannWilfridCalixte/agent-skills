@@ -36,15 +36,15 @@ The calling workflow **MUST** provide:
 
 ### 1. Dispatch Reviews (Parallel)
 
-For each skill in `review_skills`, spawn a subagent **in parallel**:
+For each skill in `review_skills`, spawn a subagent **in parallel** per `agentic:skill:delegate-work`:
 
-- **Persona**: per mapping above — subagent **MUST** read persona file first
+- **Persona**: per mapping above
 - **Skill**: the review skill to apply (e.g., `agentic:skill:review-code`)
-- **Skills**: pass `technical_skills_prompt`
-- **Agent Type**: general purpose or default
-- **Model**: QA_MODEL from agentic config
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: general purpose
+- **Model**: `QA_MODEL`
 - **Output**: as defined by each review skill
-- **Context**: pass available inputs (plan, implementation log, code diff)
+- **Input**: available inputs (plan, implementation log, code diff)
 
 ### 2. Aggregate
 
@@ -62,12 +62,12 @@ ELSE → proceed to fix phase
 
 Collect all blocker + major issues from all reviews. Group into independent fix sets (non-overlapping files).
 
-For each independent group, spawn a subagent **in parallel**:
+For each independent group, spawn a subagent **in parallel** per `agentic:skill:delegate-work`:
 
 - **Persona**: `agentic:agent:software-engineer`
-- **Skills**: pass `technical_skills_prompt`
-- **Agent Type**: general purpose or default
-- **Model**: CODE_WRITING_MODEL from agentic config
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: general purpose
+- **Model**: `CODE_WRITING_MODEL`
 - **Input**: issues to fix (location, description, suggested fix)
 - **Instructions**: fix issues, run tests to verify no regressions
 

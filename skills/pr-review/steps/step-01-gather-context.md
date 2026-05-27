@@ -32,12 +32,12 @@ In **batch mode**, the parent orchestrator passes these preferences — skip the
 
 You **MUST** delegate this to a subagent. You **MUST NOT** analyze the diff yourself.
 
-Spawn a subagent with:
+Spawn a subagent per `agentic:skill:delegate-work`:
 
-- **Persona**: `agentic:agent:architect` — the subagent **MUST** read this file first
-- **Skills**: pass `technical_skills_prompt` from workflow state (resolved language/framework skills)
-- **Agent Type**: explorer / explore
-- **Model**: automatic, defined by agent type otherwise default to fast model type haiku, composer or thinking intensity medium
+- **Persona**: `agentic:agent:architect`
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: explorer
+- **Model**: automatic — defined by agent type, otherwise default to fast model
 - **Input**: `{output_path}/pr-diff.patch` + `{output_path}/pr-metadata.md`
 - **Output**: `{output_path}/technical-context.md`
 

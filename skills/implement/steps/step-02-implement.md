@@ -14,12 +14,12 @@ Use the task analysis from step 1 to dispatch work:
 
 ## Delegation
 
-For each task or task group, spawn a subagent with:
+For each task or task group, spawn a subagent per `agentic:skill:delegate-work`:
 
-- **Persona**: `agentic:agent:software-engineer` — subagent **MUST** read this file first
-- **Skills**: pass `technical_skills_prompt` — subagent **MUST** load all skills first
-- **Agent Type**: general purpose or default
-- **Model**: CODE_WRITING_MODEL from agentic config
+- **Persona**: `agentic:agent:software-engineer`
+- **Skills**: `technical_skills_prompt`
+- **Agent Type**: general purpose
+- **Model**: `CODE_WRITING_MODEL`
 - **Input**: relevant task(s) from the plan, plus `{output_path}/input-plan.md` for full context
 - **Instructions**: implement the assigned task(s), write tests alongside, run tests to verify
 

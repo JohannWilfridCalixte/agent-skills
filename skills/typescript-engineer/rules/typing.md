@@ -71,9 +71,9 @@ const count = 0;                     // inferred
 const errors = [] satisfies Error[]; // empty array needs type
 ```
 
-### Return types
+### Return types — NO explicit return types
 
-**Primary rule: avoid explicit return types.** Return types can lie. Inference cannot.
+**NEVER write explicit return types.** Return types can lie. Inference cannot. This applies to ALL functions, including those returning `Result<T, E>`, `Promise<T>`, or any complex type.
 
 | Approach | Risk |
 |----------|------|
@@ -170,5 +170,7 @@ async function collectOptions() {
 | "It documents the function contract" | Documents what you HOPE it returns, not what it DOES |
 | "It's clearer with the return type" | Clarity that can lie is worse than inference that can't |
 | "`: never \| undefined` documents control flow" | TS infers this already - the annotation adds nothing |
+| "Result/Option types need annotation" | No. TS infers `Result<T, E>` from `Ok()`/`Err()` returns |
+| "Promise return type makes async clear" | `async` keyword already signals Promise. TS infers the rest |
 
-Default: let TypeScript infer. Use `as const` to narrow. Use `satisfies` to validate.
+**Default: let TypeScript infer. Use `as const` to narrow. Use `satisfies` to validate. NEVER annotate `: ReturnType`.**

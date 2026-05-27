@@ -13,7 +13,7 @@ All switches on unions use `satisfies never` in default. Compile-time + runtime 
 **Incorrect:**
 
 ```typescript
-function getPrice(item: CartItem): number {
+function getPrice(item: CartItem) {
   switch (item.type) {
     case 'product': return item.unitPrice * item.quantity;
     case 'service': return item.hourlyRate * item.hours;
@@ -25,7 +25,7 @@ function getPrice(item: CartItem): number {
 **Correct:**
 
 ```typescript
-function getPrice(item: CartItem): number {
+function getPrice(item: CartItem) {
   switch (item.type) {
     case 'product': return item.unitPrice * item.quantity;
     case 'service': return item.hourlyRate * item.hours;

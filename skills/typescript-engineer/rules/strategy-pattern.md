@@ -25,8 +25,8 @@ const ProductStrategy: ItemStrategy<Product> = {
   calculate: (data) => data.unitPrice * data.quantity,
 };
 
-// Factory with satisfies never
-function getStrategy(type: ItemType): ItemStrategy<ItemData> {
+// Factory with satisfies never — no explicit return type
+function getStrategy(type: ItemType) {
   switch (type) {
     case 'product': return ProductStrategy;
     case 'service': return ServiceStrategy;

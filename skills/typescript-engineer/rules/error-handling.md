@@ -8,12 +8,12 @@ tags: result, option, monad, error, throwing, domain-logic
 
 **Impact: HIGH**
 
-Domain logic returns `Result<T, E>` or `Option<T>`. No throwing.
+Domain logic returns `Result<T, E>` or `Option<T>`. No throwing. Never annotate the return type — let TS infer it (see `typing.md`).
 
 **Incorrect:**
 
 ```typescript
-function calculate(input: Input): number {
+function calculate(input: Input) {
   if (!isValid(input)) throw new Error('Invalid');
   return compute(input);
 }
@@ -22,8 +22,8 @@ function calculate(input: Input): number {
 **Correct:**
 
 ```typescript
-function calculate(input: Input): Result<Output, CalcError> {
-  if (!isValid(input)) return Err({ code: 'INVALID_INPUT', message: '...' });
+function calculate(input: Input) {
+  if (!isValid(input)) return Err({ code: 'INVALID_INPUT', message: '...' } as const);
   return Ok(compute(input));
 }
 ```

@@ -33,7 +33,7 @@ Rules for writing production-grade TypeScript. Covers type safety, error handlin
 | Missing `readonly` on properties | Add `readonly` everywhere |
 | `readonly` inside `z.object({})` | Remove - runtime JS, not type syntax |
 | `any` or `as` casts | `unknown` + narrowing or type guards |
-| Explicit return types | Inference + `as const` / `satisfies` |
+| Explicit return types (including `: Result<T,E>`, `: Promise<T>`) | NEVER. Inference + `as const` / `satisfies` |
 | Function overloads | Union returns instead |
 | Throwing in domain logic | `Result<T, E>` |
 | Switch without `satisfies never` | Add default with `satisfies never` |

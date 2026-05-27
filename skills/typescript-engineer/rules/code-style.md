@@ -58,5 +58,5 @@ switch (data.type) {
 **Correct:**
 
 ```typescript
-function handleX(data: X): Result { /* ... */ }
+function handleX(data: X) { /* ... */ }
 ```

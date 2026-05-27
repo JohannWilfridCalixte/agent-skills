@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    {
+      "name": "agentic:skill:use-agentic",
+      "type": "skill",
+      "path": "skills/use-agentic"
+    }
+  ]
+}

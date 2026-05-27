@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    {
+      "name": "agentic:agent:security-engineer",
+      "type": "agent",
+      "path": "agents"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "dependencies": [
+    { "name": "agentic:skill:use-agentic", "type": "skill", "path": "skills/use-agentic" },
+    { "name": "agentic:skill:use-workflow", "type": "skill", "path": "skills/use-workflow" },
+    { "name": "agentic:skill:review-code", "type": "skill", "path": "skills/review-code" },
+    { "name": "agentic:skill:review-tests", "type": "skill", "path": "skills/review-tests" },
+    { "name": "agentic:skill:review-security", "type": "skill", "path": "skills/review-security" },
+    { "name": "agentic:agent:qa", "type": "agent", "path": "agents" },
+    { "name": "agentic:agent:security-engineer", "type": "agent", "path": "agents" },
+    { "name": "agentic:agent:software-engineer", "type": "agent", "path": "agents" }
+  ]
+}

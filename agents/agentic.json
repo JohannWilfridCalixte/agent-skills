@@ -1,0 +1,14 @@
+{
+  "architect": {
+    "dependencies": []
+  },
+  "qa": {
+    "dependencies": []
+  },
+  "security-engineer": {
+    "dependencies": []
+  },
+  "software-engineer": {
+    "dependencies": []
+  }
+}

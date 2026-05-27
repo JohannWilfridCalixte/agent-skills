@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    { "name": "agentic:skill:use-agentic", "type": "skill", "path": "skills/use-agentic" },
+    { "name": "agentic:skill:use-workflow", "type": "skill", "path": "skills/use-workflow" },
+    { "name": "agentic:agent:architect", "type": "agent", "path": "agents" }
+  ]
+}

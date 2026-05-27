@@ -19,6 +19,10 @@ Review tests for quality, coverage, and anti-patterns.
 - **Isolation** — can tests run in any order, in parallel?
 - **Naming** — do test names describe expected behavior?
 
+## Skills
+
+You **MUST** load `/agentic:skill:code-testing` skill before continuing.
+
 ## Anti-Pattern Checklist
 
 | Anti-Pattern | What It Looks Like | Severity |

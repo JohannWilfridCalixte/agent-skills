@@ -1,5 +1,10 @@
 {
   "dependencies": [
-    { "name": "agentic:agent:qa", "type": "agent", "path": "agents" }
+    { "name": "agentic:agent:qa", "type": "agent", "path": "agents" },
+    {
+      "name": "agentic:skill:code-testing",
+      "type": "skill",
+      "path": "skills/code-testing"
+    }
   ]
 }

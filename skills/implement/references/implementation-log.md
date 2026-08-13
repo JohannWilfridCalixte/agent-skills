@@ -1,6 +1,8 @@
-# Implementation Log
+# Implementation Log — Per Ticket
 
-## Task: {task-id} — {task-title}
+One file per ticket: `implementation-log-{NN}.md`.
+
+## Ticket: {NN} — {title}
 
 ### Changes
 
@@ -12,7 +14,7 @@ Tests written or modified. What they cover and current status (pass/fail).
 
 ### Decisions
 
-Any decisions made during implementation that weren't in the original plan. Include rationale.
+Any decisions made during implementation that weren't in the ticket or plan. Include rationale.
 
 ### Issues
 

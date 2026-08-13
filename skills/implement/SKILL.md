@@ -1,12 +1,12 @@
 ---
 name: agentic:workflow:implement
-description: Use when implementing from a technical plan (from agentic:workflow:technical-planning or planning mode). Triggers - "implement this plan", "implement technical plan", technical plan file provided.
-argument-hint: "<path/to/technical-plan.md | technical plan in context>"
+description: Use when implementing from a technical plan (from agentic:workflow:technical-planning or planning mode). Triggers - "implement this plan", "implement technical plan", planning run dir provided.
+argument-hint: "<path/to/planning-run-dir>"
 ---
 
 # Implement from Technical Plan
 
-Takes a **technical plan** and implements it: code, tests, review, optional PR. The plan must already exist — this workflow does NOT create plans.
+Takes a **planning run dir** (technical-plan.md + tickets/) and implements it ticket by ticket: code, tests, review, commit, PR. Plan and tickets must already exist — this workflow does NOT create them.
 
 ## Dependencies
 
@@ -17,33 +17,48 @@ You **MUST** load these before proceeding:
 
 ## Input Handling
 
-Parse the invocation argument:
+Argument = planning run dir produced by `/agentic:workflow:technical-planning`, containing:
 
-- File path → read the file
-- Technical plan in conversation context → use directly
-- No args or non-plan input → **HALT** (see Hard Gate below)
+- `technical-plan.md` — required
+- `tickets/*.md` — required, ≥1 ticket
+- `prd.md` — optional, read-only context
 
-Write raw input to `{output_path}/input-plan.md`.
+Ticket file format:
 
-## Hard Gate: Technical Plan Required
+```
+# NN — {Title}
+**What to build:** ...
+**Blocked by:** {NN, NN | None — can start immediately}
+**Status:** ready | in_progress | committed
+## Acceptance criteria
+- [ ] ...
+## Tech notes
+...
+```
 
-**This workflow MUST NOT start without a valid technical plan.**
+No arg or invalid dir → **HALT** (see Hard Gate below).
 
-A valid plan has: task breakdown, file change areas, and implementation steps. If the input lacks these:
+## Hard Gate: Planning Run Dir Required
 
-> **STOP.** This workflow requires a technical plan.
+**This workflow MUST NOT start without a valid planning run dir.**
+
+Valid input = dir with `technical-plan.md` AND `tickets/` containing ≥1 ticket with the fields above. If not:
+
+> **STOP.** This workflow requires a planning run dir (technical-plan.md + tickets/).
 >
 > Create one first: `/agentic:workflow:technical-planning`
 >
-> Then re-invoke `/agentic:workflow:implement` with the resulting plan.
+> Then re-invoke `/agentic:workflow:implement` with the resulting run dir.
 
-**Do NOT proceed. Do NOT offer to create the plan yourself. Halt.**
+**Do NOT proceed. Do NOT offer to create the plan or tickets yourself. Halt.**
 
 ## Orchestrator Role
 
 You are the **orchestrator**. You coordinate subagents and manage workflow state.
 
 **You MUST delegate all code work.** You never write code, tests, or reviews yourself. If you catch yourself doing agent work, STOP and delegate.
+
+**Git is orchestrator-only.** Subagents MUST NEVER run git commands. You pass names and paths, never content.
 
 ## Workflow Init
 
@@ -53,27 +68,27 @@ Initialize via use-workflow (generates run ID, creates output dir, writes initia
 
 | Step | File | Intent |
 |------|------|--------|
-| 1 | `steps/step-01-validate-plan.md` | Validate plan completeness, resolve skills |
-| 2 | `steps/step-02-implement.md` | Software engineer implements code + tests |
-| 3 | `steps/step-03-review-loop.md` | Review loop: code + tests + security |
-| 4 | `steps/step-04-finalize.md` | Optional PR creation or handoff |
+| 1 | `steps/step-01-validate.md` | Validate run dir, resolve skills, dependency graph, feature branch |
+| 2 | `steps/step-02-process-tickets.md` | Frontier loop: implement → review → commit per ticket |
+| 3 | `steps/step-03-finalize.md` | Push, PR, PR-level review loop |
 
 ## Key Rules
 
 **CRITICAL**: You MUST ALWAYS respect the following rules during this workflow execution:
 
 - **Delegate everything**: all code, test, and review work goes to subagents
-- **Autonomous for steps 1-3**: log decisions, don't ask the developer
-- **Interactive for step 4**: ask the developer about PR/branch creation
+- **Autonomous for steps 1-2 after branch confirm**: log decisions, don't ask the developer
+- **Interactive for the PR question** in step 3
 - **One step at a time**: complete current step before loading next
+- **Commits strictly serialized**: one commit gate at a time, orchestrator only
 
 ## Artifacts
 
 | Artifact | Description |
 |----------|-------------|
-| `input-plan.md` | Input technical plan (copied) |
-| `implementation-log.md` | What was implemented + decisions |
+| `implementation-log-{NN}.md` | Per-ticket log: changes, tests, decisions, issues |
+| `follow-ups.md` | Out-of-scope discoveries as proposed tickets |
 
 ## Start
 
-Load `steps/step-01-validate-plan.md`.
+Load `steps/step-01-validate.md`.

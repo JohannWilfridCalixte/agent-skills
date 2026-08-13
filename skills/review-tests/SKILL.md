@@ -47,7 +47,7 @@ You **MUST** load `/agentic:skill:code-testing` skill before continuing.
 
 ## Output
 
-Write to `{output_path}/review-tests-{iteration}.md`.
+Write to `{output_path}/review-tests-{iteration}.md`, or the filename provided by the calling workflow (review-loop passes `review-tests-{scope}-{iteration}.md` when scoped, e.g. `review-tests-t03-1.md`).
 
 ### Required Sections
 

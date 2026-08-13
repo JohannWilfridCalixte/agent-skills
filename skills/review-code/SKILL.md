@@ -31,7 +31,7 @@ Review implementation code (not tests) for correctness, quality, and maintainabi
 
 ## Output
 
-Write to `{output_path}/review-code-{iteration}.md`.
+Write to `{output_path}/review-code-{iteration}.md`, or the filename provided by the calling workflow (review-loop passes `review-code-{scope}-{iteration}.md` when scoped, e.g. `review-code-t03-1.md`).
 
 ### Required Sections
 

@@ -32,7 +32,7 @@ Review code for security vulnerabilities and compliance.
 
 ## Output
 
-Write to `{output_path}/review-security-{iteration}.md`.
+Write to `{output_path}/review-security-{iteration}.md`, or the filename provided by the calling workflow (review-loop passes `review-security-{scope}-{iteration}.md` when scoped, e.g. `review-security-t03-1.md`).
 
 ### Required Sections
 

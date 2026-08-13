@@ -1,7 +1,6 @@
 ---
-name: use-knowledge
+name: agentic:skill:use-knowledge
 description: Use when a conversation surfaces new knowledge worth preserving — architectural decisions, domain terms, product features, or unresolved discussions. Also use when creating, reorganizing, or indexing documentation.
-disable-model-invocation: true
 ---
 
 # Knowledge Management

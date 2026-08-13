@@ -42,7 +42,6 @@ The result: reproducible, auditable development pipelines where AI agents follow
 | Workflow | Description |
 |---|---|
 | `ask-codebase` | Question → code-informed answer |
-| `product-spec` | Idea → PRD |
 | `product-vision` | Idea → comprehensive vision document |
 | `frontend-development` | Idea → design → frontend code |
 | `auto-implement` | Idea → autonomous code (full pipeline) |
@@ -118,7 +117,7 @@ Workflows are multi-step orchestrated processes. Each workflow generates a run I
 
 ```
 /agentic:workflow:technical-planning "Add user authentication with JWT"
-/agentic:workflow:implement path/to/technical-plan.md
+/agentic:workflow:implement path/to/planning-run-dir
 /agentic:workflow:debug "Login returns 401 for valid credentials"
 /agentic:workflow:pr-review #42
 ```
@@ -131,12 +130,13 @@ Transforms specs, ideas, or issues into detailed technical plans.
 |---|---|
 | 1. Gather Context | Architect explores codebase → `technical-context.md` |
 | 2. Grill | Question developer on every design decision until unambiguous |
-| 3. Generate Plan | Produce implementable plan → `technical-plan.md` |
-| 4. Handoff | Summarize artifacts, suggest implement workflow |
+| 3. Generate Plan | Produce PRD, tickets, and implementable plan → `prd.md`, `tickets/NN-slug.md`, `technical-plan.md` |
+| 4. Quiz Gate | Quiz developer on ticket granularity, blocking edges, merge/split — iterate until approved |
+| 5. Handoff | Summarize artifacts, optionally publish tickets as GitHub issues, suggest implement workflow |
 
 **Rules**: Always interactive. No plan generation while open questions remain. Codebase exploration delegated to architect subagent.
 
-**Artifacts**: `input.md`, `technical-context.md`, `technical-decisions.md`, `technical-plan.md`
+**Artifacts**: `input.md`, `technical-context.md`, `technical-decisions.md`, `prd.md`, `tickets/NN-slug.md`, `technical-plan.md`
 
 ### Implement
 
@@ -144,14 +144,13 @@ Takes a technical plan and implements it — code, tests, review, optional PR.
 
 | Step | What Happens |
 |---|---|
-| 1. Validate Plan | Confirm plan completeness, resolve skill profiles |
-| 2. Implement | Software engineer subagent(s) code + test per plan |
-| 3. Review Loop | review-code + review-tests + review-security (max 3 iterations) |
-| 4. Finalize | Ask developer: create PR, commit only, or nothing |
+| 1. Validate | Validate planning run dir, resolve skill profiles, build ticket dependency graph, create feature branch |
+| 2. Process Tickets | Frontier loop: parallel lane per unblocked ticket — implement → review loop (3 review skills, max 2 iterations) → 1 conventional commit |
+| 3. Finalize | Create PR → review loop over full PR diff |
 
-**Rules**: Hard gate — won't start without valid technical plan. All code work delegated to subagents. Autonomous for steps 1-3, interactive for step 4.
+**Rules**: Hard gate — won't start without valid planning run dir. All code work delegated to subagents.
 
-**Artifacts**: `input-plan.md`, `implementation-log.md`
+**Artifacts**: `implementation-log-{NN}.md`, `follow-ups.md`
 
 ### Debug
 
@@ -217,6 +216,7 @@ Four persona files defining role, decision heuristics, quality standards, and co
 | `code-testing` | Test philosophy, pyramid, anti-patterns, FIRST principles |
 | `write-instrumented-code` | Logging, tracing, OpenTelemetry, JSON-only logs |
 | `delegate-work` | Canonical pattern for dispatching subagents |
+| `use-knowledge` | Knowledge capture — ADRs, RFCs, ubiquitous language, docs |
 
 ### Review Skills
 
@@ -260,7 +260,8 @@ agentic-v2/
     ├── clean-architecture/   # Ruleset: ports & adapters
     ├── code-testing/         # Ruleset: testing philosophy
     ├── write-instrumented-code/  # Ruleset: observability
-    └── delegate-work/        # Utility: subagent dispatch pattern
+    ├── delegate-work/        # Utility: subagent dispatch pattern
+    └── use-knowledge/        # Utility: knowledge capture (ADRs, RFCs, docs)
 ```
 
 ### Design Principles
@@ -274,7 +275,8 @@ agentic-v2/
 
 ```
 technical-planning
-    ↓ produces technical-plan.md
+    ├→ use-knowledge
+    ↓ produces prd.md + tickets/ + technical-plan.md
 implement
     ├→ review-loop
     │   ├→ review-code (via qa)

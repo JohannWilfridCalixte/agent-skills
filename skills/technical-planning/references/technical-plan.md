@@ -6,20 +6,11 @@ What's in scope and what's explicitly out of scope.
 
 ## Design
 
-Proposed architecture and design reflecting all developer decisions. Component structure, data flow, integration points.
+Proposed architecture and design reflecting all developer decisions. Component structure, data flow, integration points. Decisions backed by ADRs cite ADR-NNNN.
 
 ## Contracts & Interfaces
 
 API endpoints, function signatures, data schemas, type definitions, and other contracts.
-
-## Task Breakdown
-
-PR-sized implementation tasks in order of execution.
-
-| Task | Description | Dependencies |
-|------|-------------|--------------|
-| TASK-01 | ... | — |
-| TASK-02 | ... | TASK-01 |
 
 ## Verification
 

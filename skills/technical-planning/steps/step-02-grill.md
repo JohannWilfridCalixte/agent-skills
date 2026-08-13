@@ -2,19 +2,28 @@
 
 ## Intent
 
-Question the developer on every technical decision needed for an unambiguous plan. One question at a time. Relentlessly. Until reaching shared understanding on all structural decisions.
+Question the developer on every decision needed for an unambiguous plan. Model decisions as a **design tree**, ask in **frontier rounds** until the frontier is empty.
 
-## How to Question
+Load `/agentic:skill:use-knowledge` before starting — decisions are classified into docs as they resolve.
 
-- **One question at a time** — never batch multiple questions
-- **Prefer multiple choice** when options are enumerable (from codebase patterns or known approaches)
-- **Use codebase context** from `technical-context.md` to ground questions in what exists
-- **Challenge vague answers**: if the developer says "whatever works", "you decide", or "doesn't matter", push back with specific options and their concrete trade-offs. If they insist after one challenge, make your best recommendation, get confirmation, and log as DEVELOPER_DEFERRED.
+## Frontier Rounds
+
+- Build a design tree from input + technical-context: nodes = decisions, edges = prerequisites between decisions.
+- **Frontier** = all open questions whose prerequisites are settled.
+- Each round: ask **ALL** frontier questions — each with a recommended answer. Present via the harness's structured multi-choice mechanism when available, else a numbered list. Max 4 questions per round (overflow → next round).
+- Answers reshape the tree (prune branches, spawn new decisions) → recompute frontier → next round.
+- Done when the frontier is empty.
+
+## Facts vs Decisions
+
+- **Facts are your job**: if a question can be answered from the codebase, delegate the lookup to a subagent (per `agentic:skill:delegate-work`) — never ask the developer.
+- **Decisions are the developer's**: never resolve one silently.
 
 ## Question Categories
 
 Work through relevant categories. Skip what's clearly irrelevant. Adapt based on what emerges.
 
+0. **Product framing** — problem, users, out-of-scope. Ask **only** when input lacks it (feeds `prd.md`)
 1. **Architecture & component boundaries** — where does this live, new vs extend existing, integration points
 2. **Data model & storage** — new entities, relationships, migrations, caching, validation
 3. **API contracts & interfaces** — endpoints, request/response shapes, error semantics, versioning
@@ -25,6 +34,10 @@ Work through relevant categories. Skip what's clearly irrelevant. Adapt based on
 8. **Testing strategy** — test types, mocking approach, critical paths needing coverage
 9. **Performance & scaling** — SLAs, expected load, optimization approach
 
+## Challenge Rule
+
+If the developer says "whatever works", "you decide", or "doesn't matter": push back once with specific options and concrete trade-offs. If they insist, make your best recommendation, get confirmation, log as DEVELOPER_DEFERRED.
+
 ## Decision Logging
 
 Initialize `{output_path}/technical-decisions.md` at the start of this step.
@@ -34,6 +47,19 @@ Log every decision as you go:
 - **Question asked** → **answer given** → **decision derived** → **impact on plan**
 - For DEVELOPER_DEFERRED: your recommendation + rationale + developer confirmation
 
+## Knowledge Capture
+
+As each decision/term resolves, classify **inline** (not batched at end) per `agentic:skill:use-knowledge`:
+
+| Resolved item | Destination |
+|---|---|
+| Domain term defined/clarified | ubiquitous-language entry |
+| Firm decision meeting **ALL** of: hard to reverse, surprising without context, result of real trade-off | ADR (sparingly) |
+| In-progress technical reflection | RFC |
+| Everything else | `technical-decisions.md` only |
+
+When a decision becomes an ADR, note its number next to the decision in `technical-decisions.md` — the plan cites ADR numbers where relevant.
+
 ## Gate Rule
 
 You **MUST NOT** proceed to step 3 while structural open questions remain.
@@ -42,7 +68,7 @@ You **MUST NOT** proceed to step 3 while structural open questions remain.
 
 **Minor** = cosmetic or easily changed later: naming, log levels, comment wording. These can remain — note defaults in the plan.
 
-When all relevant categories are covered, perform the gate check. If structural questions remain, list them and keep asking. If only minor questions remain, state them, confirm with the developer, and proceed.
+When the frontier is empty, perform the gate check. If structural questions remain, list them and keep grilling. If only minor questions remain, state them, confirm with the developer, and proceed.
 
 ## Update State
 
@@ -53,4 +79,4 @@ artifacts:
 
 ## Next
 
-Load `steps/step-03-generate-plan.md`.
+Load `steps/step-03-generate.md`.

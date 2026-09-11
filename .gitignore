@@ -10,3 +10,4 @@ skills-lock.json
 # Local only
 .local
 .tmp
+.agentic/output

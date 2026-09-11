@@ -1,0 +1,25 @@
+{
+  "namespace": "agentic",
+  "workflows": [
+    "technical-planning",
+    "implement",
+    "debug",
+    "pr-review"
+  ],
+  "profiles": [],
+  "selectedProfiles": [],
+  "ides": {
+    "codex": {
+      "outputFolder": ".agentic/output",
+      "highThinkingModelName": "gpt-6-astra",
+      "codeWritingModelName": "gpt-5.6-sol",
+      "qaModelName": "gpt-6-astra"
+    },
+    "claude": {
+      "outputFolder": ".agentic/output",
+      "highThinkingModelName": "opus",
+      "codeWritingModelName": "sonnet",
+      "qaModelName": "opus"
+    }
+  }
+}

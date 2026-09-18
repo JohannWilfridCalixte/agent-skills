@@ -1,66 +1,20 @@
 # Step 3: Generate PRD, Plan, Tickets
 
-## Pre-condition
+Precondition: structural decisions resolved. Preserve the generation choice: orchestrator generation (recommended for compact context) or a native document-writing worker (useful for a long conversation). Reuse a prior explicit choice. If delegating, use the high-thinking model role, selected skills, input/context/decision paths and these templates; the worker returns artifacts, not shared state edits.
 
-All structural open questions resolved (gate rule from step 2).
+Create a durable draft in `{execution_context.spec_folder}/<spec-id>/`:
 
-## Generation Strategy
+| Artifact | Content |
+|---|---|
+| [prd.md](../references/prd.md) | Product problem, users, outcomes, stories and out-of-scope; no implementation/testing decisions |
+| [technical-plan.md](../references/technical-plan.md) | Scope, design, contracts, verification, decision/ADR references, minor defaults |
+| [tickets/NN-slug.md](../references/ticket.md) | Stable ticket ID, end-to-end delivery, known dependencies, exact file ownership, acceptance IDs |
+| `plan.json` | Shared machine-readable plan contract, requirements, tickets, decisions and sealed Markdown artifacts |
 
-You **MUST** ask the developer how to generate. Two options:
+Reflect every accepted decision without silently reinterpreting it. Allocate stable `AC-...` requirement IDs; preserve IDs across wording edits, splits/reordering where the requirement identity survives, and link new IDs when meaning splits. The parent maintains revision history and explicit supersession. Ticket IDs remain stable when presentation order changes; paths may be reordered without silently renaming IDs.
 
-1. **Orchestrator generates** (recommended for speed) — you already have full context from the conversation
-2. **Delegate to architect subagent** (recommended if conversation is long or cluttered) — fresh context window, pass all artifacts
+Keep vertical, independently verifiable slices sized for one fresh worker context; a single ticket is valid. Infrastructure/refactor tickets deliver a complete verifiable boundary without inventing schema/API/UI layers. Prefactor first. Wide migrations use expand → independent migrate batches blocked by expand → contract blocked by all batches. Add an ordering edge for shared owned files/resources; file-disjointness alone does not prove runtime isolation.
 
-## Inputs (whichever strategy)
+Resolve the helper from the installed `use-workflow` skill's `scripts/agentic.mjs`; run `seal-plan <spec-dir>/plan.json`, then `validate-plan <spec-dir>/plan.json`. The plan contract requires schema_version=1, spec_id, revision, prd, technical_plan, requirements, tickets, decisions and artifact hashes. Validate unique IDs; nonempty acceptance; known requirement/blocker references; no cycles; complete ticket-to-requirement mapping; safe, existing relative paths; and serialized overlapping ownership. Invalid graphs/artifacts return to generation, never to quiz or handoff.
 
-- `{output_path}/input.md` — original spec
-- `{output_path}/technical-context.md` — codebase analysis
-- `{output_path}/technical-decisions.md` — all developer decisions (+ ADR numbers)
-- `technical_skills_prompt` from workflow state
-
-## Outputs
-
-Three artifacts:
-
-| Artifact | Template | Content |
-|---|---|---|
-| `{output_path}/prd.md` | `references/prd.md` | Product-only, synthesized from input.md + grill answers — no separate interview. **No** implementation/testing decisions (those live in the plan) |
-| `{output_path}/technical-plan.md` | `references/technical-plan.md` | Design, contracts, verification. Decisions backed by ADRs cite ADR-NNNN |
-| `{output_path}/tickets/NN-slug.md` | `references/ticket.md` | One file per ticket, numbered from 01 in dependency order |
-
-Every decision from `technical-decisions.md` **MUST** be reflected. Do not override or reinterpret any developer decision.
-
-## Ticket Slicing Rules
-
-- **Vertical slice**: each ticket cuts a COMPLETE path through every layer (schema → API → UI → tests), demoable/verifiable alone. Never layer-by-layer.
-- **Sized to one fresh subagent context window**
-- **Prefactoring tickets first**: "make the change easy, then make the easy change"
-- **Wide mechanical refactors** → expand–contract chain: expand ticket → migrate batches each blocked by expand → contract blocked by all batches
-- **File-disjoint lanes**: add a blocked-by edge whenever two tickets touch the same files, so concurrent implement lanes never collide
-- **1 ticket is a valid breakdown** for small inputs
-
-## If Delegating to Subagent
-
-Spawn per `agentic:skill:delegate-work`:
-
-- **Persona**: `agentic:agent:architect`
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose
-- **Model**: `HIGH_THINKING_MODEL`
-- **Input**: all artifact paths listed above + templates `references/prd.md`, `references/technical-plan.md`, `references/ticket.md` + ticket slicing rules above
-- **Output**: the three artifacts
-
-Validate all three outputs exist and are non-empty.
-
-## Update State
-
-```yaml
-artifacts:
-  prd: "{output_path}/prd.md"
-  technical_plan: "{output_path}/technical-plan.md"
-  tickets: "{output_path}/tickets/"
-```
-
-## Next
-
-Load `steps/step-04-quiz-gate.md`.
+Record durable paths and revision in parent `plan`/`artifacts`; execution status remains in run state, never canonical ticket Markdown. All drafts remain unapproved until step 4. Load the quiz only after validation passes.

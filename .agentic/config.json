@@ -12,14 +12,53 @@
     "codex": {
       "outputFolder": ".agentic/output",
       "highThinkingModelName": "gpt-6-astra",
-      "codeWritingModelName": "gpt-5.6-sol",
-      "qaModelName": "gpt-6-astra"
+      "codeWritingModelName": "gpt-6-astra",
+      "qaModelName": "gpt-6-astra",
+      "models": {
+        "high_thinking": {
+          "model": "gpt-6-astra",
+          "effort": "high"
+        },
+        "code_writing": {
+          "model": "gpt-6-astra",
+          "effort": "high"
+        },
+        "qa": {
+          "model": "gpt-6-astra",
+          "effort": "high"
+        },
+        "exploration": {
+          "model": null,
+          "effort": null
+        }
+      }
     },
     "claude": {
       "outputFolder": ".agentic/output",
-      "highThinkingModelName": "opus",
-      "codeWritingModelName": "sonnet",
-      "qaModelName": "opus"
+      "highThinkingModelName": "claude-fable-5-1",
+      "codeWritingModelName": "claude-fable-5-1",
+      "qaModelName": "claude-fable-5-1",
+      "models": {
+        "high_thinking": {
+          "model": "claude-fable-5-1",
+          "effort": "high"
+        },
+        "code_writing": {
+          "model": "claude-fable-5-1",
+          "effort": "high"
+        },
+        "qa": {
+          "model": "claude-fable-5-1",
+          "effort": "high"
+        },
+        "exploration": {
+          "model": null,
+          "effort": null
+        }
+      }
     }
-  }
+  },
+  "specFolder": "docs/specs",
+  "maxWorkers": 3,
+  "issueClosePolicy": "merge"
 }

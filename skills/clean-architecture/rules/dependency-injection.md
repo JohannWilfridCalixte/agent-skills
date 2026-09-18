@@ -8,20 +8,18 @@ tags: di, composition-root, constructor-injection, interfaces
 
 **Impact: HIGH**
 
+Composition root wiring for the constructors in [application.ts](../examples/application.ts), with concrete project adapters supplied at startup:
+
 ```typescript
-// Composition root (main.ts or DI container)
-const stripe = new Stripe(config.stripeKey);
-const pool = new Pool(config.dbUrl);
-
-const paymentGateway = new StripeAdapter(stripe);
-const orderRepo = new PostgresOrderRepository(pool);
-const notifications = new EmailNotificationAdapter(sendgrid);
-
-const placeOrder = new PlaceOrderUseCase(orderRepo, paymentGateway, notifications);
+const placeOrder = new PlaceOrderUseCase(customerRepo, orderRepo);
+const deliverNotification = new DeliverOrderNotification(outboxRepo, notifications);
+const paymentGateway = new PaymentAdapter(providerClient);
 ```
 
-**Rules:**
-- Inject dependencies, never instantiate in business code
-- Constructor injection preferred
-- Interfaces over concrete types
-- Compose at application startup
+- Inject effectful infrastructure; do not instantiate SDK clients, database pools or transport adapters inside business code. Constructing a validated entity/value object is normal domain behavior.
+- Constructor injection is the default; use the project's composition mechanism.
+- Depend on owned port interfaces at architectural boundaries, not concrete provider types.
+- Compose at application startup, including validated configuration and resource lifecycle ownership.
+- Keep request/tenant state scoped per invocation; do not mutate shared singleton context.
+
+The examples deliberately distinguish order persistence from payment and notification adapters. Do not pass a payment gateway into an order-repository constructor slot simply because the parameter counts match.

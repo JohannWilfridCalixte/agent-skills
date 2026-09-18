@@ -1,21 +1,33 @@
-# Implementation Log — Per Ticket
+# Implementation Log — {ticket-id}: {title}
 
-One file per ticket: `implementation-log-{NN}.md`.
+## Identity
 
-## Ticket: {NN} — {title}
+Accepted plan revision, repository/base/head, worker owner, immutable candidate snapshot/digest, owned file paths, and assigned requirement IDs.
 
-### Changes
+## Changes
 
-Files modified, created, or deleted. Path and brief description of each change.
+Files created/modified/deleted, behavior before/after, and exact candidate diff artifact. Identify any requested scope expansion separately.
 
-### Tests
+## Acceptance evidence
 
-Tests written or modified. What they cover and current status (pass/fail).
+| AC ID | Observable criterion | Check ID / command | Code + plan revision | Result / evidence path |
+|---|---|---|---|---|
+| AC-01 | {behavior demonstrated} | {receipt} | {identities} | {observed result} |
 
-### Decisions
+Unverified, changed and deferred criteria stay explicit. A green suite alone is not complete acceptance.
 
-Any decisions made during implementation that weren't in the ticket or plan. Include rationale.
+## Tests
 
-### Issues
+Scoped tests written/modified, their behavioral coverage and actual results. Parent records integration full-suite receipts separately and links them here.
 
-Problems encountered and how they were resolved. Unresolved issues flagged for review.
+## Decisions
+
+New decisions, rationale, affected requirements and required approval evidence. Knowledge updates are proposals with provenance for the parent to reconcile.
+
+## Issues and recovery
+
+Failures, hypotheses/repairs where relevant, retries, unresolved concerns and proposed follow-ups. Include ownership/base changes that invalidate evidence.
+
+## Delivery
+
+Parent-recorded integrated snapshot or commit SHA, actual PR/publication status and remaining work. Runtime state is canonical; this report does not change ticket status.

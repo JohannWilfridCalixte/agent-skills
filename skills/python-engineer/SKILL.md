@@ -5,7 +5,7 @@ description: Use when writing Python code - covers typing, error handling, style
 
 # Python Engineer
 
-Rules for writing production-grade Python. Target: Python 3.12+. Strict type checking with pyright or mypy in strict mode.
+Rules for writing production-grade Python. Default target: Python 3.12+, with the repository's selected strict pyright or mypy configuration. Inspect its supported runtime/checker first; do not silently upgrade Python to use newer syntax. TypeIs needs Python 3.13 or typing_extensions. Under mypy strict, annotate private as well as public function signatures.
 
 ## When to Apply
 
@@ -34,11 +34,11 @@ Rules for writing production-grade Python. Target: Python 3.12+. Strict type che
 | `# type: ignore` without error code | Add `# type: ignore[specific-code]` + comment why |
 | Bare generic: `dict`, `list`, `tuple` without parameters | `dict[str, int]`, `list[str]`, `tuple[str, ...]` |
 | Mutable default arguments | `None` sentinel + create inside function |
-| `@dataclass` without `frozen=True, slots=True` | Add `frozen=True, slots=True` |
-| Pydantic model without `strict=True, frozen=True, extra="forbid"` | Add to `model_config` |
+| `@dataclass` without `frozen=True, slots=True` | Apply the immutable-record default unless the domain explicitly needs mutation |
+| Pydantic model without `strict=True, frozen=True, extra="forbid"` | Apply the boundary-model default; preserve explicit compatibility/coercion contracts |
 | Bare `except:` or `except Exception: pass` | Specific exception type, log + re-raise |
 | Raising exceptions for expected domain failures | Use Result pattern |
-| Match without `assert_never` in wildcard case | Add `case _ as unreachable: assert_never(unreachable)` |
+| Exhaustive closed-union/enum match without `assert_never` | Add `case _ as unreachable: assert_never(unreachable)`; explicitly handle valid remainder in partial matches |
 | `isinstance` chains instead of pattern matching | Use `match` statement |
 | Old-style `TypeVar("T")` instead of 3.12+ `[T]` syntax | Use new `[T]` syntax |
 | Old-style `Union[X, Y]` / `Optional[X]` | Use `X \| Y` / `X \| None` |

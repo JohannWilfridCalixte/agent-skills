@@ -1,68 +1,56 @@
 ---
 name: agentic:skill:review-tests
-description: Use when reviewing test quality, coverage adequacy, and testing anti-patterns. Does NOT review implementation code (review-code handles that).
+description: Use when reviewing test quality, coverage adequacy, or testing anti-patterns.
 ---
 
 # Review Tests
 
-Review tests for quality, coverage, and anti-patterns.
+Review what tests prove and what requested behavior remains untested. Findings concern test quality; read implementation/spec context to establish the contract, while implementation defects belong to `agentic:skill:review-code`.
 
-## Scope
+**Required skill:** load `agentic:skill:code-testing` directly before reviewing, including applicable language rules. Use the local installed code-testing package; no external testing skill or persona is required.
 
-**Test code only.** Implementation review is handled by `agentic:skill:review-code`.
+## Inputs and inspection
 
-## What to Review
+Use accepted spec/plan requirements, implementation log, test files/diff, fixed target revision, and resolved engineering skills. Inspect every changed test file in the assigned scope; map each acceptance criterion/plan task to its actual assertions, not just a test name or passing command. Read relevant unchanged tests when coverage depends on them.
 
-- **Coverage** — are all acceptance criteria / plan tasks tested?
-- **Quality** — do tests verify behavior, not implementation?
-- **Anti-patterns** — see checklist below
-- **Isolation** — can tests run in any order, in parallel?
-- **Naming** — do test names describe expected behavior?
+Record inspected/uninspected files and unavailable checks. Never approve unread scope or imply tests ran when they were only inspected. Separate observed failures from hypotheses and state the check needed to resolve uncertainty. Explicit user instructions override conventions; inspect existing patterns and clarify only consequential unresolved ambiguity.
 
-## Skills
+## Quality checklist
 
-You **MUST** load `/agentic:skill:code-testing` skill before continuing.
-
-## Anti-Pattern Checklist
-
-| Anti-Pattern | What It Looks Like | Severity |
+| Pattern | What to inspect | Severity when established |
 |---|---|---|
-| The Liar | No meaningful assertions | Blocker |
-| Shared State | Tests depend on execution order | Blocker |
-| Brittle Test | Tests implementation details | Major |
-| Over-Mocking | Mocking internal collaborators | Major |
-| Flaky Test | Uses `sleep()` or arbitrary delays | Major |
-| Test-to-Code Coupling | Breaks on valid refactors | Major |
-| Giant Test | Tests multiple behaviors in one | Minor |
-| Missing Edge Cases | Happy path only | Minor |
+| The Liar | No meaningful assertion; passes when required behavior is broken | Blocker |
+| Shared State | Results depend on order/parallel interference | Blocker |
+| Brittle Test | Private implementation details or unnecessary exact structure | Major when strategy is fragile |
+| Over-Mocking | Canned internal collaborators replace the behavior being tested | Major |
+| Flaky Test | Uncontrolled time, races or arbitrary sleeps | Major when reliability is compromised |
+| Test-to-Code Coupling | Breaks on valid refactors without behavioral change | Major |
+| Giant Test | Unrelated behaviors make failures hard to diagnose | Minor |
+| Missing Edge Cases | Required error/boundary behavior lacks evidence | Risk-based: Major on critical paths, Minor on low-risk paths |
 
-## Severity Guide
+An owned port fake for an isolated use case is a valid boundary; do not automatically flag it as internal over-mocking. A state-transition/protocol requirement may need multiple actions/assertions for one behavior. Setup size and sleep usage prompt inspection of the actual consequence rather than substituting for evidence.
 
-| Severity | Meaning | Blocks? |
-|----------|---------|---------|
-| **Blocker** | Test proves nothing or is fundamentally broken | Yes |
-| **Major** | Coverage gap on critical path, fragile test strategy | Yes |
-| **Minor** | Missing edge case on low-risk path, style issue | No |
-| **Nit** | Naming, minor structure improvement | No |
+Check FIRST isolation/determinism, public behavior, meaningful assertions, specification-like names, and appropriate unit/integration/E2E boundaries. For changed effects, inspect relevant concurrent-update, idempotency, retry-after-partial-success, cancellation/cleanup and compatibility tests. Verify a regression test fails for its intended defect, not a setup error.
+
+## Severity and evidence
+
+| Severity | Meaning | Blocks readiness? |
+|---|---|---|
+| Blocker | Test proves nothing or is fundamentally broken | Yes |
+| Major | Coverage gap on critical behavior (for example auth denial), unreliable/fragile strategy | Yes |
+| Minor | Missing low-risk edge case, incidental log-format coverage, style issue | No |
+| Nit | Naming or minor structural preference | No |
+
+Prefer the lower severity when borderline; explain concrete risk. Style never blocks. A green suite or 95% coverage does not excuse a missing acceptance criterion. Neither does a low global percentage alone establish a defect.
 
 ## Output
 
-Write to `{output_path}/review-tests-{iteration}.md`, or the filename provided by the calling workflow (review-loop passes `review-tests-{scope}-{iteration}.md` when scoped, e.g. `review-tests-t03-1.md`).
+Write the caller's filename, otherwise `{output_path}/review-tests-{iteration}.md` (scoped callers may use `review-tests-{scope}-{iteration}.md`). Include:
 
-### Required Sections
+1. **Summary:** revision/scope, severity counts, completion status and verdict.
+2. **Coverage matrix:** requirement/plan-task ID → test file/line and assertion → covered/weak/missing. Record unavailable execution separately from missing tests; non-executable requirements need their actual verification evidence.
+3. **Issues:** grouped by severity, with location, anti-pattern when applicable, evidence versus hypothesis, concrete impact, suggested fix, confidence and requirement IDs.
+4. **Coverage and limitations:** inspected/uninspected files, commands/results actually observed, and unresolved uncertainty.
+5. **Verdict:** `PASS` for complete inspection with no Blockers/Majors; `CHANGES_REQUESTED` for complete inspection with either; otherwise `INCOMPLETE` with findings retained.
 
-1. **Summary** — severity counts + verdict
-2. **Coverage Matrix** — plan tasks / acceptance criteria mapped to test locations (covered / weak / missing)
-3. **Issues** — grouped by severity, each with:
-   - Location (`file:line`)
-   - Description + anti-pattern name if applicable
-   - Suggested fix
-4. **Verdict** — `PASS` | `CHANGES_REQUESTED`
-
-## Inputs
-
-Use when available:
-- Technical plan — what should be tested
-- Implementation log — what was built
-- Test files — actual test code
-- `technical_skills_prompt` — language/framework skills to load
+When `contract_path` is supplied, read that protocol and emit its required JSON sibling. Aggregation, repair loops and review posting belong to the caller, not this lens.

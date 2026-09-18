@@ -1,37 +1,14 @@
 # Step 3: Finalize
 
-## Intent
+Run a final integration review for both local-only and PR delivery: `review-loop` repair mode, max_rounds=2, code/tests/security, immutable complete accepted-change diff, exact owned paths and a unique integration scope. Reuse an already completed review only when its target and accepted revision are identical. Repairs need relevant checks and the full-suite gate on the resulting snapshot. `max_reached`/`blocked` keep the run incomplete and invoke the concrete caller escalation choice; never mark completed merely because a loop returned.
 
-Push branch, open PR, run PR-level review loop, complete workflow.
+Generate the final requirement coverage view. All active criteria need current criterion-specific evidence; explicitly deferred scope needs recorded developer decision. Reconcile durable knowledge and indexes through `use-knowledge`; workers propose updates and the parent owns publication. Confirm only accepted task paths are included and all user-owned changes remain intact.
 
-## Ask Developer
+Prepare a reviewable PR title/body locally from ticket IDs, AC coverage, commit SHAs (when present), implementation logs, relevant tests and repository-qualified issue references appropriate to execution_context.issue_close_policy. Preserve the **Open a PR?** choice and reuse earlier authorization. Present the concrete body before asking when permission is needed.
 
-Commits already exist on the branch. Only remaining question — **interactive**:
+- No PR, or explicit no-commit mode: retain local verified changes/commits as applicable; report exact delivery status and remaining persistence work. Do not push, commit or create a PR under a no-commit instruction.
+- PR authorized with committed work: parent pushes the owned branch and creates/updates the matching PR with explicit repository identity and body-file/structured arguments. Reconcile an existing branch PR before retry after uncertain creation; persist URL and delivery result. For `issue_close_policy: merge`, include `Closes owner/repo#N` only for covered mapped issues; closure occurs on merge. For `release` or `manual`, use non-closing references such as `Related: owner/repo#N` and omit every closing keyword. Release closure requires a separately authorized delivery action with verified release evidence; manual leaves closure to the owner. Neither local commit nor PR creation closes those issues.
 
-- **Open a PR?** Yes / No
+Verify the remote PR base/head matches the reviewed integration target. If it changed, refresh the target and run full-PR review/checks before claiming it reviewed; preserve prior evidence as stale history. Follow-up repairs are parent-committed/pushed conventional commits only within authorization, each with exact tested scope. Partial publication failure remains blocked for that required delivery action, with successful local work retained.
 
-No → complete workflow (branch keeps local commits).
-
-## Push + PR
-
-Orchestrator-only git:
-
-1. Push the feature branch
-2. `gh pr create` — title from topic; body = ticket list with commit SHAs + summary from `implementation-log-{NN}.md` files
-
-## PR Review Loop
-
-Invoke `/agentic:workflow:review-loop` over the **FULL PR diff**:
-
-| Parameter | Value |
-|-----------|-------|
-| `max_iterations` | `2` |
-| `review_skills` | `[agentic:skill:review-code, agentic:skill:review-tests, agentic:skill:review-security]` |
-| `diff_scope` | full PR diff |
-| `state_key` | `review_loop.pr` |
-
-Fixes are committed + pushed as follow-up conventional commits (orchestrator commits).
-
-## Complete Workflow
-
-Update workflow state: status → `completed`, set `completed_at`. List artifacts with **absolute paths**: per-ticket implementation logs, `follow-ups.md`, PR URL.
+Complete only after all tickets are verified integrated (explicit no-commit) or committed, required review/full-suite/AC gates pass, knowledge is reconciled, and chosen delivery succeeded. Record status completed and completed_at; list absolute implementation-log, follow-up, coverage/spec paths and PR URL if any. Do not claim merge/release from a local commit or PR creation.

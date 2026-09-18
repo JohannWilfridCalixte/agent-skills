@@ -1,49 +1,20 @@
 # Step 1: Investigate
 
-## Intent
+Retrieve relevant accepted knowledge through `use-knowledge` and record conflicts/freshness. Parent records repository/base/head, initial user changes and assigned diagnostic scope. Preserve the model-choice question: code-writing or high-thinking role for investigation; reuse an existing explicit answer and resolve the chosen role through `use-agentic`.
 
-Gather evidence about the bug. Delegate codebase exploration to architect subagent(s) that trace the failure and produce `investigation-report.md`.
+Delegate one or more bounded investigations through `delegate-work`, using selected profile skills, [exploration guidance](../../delegate-work/references/exploration.md), the bug report and knowledge packet. Workers are source-read-only and may write only their unique reports. Parent combines results into `investigation-report.md` using [the template](../references/investigation-report.md).
 
-## Delegation
+Workers must:
 
-You **MUST** delegate this to 1 or multiple subagents. You **MUST NOT** investigate yourself.
+1. Read complete relevant errors/traces; preserve diagnostic structure while redacting sensitive values.
+2. Locate failure component and precise file/line at the recorded revision.
+3. Trace data backward from failure to the origin of bad state.
+4. Inspect relevant recent Git history/diffs read-only, or request parent-provided artifacts when that capability is unavailable.
+5. Compare similar working code and existing patterns.
+6. Record observed facts, unknowns, assumptions, environmental/intermittent factors and downstream effects separately.
 
-Spawn subagent(s) per `agentic:skill:delegate-work`:
+Parent verifies citations/current revision, failure/dataflow analysis and evidence quality. Missing sections or unsupported claims return to the worker with specific gaps. Do not accept an attractive hypothesis without supporting evidence.
 
-- **Persona**: `agentic:agent:architect`
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose
-- **Model**: ask developer (question tool if available) whether to use `CODE_WRITING_MODEL` or `HIGH_THINKING_MODEL`
-- **Input**: `{output_path}/bug-report.md`
-- **Output**: `{output_path}/investigation-report.md` following the template in `references/investigation-report.md`
+Present findings and preserve the correction gate: “Anything wrong or missing from this investigation?” Reuse prior confirmation of this same evidence. Corrections trigger refinement; absent required confirmation leaves awaiting_input, with independent factual lookups continuing where useful.
 
-The architect must:
-
-1. Read error messages and stack traces completely — never skip or summarize prematurely
-2. Identify the failing component and exact failure point (file:line)
-3. Trace data flow backward from failure to origin of bad state
-4. Check recent changes (`git log`, `git diff`) for relevant modifications
-5. Find working examples of similar code for comparison
-6. Document all evidence — what was observed, not assumed
-
-## Validate
-
-After the subagent(s) complete, verify `investigation-report.md` exists and contains: error analysis, failure point, data flow trace, and evidence summary. If sections are missing, re-delegate with specific requests.
-
-## Context Confirmation (Soft Gate)
-
-Present a summary of the investigation findings to the developer. Ask: "Anything wrong or missing from this investigation?"
-
-- If confirmed → proceed to step 2
-- If corrections → pass feedback to architect for refinement, re-present when done
-
-## Update State
-
-```yaml
-artifacts:
-  investigation_report: "{output_path}/investigation-report.md"
-```
-
-## Next
-
-Load `steps/step-02-regression-test.md`.
+Record artifact paths, model choice, context gate and knowledge provenance in parent state; load step 2 after confirmation.

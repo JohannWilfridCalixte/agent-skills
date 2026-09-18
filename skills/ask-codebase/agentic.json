@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    { "name": "agentic:skill:use-agentic", "type": "skill", "path": "skills/use-agentic" },
+    { "name": "agentic:skill:delegate-work", "type": "skill", "path": "skills/delegate-work" },
+    { "name": "agentic:skill:use-knowledge", "type": "skill", "path": "skills/use-knowledge" }
+  ]
+}

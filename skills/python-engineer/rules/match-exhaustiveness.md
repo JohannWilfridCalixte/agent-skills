@@ -8,9 +8,10 @@ tags: match, assert-never, union, enum, exhaustive-check
 
 **Impact: CRITICAL**
 
-All match statements on unions/enums use `assert_never` in wildcard case.
+Exhaustive matches on closed unions/enums use `assert_never` in the wildcard case. An intentionally partial match must explicitly handle the remaining valid inputs; they are not `Never`.
 
 ```python
+import enum
 from typing import assert_never
 
 class Status(enum.Enum):

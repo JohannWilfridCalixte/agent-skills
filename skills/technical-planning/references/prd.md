@@ -1,26 +1,21 @@
 # PRD — {topic}
 
-Product-only document. No implementation or testing decisions — those live in `technical-plan.md`.
-
 ## Problem Statement
 
-The problem from the user's perspective.
+The user's problem, affected people and relevant context.
 
 ## Solution
 
-The solution from the user's perspective — what changes for them, not how it's built.
+What changes for users and the intended outcomes. Product content only; implementation/testing decisions live in technical-plan.md.
 
 ## User Stories
 
-Numbered, extensive. Format: "As an X, I want Y, so that Z."
-
-1. As a ..., I want ..., so that ...
-2. As a ..., I want ..., so that ...
+Proportional to scope: “As an X, I want Y, so that Z.” Link stable requirement IDs where useful.
 
 ## Out of Scope
 
-What this explicitly does not cover.
+Explicit product exclusions.
 
 ## Further Notes
 
-Anything product-relevant that doesn't fit above.
+Product constraints, provenance and accepted assumptions not covered above.

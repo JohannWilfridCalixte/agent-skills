@@ -10,7 +10,7 @@ tags: strategy, pattern, discriminator, anti-patterns, mutable-defaults, isinsta
 
 ### Strategy pattern
 
-Use when same discriminator matched in 3+ locations with 5+ lines per branch.
+Default signal: the same discriminator is matched in 3+ locations with 5+ lines per branch. Extract a strategy when independent behavior/reuse warrants it; the counts are a heuristic, not a quota.
 
 ```python
 from typing import Protocol
@@ -64,7 +64,7 @@ match shape:
     case Square(side=s):
         area = s ** 2
 
-# ❌ String formatting
+# ❌ Unnecessary formatting boilerplate for ordinary constructed strings
 msg = "Hello %s" % name
 msg = "Hello {}".format(name)
 
@@ -77,3 +77,5 @@ if len(items) > 0: ...
 # ✅ Truthiness
 if items: ...
 ```
+
+Use the logging/translation API's intended deferred formatting when needed; the f-string preference is not a reason to eagerly format expensive or sensitive values. For a match over a closed union, follow `match-exhaustiveness.md`; for an intentionally partial match, give remaining inputs their defined behavior.

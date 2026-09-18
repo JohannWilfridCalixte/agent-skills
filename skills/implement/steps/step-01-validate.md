@@ -1,61 +1,23 @@
 # Step 1: Validate
 
-## Intent
+Read the accepted spec directory, provenance and prior run state if resuming. Resolve the helper from the installed `use-workflow` skill's `scripts/agentic.mjs`, not an assumed source checkout. Invoke `validate-plan <plan.json>` and `validate-state <workflow-state.yaml>`; verify all sealed artifact hashes and approval scope/revision. Validation covers unique IDs, nonempty acceptance, known dependencies/requirements, cycles, safe paths and ordered overlapping ownership. Any missing/invalid required input triggers the entry hard gate. Do not fabricate approvals.
 
-Validate the planning run dir, resolve technical skills, build the ticket dependency graph, create the feature branch.
+Load durable `acceptance.json` and run `validate-acceptance <plan.json> <acceptance.json>`. It must contain real structural/ticket approval evidence for the current sealed revision and complete scope. A fresh checkout can use that receipt without the original ignored run state. Genuine explicit approval supplied in the current session can satisfy the same gates; record and persist it as a durable receipt rather than fabricating a prior one. Only then set plan.accepted_revision. Missing/mismatched approval returns to the planning acceptance gate, not code work.
 
-## Validation
+Resolve the execution context once through `use-agentic`, using ticket paths and explicit profile/model choices; pass its skill list to every worker. Retrieve relevant accepted knowledge through `use-knowledge`. Import repository-qualified issue-publication records with the resolved merge/release/manual issue closure policy.
 
-Read the run dir from the invocation argument. Verify:
+## Repository and branch gate
 
-1. `technical-plan.md` exists
-2. `tickets/` contains ≥1 ticket with: `# NN — {Title}`, **What to build**, **Blocked by**, **Status**, `## Acceptance criteria`
-3. `prd.md` — optional, read-only context
+Parent records repository root, branch, base/head SHA and an inventory of pre-existing tracked/untracked/index changes. Preserve those changes and their ownership. Suggest a feature branch using user/host convention, offer reuse of an existing non-main branch, and confirm once. An existing explicit branch choice satisfies the gate. Record commit mode (`per_ticket` by default, `none` for no-commit), delivery authorization and isolation capability. No source work begins before branch/scope confirmation.
 
-Anything missing → **HALT** with the Hard Gate message from SKILL.md. Redirect to `/agentic:workflow:technical-planning`.
+Prefer an independent working tree for each lane and an exclusively owned integration tree. Parent creates/manages these; workers never mutate Git. If unavailable, use the freeze-and-snapshot fallback in step 2. Never stash, reset or stage unrelated user changes to create a clean baseline. If required user edits overlap the candidate, resolve ownership before proceeding.
 
-## Import Published Tickets
+## Verified resume
 
-Read the planning run dir's `workflow-state.yaml`. If `tickets_published:` exists (GH issue numbers per ticket), copy it into this run's `workflow-state.yaml` — the step 2 commit gate uses it to `gh issue close`.
+Run `resume-check <plan.json> <state.yaml>` and inspect its evidence requirements. The helper does not execute tests or prove acceptance. Before skipping a ticket, verify repository/branch identity, current accepted plan revision, recorded commit reachability (for committed work), and current expected effects using revision-bound checks/criteria. Reachability alone fails for reverted commits. Integrated no-commit work needs its saved snapshot/effects present and verified; no SHA is invented.
 
-## Skill Resolution
+Reconcile interrupted states explicitly: inspect a claimed owner's actual activity, preserve their diff/result, and resume that lane or release a confirmed stale owner. After a crash between commit and state save, identify the exact ticket commit and verify its effect before recording it; never replay by label. If identity/effect/evidence is stale, return affected tickets to verification/work and invalidate their requirement evidence plus dependent tickets/gates.
 
-This step is **CRITICAL**: you **MUST** go out of your way to resolve the profiles and associated skills to load based on the tickets and their context.
+For a changed plan, preserve old/new sealed manifests, run `impact`, and record affected and retained ticket IDs. Invalidate affected approvals/checks, show the concrete changed scope and obtain required approval. Archive superseded receipts in `history.gates`, `history.checks` and `history.review_loops` with their reason/candidate before replacing active records with the current pending gates and checks. Current failures stay active; archival must never hide an unmet prerequisite. Rebind retained approvals/evidence explicitly with reasons; do not re-ask unchanged structural decisions. Affected dependants cannot run on stale completion evidence.
 
-Resolve `technical_skills_prompt` from agentic config profiles. These skills will be passed to all subagents.
-
-## Dependency Graph
-
-Build the graph from each ticket's **Blocked by** field:
-
-- One node per ticket; edge blocker → blocked
-- `None` → ticket can start immediately
-- Cycle detected → **HALT**, report the cycle to the developer
-
-## Feature Branch
-
-Orchestrator-only git:
-
-1. Suggest a conventional branch name from the topic, e.g. `feat/{slug}`
-2. Confirm once with the developer
-3. Already on a non-main branch → offer to reuse it instead
-
-## Update State
-
-Init `tickets:` map mirroring each ticket file's **Status**:
-
-```yaml
-status: in_progress
-current_step: 1
-branch: "{branch-name}"
-tickets:
-  "{NN}": { status: ready }
-```
-
-## Resume
-
-Re-run on the same run dir → tickets with `Status: committed` are skipped. Init state from ticket file Status values, not from scratch.
-
-## Next
-
-Load `steps/step-02-process-tickets.md`.
+Parent initializes/reconciles `tickets[id]` with status, owner, plan_revision and commit. Ready requires current approved scope and satisfied predecessors; runtime Markdown labels are only derived views. Save state, then load step 2.

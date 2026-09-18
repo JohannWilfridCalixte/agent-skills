@@ -1,0 +1,13 @@
+{
+  "skills/typescript-engineer/SKILL.md": "643e62d54c31021fda889059849def5f7f4c974949d5795ebb7216f77c8805de",
+  "skills/typescript-engineer/agentic.json": "9736ab41765f59e54dd10c6fb56e8205ff8a8ed9e0ac01e5263fb611c7713f3b",
+  "skills/typescript-engineer/rules/_sections.md": "25ff30c3cccd2d6876755066e83d3c5d4fbf8376a86b638eaef668c5d9dfda46",
+  "skills/typescript-engineer/rules/_template.md": "26aeb334378fe28a2fa44b54c5ed2d8e21884888d320f33c6138e68aeb984ef2",
+  "skills/typescript-engineer/rules/code-style.md": "ca3d2213b86fa4318b634106d26df48d1b67c5e088c172e84e91e0d2a854cfdf",
+  "skills/typescript-engineer/rules/core-principles.md": "81d16c653fb5274aaf3f6731384ea10dbd70f3c3dd8de18a8d6a4d9a16c72975",
+  "skills/typescript-engineer/rules/error-handling.md": "3d7f87edd68e63a788c5ea018284e8424ff4f51cbefa0d813c497bb12c6a3f2d",
+  "skills/typescript-engineer/rules/imports.md": "9925e82fefa6eda65d19182d8eb6c261e4b7f8b09e8d4f31704c0190757b7cf8",
+  "skills/typescript-engineer/rules/strategy-pattern.md": "ff4ddc4f5f479af00701bbc4301b13f03e13865dbfe54dd2164dd4bb5e9ffbcd",
+  "skills/typescript-engineer/rules/switch-exhaustiveness.md": "9f6b15ba0fb76fae88327651f100038119d54a1e9f31e00c614b7472cc6019ff",
+  "skills/typescript-engineer/rules/typing.md": "b42b1a5a1677e1e3083a20a1b100ad858342fa2ef699e58d866348c51501fa6e"
+}

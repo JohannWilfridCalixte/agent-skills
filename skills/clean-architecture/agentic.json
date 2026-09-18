@@ -1,3 +1,9 @@
 {
-  "dependencies": []
+  "dependencies": [
+    {
+      "name": "agentic:skill:code-testing",
+      "type": "skill",
+      "path": "skills/code-testing"
+    }
+  ]
 }

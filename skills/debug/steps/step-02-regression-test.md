@@ -1,46 +1,16 @@
 # Step 2: Regression Test
 
-## Intent
+Delegate to a code-writing worker with selected skills, `code-testing`, [engineering guidance](../../delegate-work/references/engineering-contract.md), bug/investigation paths and an owned test scope. The worker writes a minimal behavioral regression test before any product fix, runs it on the baseline, and returns test path, command, expected assertion, actual output, baseline revision and what defect the failure demonstrates. Capture baseline full-suite status/failures as well for later attribution.
 
-Write a FAILING test that reproduces the bug. This test captures the bugged behavior — it **MUST** fail before any fix. This is the "red" in TDD.
+The parent validates **why** the test is red:
 
-## Delegation
+| Observation | Action |
+|---|---|
+| Expected behavioral assertion fails because of the reported defect | Accept regression evidence; proceed |
+| Syntax/import/setup/environment error prevents reaching that assertion | Repair test/setup within scope and rerun; this is not a proved regression |
+| Test passes | Investigate already-fixed, incorrect assumptions or intermittent/environmental reproduction; never introduce a fake failure |
+| Reproduction remains unavailable | Record evidence/attempts and `blocked` with a concrete prerequisite; no product fix under this workflow |
 
-You **MUST** delegate this to a subagent. You **MUST NOT** write tests yourself.
+Allow at most two bounded reproducer/setup refinements before blocked escalation for missing reproduction. These are not rejected bug hypotheses. Intermittent defects require recorded repeatable conditions and the specific behavioral failure; missing evidence stays unavailable rather than pretending a deterministic test was obtained. Non-test diagnosis may inform investigation, but does not silently bypass the failing-test gate.
 
-Spawn a subagent per `agentic:skill:delegate-work`:
-
-- **Persona**: `agentic:agent:software-engineer`
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose
-- **Model**: `CODE_WRITING_MODEL`
-- **Input**: `{output_path}/bug-report.md` + `{output_path}/investigation-report.md`
-- **Instructions**:
-  1. Read the investigation report to understand failure point and data flow
-  2. Write a test that reproduces the exact bugged behavior
-  3. Run the test — it **MUST FAIL** (proving it catches the bug)
-  4. Capture the failure output
-  5. Report: test file path, what it verifies, failure output
-
-## Validate
-
-After the subagent completes, verify:
-
-- Test file exists
-- Test was executed and **FAILED** (this is expected and correct)
-- Failure output is captured
-
-If the test passes, the test doesn't reproduce the bug — re-delegate with feedback.
-
-## Update State
-
-```yaml
-regression_test_path: "{path to test file}"
-regression_test_status: "failing"
-artifacts:
-  regression_test: "{path to test file}"
-```
-
-## Next
-
-Load `steps/step-03-hypothesis-fix-loop.md`.
+Parent stores `debug.regression` with path, command, baseline revision, expected_failure, observed_failure, evidence_path and `status: failing_behavior | unavailable`. Store baseline checks as ordinary revision-bound check receipts. The initial red check has status failed, its actual exit code and `required: false`; the accepted reproduction gate explains why that expected failure is correct evidence. Preserve it as historical evidence, distinct from the final required green regression/full-suite receipts. Load step 3 only after failing_behavior is verified.

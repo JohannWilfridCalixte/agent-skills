@@ -14,7 +14,7 @@ tags: dataclass, pydantic, typeddict, namedtuple, generics, protocol, typeis, sc
 |----------|------|
 | Internal domain objects | `@dataclass(frozen=True, slots=True)` |
 | External/untrusted data (APIs, config) | `pydantic.BaseModel` |
-| Dict-shaped data (JSON payloads) | `TypedDict` |
+| Statically described dict-shaped data | `TypedDict` (not runtime validation of untrusted JSON) |
 | Lightweight immutable records | `NamedTuple` |
 
 ```python
@@ -41,7 +41,7 @@ class ApiResponse(TypedDict):
 
 ### Immutability by default
 
-All dataclasses: `frozen=True, slots=True`. All Pydantic models: `frozen=True`.
+Default dataclasses to `frozen=True, slots=True` and Pydantic models to `strict=True, frozen=True, extra="forbid"`. If the accepted domain/compatibility contract needs mutation, coercion, or forward-compatible extra fields, make that exception explicit and test it. Frozen records do not recursively freeze mutable fields.
 
 ### Generic syntax (3.12+)
 
@@ -79,12 +79,17 @@ Accept `Sequence`, `Mapping`, `Iterable` in parameters (covariant, flexible). Re
 
 ```python
 from collections.abc import Sequence
+from decimal import Decimal
 
-# ✅ Accepts any sequence (list, tuple, etc.)
+# ✅ Accepts lists and tuples; empty input still returns Decimal
 def total(prices: Sequence[Decimal]) -> Decimal:
-    return sum(prices)
+    return sum(prices, start=Decimal(0))
+```
 
-# ❌ Rejects tuples, generators, etc.
+Use `Iterable[Decimal]` instead when the function should also accept a generator; `Sequence` itself does not accept generators.
+
+```python
+# ❌ Needlessly rejects tuples and returns int for empty input
 def total(prices: list[Decimal]) -> Decimal:
     return sum(prices)
 ```
@@ -137,18 +142,19 @@ Use ABC only when you need shared implementation (mixin methods).
 ### TypeIs for narrowing (3.13+ / typing_extensions)
 
 ```python
-from typing_extensions import TypeIs  # typing.TypeIs on 3.13+
+from collections.abc import Sequence
+from typing_extensions import TypeIs  # use typing.TypeIs on 3.13+
 
-def is_str_list(val: list[object]) -> TypeIs[list[str]]:
-    return all(isinstance(x, str) for x in val)
+def is_str_sequence(values: Sequence[object]) -> TypeIs[Sequence[str]]:
+    return all(isinstance(value, str) for value in values)
 
-def process(items: list[object]) -> None:
-    if is_str_list(items):
-        # items is list[str] — both branches narrowed
-        print(items[0].upper())
+def first_upper(items: Sequence[object]) -> str | None:
+    if is_str_sequence(items) and items:
+        return items[0].upper()
+    return None
 ```
 
-Prefer `TypeIs` over `TypeGuard` — it narrows both branches.
+Prefer `TypeIs` when the narrowed type is compatible with the input type; it can narrow both branches. `list[str]` is not a subtype of invariant `list[object]`, so that TypeIs signature is invalid. Use read-only covariant inputs as above; if a mutable-list API truly requires incompatible narrowing, `TypeGuard` is the appropriate tool. Validate predicates themselves and avoid mutation across the narrowing boundary. An all-elements check does not establish non-emptiness.
 
 ### Pydantic schemas
 
@@ -176,7 +182,7 @@ class Dog(BaseModel):
 class Owner(BaseModel):
     pet: Annotated[Cat | Dog, Field(discriminator="pet_type")]
 
-# ❌ Separate dataclass + schema
+# ❌ Duplicate models for the same boundary contract
 @dataclass
 class User:
     id: str
@@ -186,6 +192,8 @@ class UserSchema(BaseModel):  # duplication
     id: str
     name: str
 ```
+
+Separate boundary schemas and pure domain records are appropriate when they represent different layers/contracts. Convert explicitly at the adapter boundary; do not introduce Pydantic into the domain merely to avoid deliberate layer separation.
 
 ### No @overload
 
@@ -199,14 +207,14 @@ def fetch(url: str, fmt: Literal["json"]) -> dict: ...
 def fetch(url: str, fmt: Literal["text"]) -> str: ...
 
 # ✅ Union return — truth visible
-def fetch(url: str, fmt: Literal["json", "text"]) -> dict | str: ...
+def fetch(url: str, fmt: Literal["json", "text"]) -> dict[str, object] | str: ...
 ```
 
 **Exception:** `@overload` acceptable in typed stubs for untyped third-party code.
 
 ### Return types
 
-**Annotate return types on public functions. Let inference handle private/internal.**
+**Annotate public return types. Follow the chosen strict checker for private/internal signatures: mypy strict requires their return annotations too.** Local variable inference remains preferred; do not hide checker failures with suppressions.
 
 Unlike TypeScript (where inference is stronger), Python's type checkers benefit from explicit return annotations on public APIs.
 
@@ -214,9 +222,9 @@ Unlike TypeScript (where inference is stronger), Python's type checkers benefit 
 # ✅ Public function — annotate return
 def calculate_total(items: list[Item]) -> Decimal: ...
 
-# ✅ Private helper — skip return annotation, infer it
-def _sum_prices(prices: Sequence[Decimal]):
-    return sum(prices)
+# ✅ Private helper — compatible with mypy strict
+def _sum_prices(prices: Sequence[Decimal]) -> Decimal:
+    return sum(prices, start=Decimal(0))
 
 # ✅ Complex return — annotation clarifies
 def fetch_user(user_id: str) -> User | None: ...

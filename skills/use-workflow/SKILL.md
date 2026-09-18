@@ -1,76 +1,20 @@
 ---
 name: agentic:skill:use-workflow
-description: Use when executing any agentic workflow. Owns state tracking, step sequencing, decision logging, artifact storage, and communication mode. Implicitly required by all agentic:workflow:* skills.
+description: Use when starting, advancing, resuming, or finalizing an Agentic workflow with durable state and approval gates
 ---
 
 # Use Workflow
 
-The workflow engine. Every `/agentic:workflow:*` call **MUST** load this skill first.
+Keep one canonical run record. The orchestrator owns it; workers return results and unique artifacts. Required setup: `agentic:skill:use-agentic` resolves the execution context once.
 
-## Dependencies
+Resolve the helper from the installed use-workflow package: `<helper>` means its absolute `scripts/agentic.mjs` path. Consumer repositories need not contain this library's `skills/` tree.
 
-You **MUST** load `/agentic:skill:use-agentic` before this skill. Config provides OUTPUT_FOLDER and NAMESPACE.
+1. Generate `{YYYYMMDD}-{HHMMSS}-{random4hex}` and create `{OUTPUT_FOLDER}/{workflow-name}/{run-id}/`. Initialize `workflow-state.yaml` from [the state template](references/workflow-state.yaml). It uses JSON syntax, which is valid YAML 1.2. Read [state-contract.md](references/state-contract.md) before the first update.
+2. Save state through `scripts/agentic.mjs save-state`. Combine configuration and run initialization into one concise receipt. Record repository identity and accepted plan revision when applicable.
+3. Read only the current step file. Complete its work and gates before loading the next. After each step, decision, artifact, check, or gate outcome, the orchestrator validates and atomically saves the next state. Every autonomous decision includes its reason and step context.
+4. On interruption or changed scope, use the [state contract](references/state-contract.md) to verify repository/plan evidence and invalidate affected gates. Existing authorization remains valid for unchanged scope; a repeated question is not a substitute for checking its receipt.
+5. Finalize only after required checks, review results, requirement evidence, and knowledge reconciliation are recorded. Failures remain visible; a failed or unavailable check does not count as passing.
 
-## Initialization
+Accepted specifications live in the configured durable `spec_folder` (default `docs/specs`); transient logs and review artifacts live in the run. See [plan-contract.md](references/plan-contract.md) for revisions, dependency validation, coverage, and import. See [telemetry.md](references/telemetry.md) when recording measurements.
 
-When workflow starts, you **MUST**:
-
-1. Generate run ID: `{YYYYMMDD}-{HHMMSS}-{random4hex}`
-2. Create output dir: `{OUTPUT_FOLDER}/{workflow-name}/{run-id}/`
-3. Write initial `workflow-state.yaml` (schema in `references/workflow-state.yaml`)
-4. Resolve profile skills via use-agentic → `technical_skills_prompt`
-5. Confirm gate: "Workflow initialized: {workflow-name}, run={run-id}"
-
-## Step Sequencing
-
-Each workflow defines `steps/step-N-name.md`. You **MUST**:
-
-- Load steps one at a time, sequentially (lost-in-middle mitigation)
-- Complete current step before loading next
-- Update `workflow-state.yaml` after each step
-- **Never** load all steps at once or skip ahead
-
-## Decision Logging
-
-Every autonomous decision **MUST** be logged in `workflow-state.yaml`:
-
-```yaml
-decisions:
-  - step: gather-context
-    decision: Focused on auth module
-    reason: User spec mentions login flow
-```
-
-No decision without a reason. No reason without context from the step.
-
-## Artifacts
-
-Output files go in `{OUTPUT_FOLDER}/{workflow-name}/{run-id}/`. Each workflow defines prescribed artifacts. Track all paths in `workflow-state.yaml`.
-
-## Communication Mode
-
-During workflow execution, switch to ultra-compressed output:
-
-| Rule | Example |
-|---|---|
-| Drop articles, filler, hedging | "Analyzing auth module" not "I'll now analyze the auth module" |
-| Abbreviate common terms | DB, auth, config, impl, deps, req, fn |
-| Use arrows for flow | input → validate → transform → store |
-| Sentence fragments OK | "3 files modified. Tests green." |
-| Technical terms exact | Never abbreviate type names, APIs, paths |
-
-Revert to normal for: security warnings, irreversible actions, ambiguous multi-step sequences. Code, documentation, commits, PRs always standard English.
-
-## State Updates
-
-Update `workflow-state.yaml` at these checkpoints:
-
-- **Workflow start** — status: `in_progress`
-- **Each step completion** — append `steps_completed`, advance `current_step`
-- **Each decision** — append to `decisions`
-- **Each artifact produced** — update `artifacts`
-- **Workflow end** — status: `completed` or `failed`, set `completed_at`
-
-## Error Recovery
-
-If a step fails → log error in state, set status `failed`, present error to user. **Never** silently continue past a failed step.
+Use normal concise prose, respecting the user's and host's communication preferences. Report findings, uncertainty, next action, and relevant evidence. Initialization and routine checkpoint messages are announcements, not new permission gates.

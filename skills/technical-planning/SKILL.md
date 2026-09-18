@@ -1,66 +1,24 @@
 ---
 name: agentic:workflow:technical-planning
-description: Use when transforming specs, ideas, or issues into detailed technical plans. Triggers - need technical plan, want architecture decisions before coding, need to resolve all open questions before implementation.
-argument-hint: "[<spec.md | #issue | URL | inline description>]"
+description: Use when a feature, specification, issue, or accepted external plan needs architecture decisions, acceptance criteria, or an implementable ticket breakdown.
 ---
 
 # Technical Planning
 
-Transform any input (spec, idea, issue, description) into a PRD, an implementable technical plan, and a set of vertically-sliced tickets — by gathering codebase context and grilling the developer on every design decision.
+Turn accepted product intent into a durable specification and verifiable tickets. Required skills: `use-agentic`, `use-workflow`, `delegate-work`, `use-knowledge`. Initialize the run before saving input. Accept a file, issue reference/URL, inline description, or existing conversation input; ask only when input is missing. Preserve source provenance and redact sensitive values in `input.md`.
 
-## Dependencies
+Keep these five phases, loading the current step and its relevant recovery contracts progressively:
 
-You **MUST** load these before proceeding:
+| Phase | Instructions | Gate |
+|---|---|---|
+| 1 | [Gather context](steps/step-01-gather-context.md) | Evidence and developer correction point |
+| 2 | [Grill requirements](steps/step-02-grill.md) | Structural questions resolved |
+| 3 | [Generate](steps/step-03-generate.md) | Valid PRD, plan and ticket graph |
+| 4 | [Quiz](steps/step-04-quiz-gate.md) | Developer approves exact revision |
+| 5 | [Handoff](steps/step-05-handoff.md) | Durable artifacts and reviewable delivery |
 
-- `/agentic:skill:use-agentic` — config + constants
-- `/agentic:skill:use-workflow` — state tracking + step sequencing
-- `/agentic:skill:use-knowledge` — decision/term classification (ADR, RFC, ubiquitous language)
+The parent owns run state, decisions, gates and publication. Native workers explore code and may generate documents; they return results and write only assigned artifacts. Resolve profile skills and model roles once through `use-agentic`. Retrieve relevant accepted knowledge before decisions and reconcile it at handoff through `use-knowledge`.
 
-## Input Handling
+Structural decisions remain the developer's. Reuse explicit answers and authorizations already given for unchanged scope; an elapsed timeout is not approval. Preserve generation choice, quiz and optional publication. An [accepted-plan import](references/import-plan.md) creates a draft in the same contract and enters the same remaining gates; prose alone never bypasses validation or approval.
 
-Parse the invocation argument:
-
-- No args → ask what to plan
-- File path → read the file
-- `#123` or GitHub URL → fetch the issue (`gh issue view`)
-- Inline text → use directly
-
-Write raw input to `{output_path}/input.md`.
-
-## Workflow Init
-
-Initialize via use-workflow (generates run ID, creates output dir, writes initial workflow-state.yaml), then load step 1.
-
-## Steps
-
-| Step | File | Intent |
-|------|------|--------|
-| 1 | `steps/step-01-gather-context.md` | Architect explores codebase → technical-context.md |
-| 2 | `steps/step-02-grill.md` | Grill developer in frontier rounds; capture knowledge |
-| 3 | `steps/step-03-generate.md` | Generate prd.md + technical-plan.md + tickets/ |
-| 4 | `steps/step-04-quiz-gate.md` | Quiz developer on ticket breakdown until approved |
-| 5 | `steps/step-05-handoff.md` | Summarize artifacts, optional GH publish, handoff |
-
-## Key Rules
-
-**CRITICAL**: You MUST ALWAYS respect the following rules during this workflow execution:
-
-- **Always interactive**: developer answers every structural question. No auto mode.
-- **Gate rule**: no plan generation while structural open questions remain
-- **Quiz gate**: no handoff before developer approves the ticket breakdown
-- **Subagent for exploration**: delegate codebase work to architect, never do it yourself
-
-## Artifacts
-
-| Artifact | Description |
-|----------|-------------|
-| `input.md` | Raw input spec |
-| `technical-context.md` | Codebase analysis from Architect |
-| `technical-decisions.md` | All developer decisions from grilling |
-| `prd.md` | Product requirements (user perspective) |
-| `technical-plan.md` | Final implementable plan |
-| `tickets/NN-slug.md` | Vertically-sliced tickets in dependency order |
-
-## Start
-
-Load `steps/step-01-gather-context.md`.
+Use the resolved spec_folder from use-agentic (default docs/specs). Accepted artifacts live under `{execution_context.spec_folder}/<spec-id>/`; transient evidence lives in the run directory. Shared `use-workflow` plan/state contracts and helper validate graphs, sealed artifact hashes, requirement coverage and approval revisions. Begin with phase 1.

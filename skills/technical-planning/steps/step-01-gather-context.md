@@ -1,42 +1,13 @@
 # Step 1: Gather Codebase Context
 
-## Intent
+Retrieve relevant accepted ADRs, product documentation, domain terms and prior specs through `use-knowledge`; record source, status, revision and conflicts in a small knowledge packet. Read the input and current repository identity from the initialized run.
 
-Delegate codebase exploration to architect subagent(s). It reads the input, explores the codebase systematically, and produces `technical-context.md`.
+Delegate exploration through `delegate-work`: exploration model role, selected profile skills, source-read-only/report-write capability, input/spec paths, repository base/head or snapshot identity, knowledge packet and [exploration guidance](../../delegate-work/references/exploration.md). One or more independent workers may cover disjoint questions. Assign unique report paths; the parent synthesizes `technical-context.md` using [the template](../references/technical-context.md).
 
-## Delegation
+Workers explore broadly then narrow to affected paths, patterns and dependencies, including downstream and second-order effects. Cite specific files/revisions. Separate observed facts, assumptions, constraints and unknowns. They do not choose structural product/design decisions or mutate source.
 
-You **MUST** delegate this to 1 or multiple subagents. You **MUST NOT** explore the codebase yourself.
+Validate the context against the input and cited code: coverage of relevant components, current evidence, uncertainties and knowledge conflicts, not merely existence/nonempty text. Re-delegate missing or incorrect evidence.
 
-Spawn 1 or multiple subagents per `agentic:skill:delegate-work`:
+Present a concise summary and preserve the correction gate: “Anything wrong or missing?” Reuse an explicit prior confirmation of this same context. Corrections go to the exploration worker and are re-presented. If confirmation is absent, record `awaiting_input`; do independent factual lookups while waiting, but do not treat silence as confirmation.
 
-- **Persona**: `agentic:agent:architect`
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: explorer
-- **Model**: automatic — defined by agent type, otherwise default to fast model
-- **Input**: `{output_path}/input.md`
-- **Output**: `{output_path}/technical-context.md` following the template in `references/technical-context.md`
-
-The architect(s) must explore the codebase and produce a thorough technical context grounded in evidence (specific files, patterns, dependencies).
-
-## Validate
-
-After the subagent(s) completes, verify `technical-context.md` exists and is non-empty.
-
-## Context Confirmation (Soft Gate)
-
-Present a summary of the technical context to the developer. Ask: "Anything wrong or missing?"
-
-- If the developer confirms → proceed to step 2
-- If the developer has corrections → note them, ask for specific pointers (files, modules, areas to focus on), then pass feedback to the architect subagent for refinement. Re-present when done.
-
-## Update State
-
-```yaml
-artifacts:
-  technical_context: "{output_path}/technical-context.md"
-```
-
-## Next
-
-Load `steps/step-02-grill.md`.
+Parent records `artifacts.technical_context`, knowledge retrieval and gate evidence with the context revision, updates state, then loads step 2.

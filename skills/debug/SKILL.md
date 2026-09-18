@@ -1,72 +1,24 @@
 ---
 name: agentic:workflow:debug
-description: Use when debugging bug reports, CI failures, test failures, runtime errors, or flaky tests. Triggers - error logs, stack traces, failing tests, unexpected behavior, GitHub issue with bug label.
+description: Use when investigating bug reports, error logs, stack traces, failing CI, regressions, flaky tests, or unexpected runtime behavior.
 argument-hint: "[<error.log | #issue | URL | error description>]"
 ---
 
 # Debug
 
-Systematic debugging from bug report to verified fix. Evidence-based investigation, TDD-aligned regression test, hypothesis-driven fix loop.
+Establish evidence before changing code, reproduce the behavioral defect before fixing it, and verify the owned result. Required skills: `use-agentic`, `use-workflow`, `delegate-work`, `code-testing`, `review-loop`, `use-knowledge`.
 
-## Dependencies
+Accept a file, issue reference/URL, inline report or adequate current conversation context; missing input yields usage and awaits the report. Initialize the run before writing `bug-report.md`; preserve source provenance and useful diagnostic detail while redacting secrets/personal values.
 
-You **MUST** load these before proceeding:
+| Phase | Instructions |
+|---|---|
+| 1 | [Investigate](steps/step-01-investigate.md) |
+| 2 | [Establish regression](steps/step-02-regression-test.md) |
+| 3 | [Hypothesis/fix loop](steps/step-03-hypothesis-fix-loop.md) |
+| 4 | [Verify and deliver](steps/step-04-verify.md) |
 
-- `/agentic:skill:use-agentic` — config + constants
-- `/agentic:skill:use-workflow` — state tracking + step sequencing
+Delegate technical investigation, tests, hypotheses, fixes and reviews to native workers with selected skills and bounded source/report ownership. The parent alone changes shared state or Git. Preserve initial user changes and use immutable base/candidate snapshots; reverting an attempt restores only its owned patch. Debug delivers verified local changes by default; commits, issue closure, push and PR publication require explicit user authorization.
 
-## Input Handling
+Keep the investigation/model-choice gates, reusing prior explicit answers. Keep one evidence-backed hypothesis and minimal fix at a time, behavioral red before fix, full-suite checks, rollback and escalation after three actually rejected bug hypotheses. Time pressure, an unrelated failing suite, or an exhausted review budget does not waive these gates. Exhaustion is evidence for human review, not a diagnosis of architectural failure.
 
-Parse the invocation argument:
-
-- No args → **ERROR**: input required. Show usage: `/agentic:workflow:debug <error.log | #issue | URL | description>`
-- File path → read the file (log, error output, bug report)
-- `#123` or GitHub URL → fetch the issue (`gh issue view`)
-- Inline text → use directly
-
-Write raw input to `{output_path}/bug-report.md`.
-
-## Workflow Init
-
-Initialize via use-workflow (generates run ID, creates output dir, writes initial workflow-state.yaml), then load step 1.
-
-## Steps
-
-| Step | File | Intent |
-|------|------|--------|
-| 1 | `steps/step-01-investigate.md` | Gather evidence, trace failure, produce investigation-report.md |
-| 2 | `steps/step-02-regression-test.md` | Write FAILING test that reproduces the bug |
-| 3 | `steps/step-03-hypothesis-fix-loop.md` | Hypothesize root cause → fix → run test → loop until pass (max 3) |
-| 4 | `steps/step-04-verify.md` | Run review-loop with review-code + review-tests |
-
-## Key Rules
-
-**CRITICAL**: You **MUST** ALWAYS respect the following rules during this workflow execution:
-
-- **Evidence before hypothesis**: no guessing — investigate first, gather evidence, then hypothesize
-- **One hypothesis at a time**: never bundle multiple fix attempts
-- **Test before fix**: regression test MUST exist and FAIL before any fix attempt
-- **Three strikes = escalate**: 3 failed hypothesis-fix iterations → escalate to human, likely architectural
-- **Orchestrator only**: delegate all technical work via subagents, never investigate or fix yourself
-
-## Red Flags — STOP
-
-If you catch yourself thinking:
-
-- "Quick fix for now" → return to evidence
-- "Just try changing X" → form a proper hypothesis first
-- "It's probably X" → where's the evidence?
-- "One more fix attempt" (after 3) → escalate
-
-## Artifacts
-
-| Artifact | Description |
-|----------|-------------|
-| `bug-report.md` | Raw input preserved |
-| `investigation-report.md` | Evidence from investigation (template in `references/investigation-report.md`) |
-| `hypothesis-log.md` | Hypotheses tested with results |
-| `fix-log.md` | Fix implementation details |
-
-## Start
-
-Load `steps/step-01-investigate.md`.
+Retrieve relevant knowledge before investigation and reconcile significant verified findings at completion. Start phase 1.

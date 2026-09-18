@@ -9,64 +9,33 @@ tags: entity, value-object, domain-service, identity, immutability, behavior
 **Impact: CRITICAL**
 
 ### Entities (Identity + Behavior)
+
+Entities own identity and domain behavior; the selected language may express that behavior with methods or pure operations over immutable records. Keep rules in the domain, not controllers or persistence adapters.
+
+The complete [Order and Money example](../examples/order.ts) returns Results for expected failures. `Order.create` validates the aggregate; `addItem` prevents changes after confirmation. Totaling explicitly composes failures:
+
 ```typescript
-interface OrderError {
-  readonly code: 'ORDER_NOT_DRAFT' | 'INVALID_ITEM';
-  readonly message: string;
-}
-
-class Order {
-  private constructor(
-    readonly id: OrderId,
-    private items: readonly OrderItem[],
-    private status: OrderStatus
-  ) {}
-
-  // Business logic returns Result, no throwing
-  addItem(item: OrderItem): Result<Order, OrderError> {
-    if (this.status !== 'draft') {
-      return Err({ code: 'ORDER_NOT_DRAFT', message: 'Cannot modify non-draft order' });
-    }
-    return Ok(new Order(this.id, [...this.items, item], this.status));
+calculateTotal() {
+  let total = Money.zero(this.currency);
+  for (const item of this.items) {
+    const result = total.add(item);
+    if (!result.ok) return result;
+    total = result.value;
   }
-
-  calculateTotal(): Money {
-    return this.items.reduce((sum, i) => sum.add(i.total()), Money.zero());
-  }
+  return Ok(total);
 }
 ```
+
+This is a method excerpt from the linked class. Empty orders total to zero in their declared currency; mixed currencies and overflow return errors. Returning `Money` while `add` returns a Result would hide the error contract.
 
 ### Value Objects (Immutable, no identity)
-```typescript
-interface MoneyError {
-  readonly code: 'NEGATIVE_AMOUNT' | 'CURRENCY_MISMATCH';
-  readonly message: string;
-}
 
-class Money {
-  private constructor(readonly amount: number, readonly currency: string) {}
+Value objects preserve validation and equality semantics. Follow the chosen language's representation rather than imposing a wrapper/class solely for architecture vocabulary. The linked example uses a class with a private constructor, `Money.create`, `Money.zero(currency)` and `Money.add`.
 
-  static create(amount: number, currency: string): Result<Money, MoneyError> {
-    if (amount < 0) {
-      return Err({ code: 'NEGATIVE_AMOUNT', message: 'Money cannot be negative' });
-    }
-    return Ok(new Money(amount, currency));
-  }
+Its explicit example policy is nonnegative safe-integer minor units in EUR/USD. Creation rejects negative, fractional, nonfinite and unsafe amounts; addition rejects currency mismatch and overflow. This is not a universal money policy: establish the application's currencies, scale, rounding, negative-value and serialization requirements. Use decimal or another representation when those requirements demand it; do not silently replace an existing money model.
 
-  add(other: Money): Result<Money, MoneyError> {
-    if (this.currency !== other.currency) {
-      return Err({ code: 'CURRENCY_MISMATCH', message: `Cannot add ${this.currency} to ${other.currency}` });
-    }
-    return Ok(new Money(this.amount + other.amount, this.currency));
-  }
-}
-```
+Expected errors have stable codes (`INVALID_AMOUNT`, `CURRENCY_MISMATCH`); callers propagate or handle them. A value object's immutable fields must not expose mutable nested state that bypasses its invariants.
 
 ### Domain Services (Cross-entity logic)
-```typescript
-class PricingService {
-  calculateDiscount(customer: Customer, order: Order): Result<Money, PricingError> {
-    // Logic spanning multiple entities
-  }
-}
-```
+
+A pricing or eligibility rule spanning multiple entities belongs in a pure domain service/operation. Give it domain inputs and return a value or Result; keep customer lookup, transactions, network calls and logging orchestration outside. Prefer a method when the behavior belongs to one entity; do not create a service interface per class without an architectural boundary.

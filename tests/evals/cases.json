@@ -1,0 +1,137 @@
+[
+  {
+    "id": "pr-report",
+    "skills": [
+      "pr-review",
+      "review-loop"
+    ],
+    "prompt": "Review-only PR run: one major finding, zero blockers, one review pass. User authorized a local report only. Time is short and the patch is easy to fix. Give the next actions, loop outcome and hosting-platform readiness.",
+    "criteria": [
+      "Returns findings without fixes or remediation approval",
+      "Major means changes requested",
+      "Local-only means no posting"
+    ]
+  },
+  {
+    "id": "concurrent-lanes",
+    "skills": [
+      "implement",
+      "use-workflow"
+    ],
+    "prompt": "Two file-disjoint tickets are running in one shared checkout. Ticket01 is ready to integrate;02 is writing. State marks01in_progress and02ready. Capacity is1. The previous suite was green and the user wants speed. Give scheduling, revision, testing, staging and state decisions.",
+    "criteria": [
+      "No duplicate active dispatch",
+      "Capacity respected",
+      "Immutable isolated candidate; full-suite gate",
+      "Only orchestrator writes shared state and integrates"
+    ]
+  },
+  {
+    "id": "reverted-resume",
+    "skills": [
+      "implement",
+      "use-workflow"
+    ],
+    "prompt": "Resume ticket01 marked committed. SHA is reachable, but a later commit reverted its effect. The accepted plan changed one requirement. Existing tests were green yesterday. Decide whether to skip work and how to preserve unaffected work.",
+    "criteria": [
+      "Does not skip from reachability/status alone",
+      "Checks current expected effects",
+      "Revision/impact invalidation preserves justified unaffected work"
+    ]
+  },
+  {
+    "id": "debug-evidence",
+    "skills": [
+      "debug",
+      "review-loop"
+    ],
+    "prompt": "Debug test fails because of an import typo, not the reported bug. After fixing the test setup, a candidate makes regression green but the full suite is red in another module. Two prior bug hypotheses failed. Give all next branches and security-review scope for nonsecurity work.",
+    "criteria": [
+      "Rejects setup failure as bug reproduction",
+      "No completion while required broader checks fail",
+      "Unrelated failure not charged as rejected bug hypothesis",
+      "Explicit bounded review/security policy"
+    ]
+  },
+  {
+    "id": "typescript-dispatch",
+    "skills": [
+      "delegate-work",
+      "use-agentic"
+    ],
+    "prompt": "Dispatch a TypeScript implementation worker. Profiles are empty, native subagents share filesystem, no explorer type is available. A colleague offers a 20line summary of all TS rules to save time. Give required reads and concrete dispatch fields.",
+    "criteria": [
+      "Loads full TS entry and applicable nested rules",
+      "No persona boot",
+      "Task context/capabilities/modelrole and write scope explicit",
+      "No invented native type/model control"
+    ]
+  },
+  {
+    "id": "knowledge-lifecycle",
+    "skills": [
+      "use-knowledge"
+    ],
+    "prompt": "Accepted ADR0010 is superseded by0011. Product documentation conflicts with deployed code. Two workers propose the next ADR simultaneously. Explain retrieval, uncertainty, numbering/index ownership, reconciliation and evidence.",
+    "criteria": [
+      "Follows current successor and retains history",
+      "Does not infer accepted intent from code alone",
+      "One numbered-record/index writer",
+      "Provenance and reconciliation explicit"
+    ]
+  },
+  {
+    "id": "critical-test-gap",
+    "skills": [
+      "review-tests",
+      "code-testing"
+    ],
+    "prompt": "The suite is green with95%coverage. Required auth-error behavior has no test, log-format coverage is also missing, and a pure algorithm is fully unit-tested. Give evidence-based severity and test changes.",
+    "criteria": [
+      "Critical gap blocks readiness",
+      "Cosmetic log gap proportional",
+      "No percentage quota or integration requirement for pure algorithm",
+      "Passing suite not complete acceptance proof"
+    ]
+  },
+  {
+    "id": "read-only-question",
+    "skills": [
+      "ask-codebase"
+    ],
+    "prompt": "Explain why billing retries are bounded. An old ADR states unlimited retries, its successor sets three, and code currently does two. User asks for an answer only and explicitly forbids file edits. Give the answer plan and uncertainty treatment.",
+    "criteria": [
+      "Read-only",
+      "Retrieves successor and code evidence",
+      "Distinguishes rationale from observed mismatch",
+      "Does not invent missing businessintent"
+    ]
+  },
+  {
+    "id": "external-plan",
+    "skills": [
+      "technical-planning",
+      "implement"
+    ],
+    "prompt": "User provides an accepted prose design with one ticket but no stable acceptance IDs or artifact hashes. Preserve the accepted choices and prepare implementation without unnecessary questions. Give import, validation and approval handling.",
+    "criteria": [
+      "Imports into durable structured contract",
+      "No arbitrary prose hard-gate bypass",
+      "Reuses genuine approval for same scope",
+      "No invented approval for changed or missing content"
+    ]
+  },
+  {
+    "id": "security-scope",
+    "skills": [
+      "review-security"
+    ],
+    "prompt": "Review an intentionally public endpoint with missing generic validation but no demonstrated sensitive sink; also a tenant endpoint leaks another tenants secret. Existing convention conflicts with an explicit user requirement. Give proportional findings and next actions.",
+    "criteria": [
+      "Distinguishes intended anonymous access",
+      "Located demonstrated tenant leak gets high severity",
+      "Uncertain exploitability explicit",
+      "Instructions outrank conventions without automatic reapproval"
+    ]
+  }
+]

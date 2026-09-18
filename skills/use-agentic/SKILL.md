@@ -1,75 +1,15 @@
 ---
 name: agentic:skill:use-agentic
-description: Use when invoking any agentic skill, agent, or workflow - gateway to the agentic framework
+description: Use when starting an Agentic workflow or delegated task, resolving project profiles, or handling missing configuration or host capabilities
 ---
 
 # Use Agentic
 
-Gateway skill to the agentic framework. **MUST** be invoked before any other `agentic:*` resource.
+Resolve configuration once per run, then pass the effective context to workers. Workflows are skills with ordered phases; existing `agentic:workflow:*` identifiers remain valid. Native workers load task skills directly. Standalone engineering and knowledge reads do not require workflow initialization.
 
-Agentic = AI-assisted dev toolset. Skills, agents, and workflows compose into development pipelines.
+1. Read [config-schema.md](references/config-schema.md) when resolving configuration. Use the first existing project file in this order: `.agentic.json`, `.agentic.config.json`, `.agentic/config.json`; then `~/.agentic/config.json`; then documented defaults. Record selected and shadowed paths. Invalid present configuration is an error, not a reason to silently fall through.
+2. Resolve profiles in stable order: explicit selection, profiles whose globs match task-relevant paths, then applicable task/language skills. Empty `selectedProfiles` does not disable detection or engineering policy. Keep `technical_skills_prompt` a deduplicated string array with selection reasons.
+3. Resolve model role, effort, and available host controls using [host-adapter.md](references/host-adapter.md). Preserve configured routing. Record requested/effective settings and any fallback; unsupported controls never become imaginary tool arguments.
+4. Pass this execution context by value or shared file path. Workers inherit it; recompute only for changed scope/configuration. Load complete required skills and their applicable references, including the unchanged TypeScript package.
 
-## Naming Conventions
-
-| Prefix | Purpose | Example |
-|--------|---------|---------|
-| `agentic:skill:X` | Reusable technique or ruleset | `agentic:skill:typescript-engineer` |
-| `agentic:agent:X` | Persona with role + constraints | `agentic:agent:software-engineer` |
-| `agentic:workflow:X` | Multi-step orchestrated process | `agentic:workflow:implement` |
-
-## Framework Parts
-
-| Part | What It Is |
-|------|------------|
-| Skills | Reusable techniques and rulesets any agent can apply |
-| Agents | Persona files defining role, constraints, and behavior |
-| Workflows | Multi-step orchestrated processes coordinating agents and skills |
-
-## Config
-
-**MUST** load config before proceeding with any agentic operation.
-
-### Lookup Order
-
-1. `.agentic.json` or `.agentic.config.json` or `.agentic/config.json` at project root
-2. `~/.agentic/config.json` fallback
-3. If neither found: warn user, continue with defaults
-
-### IDE Detection
-
-| IDE | Key |
-|-----|-----|
-| Claude Code | `claude` |
-| Cursor | `cursor` |
-| Codex | `codex` |
-
-Detect current IDE from environment. Use detected key to resolve IDE-specific settings from `ides.{key}`.
-
-### Cached Constants
-
-Read once from config, reuse everywhere.
-
-| Constant | Source | Default |
-|----------|--------|---------|
-| NAMESPACE | `namespace` | `agentic` |
-| OUTPUT_FOLDER | `ides.{ide}.outputFolder` | `_agentic_output` |
-| HIGH_THINKING_MODEL | `ides.{ide}.highThinkingModelName` | Opus 4.6 high thinking or GPT 5.5 xhigh or available equivalent high effort thinking frontier model or harness default |
-| CODE_WRITING_MODEL | `ides.{ide}.codeWritingModelName` | Sonnet 4.6 medium thinking or Composer 2.5 thinking or GPT 5.3 codex or harness default |
-| QA_MODEL | `ides.{ide}.qaModelName` | same default as HIGH_THINKING_MODEL |
-| SELECTED_PROFILES | `selectedProfiles` | `[]` |
-| PROFILES | `profiles` | `[]` |
-
-### Profile Resolution
-
-1. Match `selectedProfiles` entries against `profiles[].name`
-2. Collect all `skills` arrays from matched profiles
-3. Deduplicate skill list preserving order
-4. Return as `technical_skills_prompt` for downstream consumption
-
-Full schema reference: `references/config-schema.md`
-
-## Confirm Gate
-
-After config loads, confirm:
-
-> Config loaded: namespace={NAMESPACE}, outputFolder={OUTPUT_FOLDER}, ide={ide}
+Combine the initialization receipt with workflow startup: namespace, config source, output folder, host, run ID, and relevant fallbacks. This is an announcement. Existing user authorization persists; configuration loading creates no new approval gate. Missing required skills or capabilities are reported with their exact identity and affected operation before dependent work continues.

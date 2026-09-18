@@ -1,62 +1,21 @@
 ---
 name: agentic:workflow:pr-review
-description: Use when reviewing pull requests for quality and security. Triggers - review PR, code review, PR number or URL provided, batch review multiple PRs.
+description: Use when reviewing one or more pull requests, PR numbers, GitHub URLs, or cross-repository PR references.
 argument-hint: "<PR ref> [<PR ref> ...]"
 ---
 
 # PR Review
 
-Reviews pull requests using parallel QA and security review agents.
+Report independent code, test and security findings against immutable PR revisions. Source code is read-only; this skill never repairs a PR. Required skills: `use-agentic`, `use-workflow`, `delegate-work`, `review-loop`, `use-knowledge`.
 
-## Dependencies
+Accept numeric/# references in the identified current repository, full PR URLs, `owner/repo#number`, or multiple references. Missing/ambiguous identity requires clarification. Initialize one parent run before writing artifacts. Resolve profile/model context once, preserving repository-specific skill selection for each target.
 
-You **MUST** load these before proceeding:
+| Phase | Instructions |
+|---|---|
+| 1 | [Gather target/context/preferences](steps/step-01-gather-context.md) |
+| 2 | [Report-only review](steps/step-02-review-loop.md) |
+| 3 | [Report and authorized delivery](steps/step-03-report.md) |
 
-- `/agentic:skill:use-agentic` — config + constants
-- `/agentic:skill:use-workflow` — state tracking + step sequencing
+Single and batch use the same per-PR three-phase contract. Parent resolves preferences once, then delegates bounded independent PR scopes up to available capacity. Each child receives exact target identity, pre-resolved preferences, selected skills, unique output path and source-read-only/report-write capability; it returns results. Parent alone updates shared state and performs external publication. Children never initialize competing parent states or write to another PR's paths.
 
-## Input Handling
-
-Parse invocation arguments:
-
-- No args → **ERROR**: PR reference required. Show usage: `/agentic:workflow:pr-review <PR ref> [<PR ref> ...]`
-- `123` or `#123` → PR number (current repo)
-- `https://github.com/owner/repo/pull/123` → full PR URL
-- `owner/repo#123` → cross-repo PR reference
-- Multiple args → batch mode (parallel reviews)
-
-## Route
-
-**Single PR**: steps 1→2→3 sequentially.
-
-**Batch**: step 1 classifies all PRs + asks preferences once, then dispatches one subagent per PR running steps 1.5 (preferences already resolved)→2→3 in parallel. Collect all results at end.
-
-## Steps
-
-| Step | File | Intent |
-|------|------|--------|
-| 1 | `steps/step-01-gather-context.md` | Verify PR exists, extract diff/metadata, ask output mode + verbosity, delegate context gathering to architect |
-| 2 | `steps/step-02-review-loop.md` | Run `/agentic:workflow:review-loop` (max 1 iteration) |
-| 3 | `steps/step-03-report.md` | Aggregate findings, deliver in chosen output mode |
-
-## Key Rules
-
-**CRITICAL**: You **MUST** ALWAYS respect the following rules during this workflow execution:
-
-- **Orchestrator only**: delegate all reviews, never review code yourself
-- **Subagent delegation**: all technical work via subagents (`agentic:agent:architect` for context, `/agentic:workflow:review-loop` for reviews)
-- **One step at a time**: complete each step before loading next
-- **Track state**: update workflow-state.yaml after each step
-
-## Artifacts
-
-| Artifact | Description |
-|----------|-------------|
-| `pr-metadata.md` | PR title, description, author, files changed |
-| `pr-diff.patch` | Full PR diff |
-| `technical-context.md` | Codebase context from architect |
-| `review-report.md` | Aggregated review (template in `references/review-report.md`) |
-
-## Start
-
-Load `steps/step-01-gather-context.md`.
+Preserve local/PR-comments and verbosity choices, reusing existing explicit authorization. Local-only means no external posting. Retrieve relevant knowledge for each repository without treating another repository's guidance as authoritative; reconcile material knowledge proposals at completion. Keep complete/incomplete review outcomes distinct from pass/fail readiness. Start phase 1.

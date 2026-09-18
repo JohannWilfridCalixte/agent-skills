@@ -1,73 +1,38 @@
 # Investigation Report
 
+## Identity and source
+
+Bug source, repository/base/head or snapshot, investigated paths, known environment and relevant knowledge records with freshness/status.
+
 ## Error Analysis
 
-### Exact Error
-```
-{quoted error message — complete, not summarized}
-```
-
-### Stack Trace
-```
-{full stack trace if applicable}
-```
-
-### Error Location
-- File: {path}
-- Line: {number}
-- Function: {name}
+Complete relevant error/stack structure, redacting secret/personal values. Mark redactions and omitted irrelevant portions. Exact file, line, function and observation revision. Distinguish assertion failure from setup/import/environment failure.
 
 ## Failure Point
 
-### Immediate Cause
-{what code directly causes the error}
-
-### Data State at Failure
-{what values were present when it broke}
+Immediate observed cause and minimal diagnostic data state. Do not persist full sensitive payloads merely to fill this section.
 
 ## Data Flow Trace
 
-### Call Chain
-```
-{entry point}
-  → {function A}
-  → {function B}
-  → {failure point}
-```
-
-### Bad Value Origin
-- Value: {what value is wrong}
-- First appears: {where it originates}
-- Passed through: {intermediate points}
+Entry → intermediate transformations → failure. Describe the bad value/state, first observed origin and propagation, with file/revision evidence.
 
 ## Recent Changes
 
-### Relevant Commits
-{commits that could affect this code path}
-
-### Related Modifications
-{files changed recently that touch the failure path}
+Relevant commits/modifications and why they could affect this path. Treat temporal correlation separately from causation.
 
 ## Working Comparison
 
-### Similar Working Code
-{working examples of similar patterns in the codebase}
-
-### Key Differences
-| Aspect | Working | Broken |
-|--------|---------|--------|
-| {aspect} | {value} | {value} |
+Similar working code and meaningful differences in behavior/contracts/state.
 
 ## Evidence Summary
 
-| Question | Answer |
-|----------|--------|
-| What fails? | {specific} |
-| Where exactly? | {file:line} |
-| What data is wrong? | {value} |
-| Where does bad data originate? | {origin} |
-| What changed recently? | {relevant changes} |
+| Question | Observation / evidence | Confidence |
+|---|---|---|
+| What fails and where? | {specific file/revision/output} | {supported / uncertain} |
+| Where does bad data arise? | {trace} | {supported / uncertain} |
+| What recently changed? | {relevant diff} | {supported / uncertain} |
+| Reproduction conditions? | {deterministic/intermittent/environmental evidence} | {supported / uncertain} |
 
-## Open Questions
+## Open Questions and constraints
 
-{things that couldn't be determined — explicit unknowns}
+Explicit unknowns, unavailable evidence, environment/setup limitations, knowledge conflicts and second-order effects. Populate only applicable sections; absence of evidence is not a diagnosis.

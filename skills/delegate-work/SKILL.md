@@ -1,96 +1,27 @@
 ---
 name: agentic:skill:delegate-work
-description: Use when a workflow step needs to spawn subagents for implementation, exploration, review, or fixing — ensures correct persona loading, skill loading, agent type, and model selection across harnesses
+description: Use when a task needs native subagents for bounded exploration, implementation, review, or fixes
 ---
 
 # Delegate Work
 
-Canonical pattern for dispatching subagents. Every workflow step that spawns subagents **MUST** follow this.
+Dispatch a bounded task with enough evidence to verify its result. The orchestrator resolves `agentic:skill:use-agentic` once; workers inherit that execution context. There is no persona lookup or persona boot stage.
 
-## Subagent Boot Sequence
+Every dispatch has these fields:
 
-The subagent prompt **MUST** instruct this exact order — BEFORE any task work:
+| Field | Required content |
+|---|---|
+| `task_id`, goal, completion condition | Unique worker assignment and useful result. |
+| `skills`, references | Operation skill and `technical_skills_prompt` names plus installed paths; direct task references below. |
+| inputs, revision | Actual artifact/source paths, repository root, accepted plan revision and immutable code revision where applicable. |
+| allowed writes | Explicit source-file scope and unique artifact path; empty source scope means repository read-only. |
+| capabilities, model role | Actual native worker capability and resolved model/effort from execution context. |
+| output, evidence | Required artifact/result, relevant checks, unresolved decisions, and constraints. |
 
-1. **Load persona** — read the agent definition file (e.g., `agentic:agent:software-engineer`)
-2. **Load skills** — invoke each skill name from `technical_skills_prompt` using the skill loading mechanism
-3. **Read inputs** — read input files from provided paths
-4. **Begin task**
+Before task work, the worker loads operation/profile skills and their required references, then reads inputs. Shared files are passed by path, with complete nested rule retrieval. Missing paths are returned as errors. For TypeScript, load the entry point and all seven applicable rule files; a copied quick-reference table does not replace them. Use [dispatch.md](references/dispatch.md) for the concrete contract and result validation.
 
-Orchestrator passes **names and paths**, never content. Subagent loads everything itself.
+For source implementation/test/fix work, load [engineering-contract.md](references/engineering-contract.md). For context gathering/investigation, load [exploration.md](references/exploration.md). These are task acceptance rules, not identities. Review skills own their lenses; `review-loop` owns review outcomes and fix budgets.
 
-## Dispatch Parameters
+Spawn independent scopes concurrently within configured and native capacity. Shared source writes, indexes, state, or Git operations require isolation or sequencing. The orchestrator owns canonical state, numbered knowledge allocation, integration, and commits. Workers return proposed knowledge captures.
 
-Every subagent spawn **MUST** specify all of these:
-
-| Parameter | What to Pass |
-|-----------|-------------|
-| **Persona** | Fully qualified name: `agentic:agent:{role}` |
-| **Skills** | `technical_skills_prompt` — skill name list, **NOT** skill content |
-| **Agent Type** | `explorer` or `general purpose` (see below) |
-| **Model** | Config constant (see below) |
-| **Input** | File **paths** to read |
-| **Output** | Expected output file path |
-
-## Agent Types
-
-Models: map these to your harness's native subagent types (read-only search agents, full-capability agents, etc.).
-
-| Type | When | Capability |
-|------|------|-----------|
-| `explorer` / `explore` | Codebase analysis, investigation, context gathering | Read-only, fast, cheap |
-| `general purpose` / `worker` / `default` | Implementation, fixing, review, anything that writes | Full read + write |
-
-## Model Constants
-
-Resolved from agentic config per IDE. Use constant names, never hardcoded model identifiers.
-
-| Constant | Use For |
-|----------|---------|
-| `HIGH_THINKING_MODEL` | Planning, investigation, complex reasoning |
-| `CODE_WRITING_MODEL` | Implementation, fixing, test writing |
-| `QA_MODEL` | Code review, test review, security review |
-
-## Parallelization
-
-Spawn subagents concurrently when tasks are independent (no shared file writes, no dependency):
-
-- Multiple review skills → parallel
-- Independent implementation tasks → parallel
-- Investigation then implementation → **sequential**
-
-## Anti-Patterns
-
-### Inlining content into subagent prompts
-
-```
-# ❌ WRONG — pastes skill/persona content
-"Follow these TypeScript rules: [500 lines]..."
-"You are a pragmatic engineer who..."
-
-# ✅ RIGHT — passes names for subagent to load
-"Load persona agentic:agent:software-engineer first."
-"Load skills: /typescript-engineer, /clean-architecture"
-"Read the plan at {output_path}/technical-plan.md"
-```
-
-**Why wrong**: wastes context window, breaks nested references (`rules/*.md`), uses stale content, subagent can't follow internal links.
-
-### Other anti-patterns
-
-| Anti-Pattern | Why Wrong | Correct |
-|---|---|---|
-| Passing file **contents** instead of paths | Bloats prompt, may truncate task | Pass paths, subagent reads itself |
-| Skipping agent type | Explorer can't write; general purpose wastes resources on read-only tasks | Always specify type |
-| Hardcoding model names (`claude-opus-4-6`) | Breaks cross-harness; ignores user config | Use `CODE_WRITING_MODEL` etc. |
-| Skipping persona | Subagent lacks role constraints and decision heuristics | Always specify persona |
-| Skipping skill loading | Subagent doesn't know project conventions | Always pass `technical_skills_prompt` |
-
-## Red Flags — STOP and Fix Your Prompt
-
-- You're copy-pasting skill file content into the subagent prompt
-- You're writing a persona description instead of referencing the persona file
-- You're embedding file contents instead of passing paths
-- You're using a literal model name instead of a config constant
-- Your prompt doesn't mention loading persona or skills as first steps
-
-**All of these mean: rewrite the subagent prompt following the boot sequence above.**
+Use supported native controls. If only a full-capability worker exists, constrain its task to allowed writes. A truly read-only worker returns the complete artifact for the orchestrator to save. No native subagents or transferable inputs means the affected delegated gate remains unmet; report the precise capability limit. Preserve already-authorized scope and continue useful independent work.

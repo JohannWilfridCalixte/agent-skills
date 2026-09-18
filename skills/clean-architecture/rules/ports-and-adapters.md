@@ -8,29 +8,16 @@ tags: port, adapter, interface, infrastructure, dependency-inversion
 
 **Impact: CRITICAL**
 
-**Port** = interface defined by domain/application for what it needs
-**Adapter** = infrastructure implementation of that interface
+**Port** = interface in the inward layer that consumes a capability (usually application; domain for a domain abstraction). **Adapter** = infrastructure implementation. Define what the application needs, not a copy of a vendor SDK.
+
+The complete [payment adapter](../examples/payment-adapter.ts) uses a provider client behind an application-owned interface:
 
 ```typescript
-// Port (in application layer) - defines WHAT we need
 interface PaymentGateway {
-  charge(amount: Money, customerId: string): Promise<Result<PaymentResult, PaymentError>>;
-}
-
-// Adapter (in infrastructure) - implements HOW, wraps external errors
-class StripeAdapter implements PaymentGateway {
-  constructor(private readonly stripe: Stripe) {}
-
-  async charge(amount: Money, customerId: string): Promise<Result<PaymentResult, PaymentError>> {
-    try {
-      const charge = await this.stripe.charges.create({ ... });
-      return Ok({ id: charge.id, status: 'completed' });
-    } catch (error) {
-      return Err({ code: 'PAYMENT_FAILED', message: error.message });
-    }
-  }
+  readonly charge: (amount: Money, customerId: string, idempotencyKey: string, signal: AbortSignal) => Promise<Result<PaymentResult, PaymentError>>;
 }
 ```
 
-**Primary adapters** (drive the app): Controllers, CLI, Message handlers
-**Secondary adapters** (driven by app): Repositories, External APIs, Email services
+Contract types describe the interface; implementations retain inferred returns under the selected TypeScript policy. The adapter converts Money to provider input, forwards idempotency and cancellation, narrows caught `unknown`, and translates the provider's recognized unavailable error to a stable `PAYMENT_FAILED` Result. It does not expose the provider's message. Unexpected programming failures and cancellation propagate after cleanup. In a real adapter, use the SDK's documented operational error types; do not catch every exception as a declined payment.
+
+**Primary adapters** drive the app: controllers, CLI handlers, message handlers. **Secondary adapters** are driven by it: repositories, external APIs, email services. Validate untrusted input at the entry boundary, enforce authorization against the resource contract, and map persistence/transport schemas to domain inputs. Runtime source dependencies still point inward even when calls execute outward.

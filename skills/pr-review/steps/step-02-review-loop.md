@@ -1,33 +1,20 @@
-# Step 2: Review Loop
+# Step 2: Report-Only Review
 
-## Intent
+Invoke `review-loop` for each frozen PR scope with:
 
-Run all review skills against the PR via `/agentic:workflow:review-loop` in a single pass (no fix cycle).
+| Field | Value |
+|---|---|
+| `mode` | `report` |
+| `max_rounds` | `1` |
+| `review_skills` | `review-code`, `review-tests`, `review-security` |
+| `scope_id` | Exact repository/PR/head identity from step 1 |
+| `target` | Explicit repo, base_sha, head_sha, immutable snapshot path/digest, saved PR diff and changed files |
+| `write_scope` | Empty; reports are the only permitted writes |
+| `inputs` | This PR's metadata, diff, context, selected skills, verbosity and relevant accepted spec paths |
+| `output_path` | This PR's unique directory plus `reviews/` |
 
-## Parameters
+The target never falls back to an ambient working diff. All lenses receive the same immutable snapshot and the shared finding contract; code/tests/security execute independently up to capacity.
 
-You **MUST** pass these to `/agentic:workflow:review-loop`:
+The loop returns `reported` after one pass with readiness `pass | changes_requested | incomplete`, deduplicated findings and coverage. Findings are reported, never fixed; remaining majors/blockers do not trigger a developer repair choice. Parent saves the returned result under `review_loops[scope_id]` and links it from `prs[scope_id]`; workers do not update shared state.
 
-- `max_iterations`: 1
-- `review_skills`: [agentic:skill:review-code, agentic:skill:review-tests, agentic:skill:review-security]
-
-## Context
-
-Review-loop needs these inputs from `{output_path}/`:
-
-- `pr-diff.patch`
-- `pr-metadata.md`
-- `technical-context.md`
-- `verbosity` from workflow state
-
-## Note
-
-PR review = single pass. Findings are reported, not fixed. Review-loop handles all parallelism and aggregation internally.
-
-## Update State
-
-Review-loop updates `workflow-state.yaml` directly with its `review_loop` block (iteration, counts, verdict).
-
-## Next
-
-Load `steps/step-03-report.md`.
+Missing material evidence/lens is an incomplete review, not approval. Retain successful independent batch reports even when another item is blocked. Load step 3 for each result with its limitations intact.

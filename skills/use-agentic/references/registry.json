@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "description": "One package kind: skill. Existing source names remain canonical; host adapters may resolve aliases without rewriting source.",
+  "skills": [
+    {
+      "name": "agentic:skill:ask-codebase",
+      "path": "skills/ask-codebase",
+      "aliases": [
+        "ask-codebase"
+      ]
+    },
+    {
+      "name": "agentic:skill:clean-architecture",
+      "path": "skills/clean-architecture",
+      "aliases": [
+        "clean-architecture"
+      ]
+    },
+    {
+      "name": "agentic:skill:code-testing",
+      "path": "skills/code-testing",
+      "aliases": [
+        "code-testing"
+      ]
+    },
+    {
+      "name": "agentic:workflow:debug",
+      "path": "skills/debug",
+      "aliases": [
+        "debug"
+      ]
+    },
+    {
+      "name": "agentic:skill:delegate-work",
+      "path": "skills/delegate-work",
+      "aliases": [
+        "delegate-work"
+      ]
+    },
+    {
+      "name": "agentic:workflow:implement",
+      "path": "skills/implement",
+      "aliases": [
+        "implement"
+      ]
+    },
+    {
+      "name": "agentic:workflow:pr-review",
+      "path": "skills/pr-review",
+      "aliases": [
+        "pr-review"
+      ]
+    },
+    {
+      "name": "agentic:skill:python-engineer",
+      "path": "skills/python-engineer",
+      "aliases": [
+        "python-engineer"
+      ]
+    },
+    {
+      "name": "agentic:skill:review-code",
+      "path": "skills/review-code",
+      "aliases": [
+        "review-code"
+      ]
+    },
+    {
+      "name": "agentic:workflow:review-loop",
+      "path": "skills/review-loop",
+      "aliases": [
+        "review-loop",
+        "agentic:skill:review-loop"
+      ]
+    },
+    {
+      "name": "agentic:skill:review-security",
+      "path": "skills/review-security",
+      "aliases": [
+        "review-security"
+      ]
+    },
+    {
+      "name": "agentic:skill:review-tests",
+      "path": "skills/review-tests",
+      "aliases": [
+        "review-tests"
+      ]
+    },
+    {
+      "name": "agentic:workflow:technical-planning",
+      "path": "skills/technical-planning",
+      "aliases": [
+        "technical-planning"
+      ]
+    },
+    {
+      "name": "agentic:skill:typescript-engineer",
+      "path": "skills/typescript-engineer",
+      "aliases": [
+        "typescript-engineer"
+      ]
+    },
+    {
+      "name": "agentic:skill:use-agentic",
+      "path": "skills/use-agentic",
+      "aliases": [
+        "use-agentic"
+      ]
+    },
+    {
+      "name": "agentic:skill:use-knowledge",
+      "path": "skills/use-knowledge",
+      "aliases": [
+        "use-knowledge"
+      ]
+    },
+    {
+      "name": "agentic:skill:use-workflow",
+      "path": "skills/use-workflow",
+      "aliases": [
+        "use-workflow"
+      ]
+    },
+    {
+      "name": "agentic:skill:write-instrumented-code",
+      "path": "skills/write-instrumented-code",
+      "aliases": [
+        "write-instrumented-code"
+      ]
+    }
+  ]
+}

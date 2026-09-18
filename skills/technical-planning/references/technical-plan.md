@@ -2,33 +2,28 @@
 
 ## Scope
 
-What's in scope and what's explicitly out of scope.
+In-scope outcomes and explicit exclusions. Stable requirement IDs match plan.json.
 
 ## Design
 
-Proposed architecture and design reflecting all developer decisions. Component structure, data flow, integration points.
+Accepted architecture, component structure, data flow and integration points. Reference decision IDs and ADR numbers, with relevant constraints and second-order effects.
 
 ## Contracts & Interfaces
 
-API endpoints, function signatures, data schemas, type definitions, and other contracts.
-
-## Task Breakdown
-
-PR-sized implementation tasks in order of execution.
-
-| Task | Description | Dependencies |
-|------|-------------|--------------|
-| TASK-01 | ... | — |
-| TASK-02 | ... | TASK-01 |
+API endpoints, signatures, schemas, error semantics and compatibility constraints.
 
 ## Verification
 
-How to verify the implementation is correct. Map requirements to test types and coverage.
+| Requirement | Observable criterion | Ticket | Check / evidence needed |
+|---|---|---|---|
+| AC-01 | {specific behavior} | 01 | {behavioral check and boundary} |
+
+A passing command alone does not prove every mapped criterion. Runtime check IDs/results and immutable revisions live in the execution state; missing evidence remains unverified.
 
 ## Software Engineer Brief
 
-Suggested implementation order, key decisions to respect, gotchas, and areas needing extra care.
+Suggested implementation order, ownership boundaries, key decisions, gotchas and extra care. Prefactoring/expand-contract sequence where applicable.
 
 ## Open Questions (Minor)
 
-Minor questions where reasonable defaults were chosen. Document the default and rationale.
+Confirmed minor defaults and rationale. No unresolved structural decision.

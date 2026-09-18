@@ -1,47 +1,11 @@
-# Step 4: Verify
+# Step 4: Verify and Deliver
 
-## Intent
+Invoke `review-loop` with `mode: repair`, `max_rounds: 2`, a unique `debug/<run-id>/fix` scope, immutable owned repo/base/head/snapshot/diff target, exact repair write paths, bug/investigation/hypothesis/fix evidence and regression path.
 
-Run review-loop sub-workflow to verify fix quality and test quality.
+Always select `review-code` and `review-tests`. Include `review-security` when changes affect authentication/authorization, input validation, trust boundaries or sensitive data, when the known cause is security-related, or when uncertainty leaves one of those risks unresolved. Otherwise omit it. Parent logs the observed trigger or exclusion reason once; this is the sole debug security policy. Lenses use QA model role and selected profile skills. Two rounds mean at most two review passes and one repair, independent of the three rejected-hypothesis budget.
 
-## Parameters
+Only `passed` satisfies verification. `max_reached` presents concrete findings and asks whether to authorize further bounded repair or stop; a draft PR is offered only if that delivery is relevant and authorized. `blocked` records the missing prerequisite. Neither becomes completed. Any repair changes the snapshot: rerun regression, relevant scoped checks and full suite on the final candidate; review/check evidence must match it. Mark final regression/full-suite receipts `required: true`. Archive only superseded candidate receipts under `history` with reasons; retain current failures as active prerequisites.
 
-You **MUST** pass these to `/agentic:workflow:review-loop`:
+Parent integrates only the owned verified changes, preserving user work/index. No automatic Git commits or remote publication. If the user requested delivery actions, prepare the concrete result and perform only authorized operations with their recorded outcomes; failures remain visible.
 
-- `max_iterations`: 2
-- `review_skills`: [agentic:skill:review-code, agentic:skill:review-tests, agentic:skill:review-security]
-
-## Context
-
-Review-loop needs these inputs from `{output_path}/`:
-
-- `bug-report.md`
-- `investigation-report.md`
-- `hypothesis-log.md`
-- `fix-log.md`
-- Regression test file path from state
-
-## Note
-
-Debug verification = single pass. Review-loop handles parallelism and aggregation internally. Security review is omitted unless the bug is security-related (orchestrator judgment — log decision if included/excluded).
-
-## Update State
-
-Review-loop updates `workflow-state.yaml` directly with its `review_loop` block (iteration, counts, verdict).
-
-On completion:
-```yaml
-status: "completed"
-completed_at: "{ISO}"
-```
-
-## Workflow Complete
-
-Present summary to developer:
-
-- Root cause (from hypothesis-log)
-- Fix applied (from fix-log)
-- Files changed
-- Test status
-- Review verdict
-- Session path for full artifacts
+Reconcile significant root-cause/decision knowledge through `use-knowledge`, with evidence and freshness; no-change is a valid reconciliation. Complete only when regression, full suite, required reviews, owned integration and chosen delivery pass. Record completed_at and artifacts, and present: supported root cause, fix, files, exact test/review status, remaining limitations, delivery boundary and absolute evidence paths. A regression-green/full-suite-red run cannot appear as a verified completed fix.

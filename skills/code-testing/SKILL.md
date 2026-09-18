@@ -21,7 +21,7 @@ description: Use when writing tests, reviewing test quality, debugging flaky tes
 
 | Principle | Meaning |
 |-----------|---------|
-| **Fast** | Milliseconds. Slow tests don't get run. |
+| **Fast** | Keep feedback fast for the layer; milliseconds for small units, realistic budgets for integration/E2E. |
 | **Isolated** | Pass alone, in sequence, or parallel. |
 | **Repeatable** | Same inputs = same results. No env/time deps. |
 | **Self-validating** | Auto pass/fail. No human inspection. |
@@ -43,7 +43,7 @@ test('calculates order total with tax', () => {
 });
 ```
 
-One behavior per test. Never Assert → Act → Assert in same test.
+One behavior per test. Default to one Arrange → Act → Assert sequence. A state-transition or protocol requirement can need several actions and assertions in one scenario; keep them focused on that single behavior.
 
 ## What Makes Tests Good vs Bad
 
@@ -94,6 +94,8 @@ expect(screen.getByText('Section 2 content')).toBeVisible();
 
 **Core insight:** Integration tests offer best confidence-to-cost ratio for most apps.
 
+The diagrams and ratios are strategy heuristics, not quotas. Choose the test boundary from the behavior and failure risk: pure domain algorithms favor units; wiring and adapter contracts need integrations. Do not manufacture integrations to meet a percentage.
+
 ## What to Test at Each Layer
 
 | Layer | Test | Examples |
@@ -113,13 +115,14 @@ expect(screen.getByText('Section 2 content')).toBeVisible();
 | **Spy** | Record calls + stub | State or Behavior |
 | **Mock** | Verify specific calls made | Behavior |
 
-**Key distinction:** Stubs verify state (what's the result?), mocks verify behavior (what calls were made?).
+**Key distinction:** Stubs supply answers; mocks verify interactions. Assert observable results or a required boundary interaction, not merely the canned answer a double was configured to return.
 
 ### Mocking Rules
 
 - **Mock at system boundaries** — external APIs, databases
-- **Don't mock what you don't own** — wrap third-party libs in your interfaces
-- **Over-mocking = testing mocks** — if setup > test code, you're testing wrong
+- **Don't mock what you don't own** — prefer owned boundary interfaces; use the provider's supported test interface when appropriate. Add a wrapper when it represents a useful boundary, not solely to satisfy a rule.
+- **Keep internal collaborators real** where practical. A repository/payment port is a legitimate isolated use-case boundary; replacing internal algorithms just to reproduce their expected answer is not.
+- **Over-mocking = testing mocks** — setup larger than the test is a signal to inspect the boundary and assertions, not proof the test is wrong.
 
 ```typescript
 // BAD: mock everything
@@ -159,8 +162,8 @@ test('renders component', () => {
 ### Flaky Tests (intermittent failures)
 
 **Root causes:**
-- 54% — improper async handling (`sleep()` vs explicit waits)
-- 31% — race conditions
+- Improper async handling (`sleep()` vs explicit waits)
+- Race conditions
 - Shared state between tests
 
 **Fixes:**
@@ -173,7 +176,7 @@ await screen.findByText('Loaded');
 await waitFor(() => expect(result).toBe(expected));
 ```
 
-- Clean shared state in `beforeEach`, not `afterEach`
+- Establish isolated state in `beforeEach`; release resources in teardown/finally even after failures. Use per-test data/namespaces for parallel tests.
 - Mock time-dependent operations
 - Run tests in random order to expose hidden deps
 
@@ -225,6 +228,12 @@ Coverage reveals untested code — useful for finding gaps.
 **Don't chase 100%:** Produces trivial tests, tests without assertions, wasted time.
 
 **Target 70-85%** as sanity check, not strict gate.
+
+Map acceptance criteria and changed behavior to meaningful checks, including required error paths. Green commands and high coverage do not establish that the requested behavior is tested. Prioritize critical gaps (for example authorization failures) over incidental log formatting.
+
+For a behavioral change, add or update its corresponding test and run the checks required by the owning workflow. For a regression test, observe failure for the intended product defect before the fix; a syntax/setup error is not regression evidence. Record the command, revision, result, and unavailable checks truthfully. Do not skip required tests to save time.
+
+For concurrent/effectful behavior, cover the relevant contract: competing updates, duplicate delivery/idempotency, cancellation cleanup, and retry after partial success. Use controlled synchronization instead of delays. For schema or API migrations, test supported old/new readers or clients through the compatibility window.
 
 ## Quick Reference
 

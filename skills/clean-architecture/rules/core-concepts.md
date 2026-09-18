@@ -21,10 +21,9 @@ tags: layers, dependency-rule, clean, hexagonal, onion
 
 ```
 Presentation → Application → Domain
-     ↓              ↓
-Infrastructure ────┘
+Infrastructure → Application / Domain
 ```
 
 **Outer layers know inner. Inner layers know nothing about outer.**
 
-When execution flows outward (domain needs DB), use **Dependency Inversion**: domain defines interface (Port), infrastructure implements it (Adapter).
+These arrows show source dependencies, not runtime calls. When execution needs I/O, use **Dependency Inversion**: define the port in the inward layer that consumes the capability (usually application; domain only when a domain abstraction requires it), and implement it in infrastructure. The domain performs no I/O; application orchestration invokes injected ports.

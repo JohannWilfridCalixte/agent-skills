@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from returns.result import Result, Success, Failure
+from returns.result import Failure, Result, Success
 
 from myapp.core.config import settings
 from myapp.models.user import User
@@ -39,10 +39,10 @@ if TYPE_CHECKING:
     from myapp.services.auth import AuthService
 ```
 
-**`from __future__ import annotations`:** Makes all annotations strings (lazy evaluation). Enables forward references and breaks import cycles. **Caveat:** Don't use with Pydantic models that need runtime annotation access — Pydantic v2 handles this, but custom `get_type_hints()` calls will break.
+**`from __future__ import annotations`:** On the supported 3.12/3.13 baseline, stores annotations as strings and enables forward references. `get_type_hints()` can resolve them when referenced names are available; postponement alone does not break it. Names imported only under TYPE_CHECKING are absent at runtime. Pydantic and other runtime annotation consumers may need resolvable names, explicit namespaces or model rebuilds; check the selected runtime/library behavior instead of assuming postponed annotations solve every cycle.
 
-**`TYPE_CHECKING` block:** Import types only needed for annotations here. Prevents circular imports — the import never runs at runtime.
+**`TYPE_CHECKING` block:** Import types needed only by static checking here; these imports never run at runtime. Exception classes used in `except`, classes used in `match`/`isinstance`, decorators, Result constructors, runtime aliases and names needed by annotation consumers belong in runtime imports.
 
 ### Auto-fix
 
-`ruff check --fix --select I` or `ruff format`.
+Run `ruff check --select I --fix`, then `ruff format` for formatting. The formatter does not sort imports. Use the repository's configured import groups and Ruff version.

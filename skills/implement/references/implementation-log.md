@@ -1,19 +1,33 @@
-# Implementation Log
+# Implementation Log — {ticket-id}: {title}
 
-## Task: {task-id} — {task-title}
+## Identity
 
-### Changes
+Accepted plan revision, repository/base/head, worker owner, immutable candidate snapshot/digest, owned file paths, and assigned requirement IDs.
 
-Files modified, created, or deleted. Path and brief description of each change.
+## Changes
 
-### Tests
+Files created/modified/deleted, behavior before/after, and exact candidate diff artifact. Identify any requested scope expansion separately.
 
-Tests written or modified. What they cover and current status (pass/fail).
+## Acceptance evidence
 
-### Decisions
+| AC ID | Observable criterion | Check ID / command | Code + plan revision | Result / evidence path |
+|---|---|---|---|---|
+| AC-01 | {behavior demonstrated} | {receipt} | {identities} | {observed result} |
 
-Any decisions made during implementation that weren't in the original plan. Include rationale.
+Unverified, changed and deferred criteria stay explicit. A green suite alone is not complete acceptance.
 
-### Issues
+## Tests
 
-Problems encountered and how they were resolved. Unresolved issues flagged for review.
+Scoped tests written/modified, their behavioral coverage and actual results. Parent records integration full-suite receipts separately and links them here.
+
+## Decisions
+
+New decisions, rationale, affected requirements and required approval evidence. Knowledge updates are proposals with provenance for the parent to reconcile.
+
+## Issues and recovery
+
+Failures, hypotheses/repairs where relevant, retries, unresolved concerns and proposed follow-ups. Include ownership/base changes that invalidate evidence.
+
+## Delivery
+
+Parent-recorded integrated snapshot or commit SHA, actual PR/publication status and remaining work. Runtime state is canonical; this report does not change ticket status.

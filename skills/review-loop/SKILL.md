@@ -1,91 +1,28 @@
 ---
 name: agentic:workflow:review-loop
-description: Use when code needs multi-angle review with iterative fix cycles. Called by implement, debug, and pr-review workflows. Not invoked directly by users.
+description: Use when an implementation, debug fix, or pull request needs independent review perspectives or bounded repair rounds.
 ---
 
 # Review Loop
 
-Sub-workflow. Runs review skills in parallel, fixes issues, re-reviews until clean or max iterations reached.
+Run independent review lenses against one immutable target. The caller owns state and delivery; workers return reports. Required skills: `use-agentic`, `use-workflow`, `delegate-work`. Inherit an initialized parent run and resolved execution context; without them return `blocked` with missing inputs.
 
-## Dependencies
+Read [findings and results](references/findings.md) before dispatch. Required call fields:
 
-Inherits from calling workflow: `output_path`, `technical_skills_prompt`, `workflow-state.yaml`.
-
-If `output_path`, `technical_skills_prompt` and `workflow-state.yaml` not found, you **MUST** load these before proceeding:
-- `/agentic:skill:use-agentic` — config + constants
-- `/agentic:skill:use-workflow` — state tracking + step sequencing
-
-## Parameters
-
-The calling workflow **MUST** provide:
-
-| Parameter | Type | Example |
-|-----------|------|---------|
-| `max_iterations` | int | `3` |
-| `review_skills` | list | `[review-code, review-tests, review-security]` |
-
-## Persona Mapping
-
-| Review Skill | Persona |
+| Field | Contract |
 |---|---|
-| `agentic:skill:review-code` | `agentic:agent:qa` |
-| `agentic:skill:review-tests` | `agentic:agent:qa` |
-| `agentic:skill:review-security` | `agentic:agent:security-engineer` |
+| `mode` | `report` or `repair`; an iteration budget is not mutation permission |
+| `max_rounds` | Positive integer counting review passes, starting at 1 |
+| `review_skills` | Required independent lenses, resolved through the skill catalog |
+| `scope_id` | Unique literal key under parent `review_loops`; never abbreviate it |
+| `target` | Repository, base/head SHA, immutable snapshot path/digest, diff path, exact files |
+| `write_scope` | Exact owned repair paths; empty in report mode |
+| `inputs`, `output_path` | Plan/evidence paths and unique scope output directory |
 
-## Loop
+1. Dispatch each lens concurrently through `delegate-work`, with QA model role, source-read-only/report-write capabilities, selected profile skills, target, and the findings contract path. Each writes `round-{N}/{lens}.md` and `.json` under this scope. Reviewers are independent of implementers and each other.
+2. Validate returned target identity, coverage and findings; deduplicate equivalent root causes, preserve evidence and adjudicate contradictory suggestions. Parent records results, counts and telemetry.
+3. `report`: return `reported` after one pass, with readiness and findings; never dispatch fixes or ask about repair choices.
+4. `repair`: complete coverage and no blockers/majors → `passed`; incomplete evidence/capability or invalid target → `blocked`; unresolved blockers/majors at `max_rounds` → `max_reached`.
+5. Otherwise group findings into independent, non-overlapping repair sets within `write_scope`. Dispatch code-writing workers using the [engineering contract](../delegate-work/references/engineering-contract.md); preserve ownership, run scoped checks, freeze a new snapshot, increment round and re-review. Scope expansion returns `blocked` for caller resolution.
 
-### 1. Dispatch Reviews (Parallel)
-
-For each skill in `review_skills`, spawn a subagent **in parallel** per `agentic:skill:delegate-work`:
-
-- **Persona**: per mapping above
-- **Skill**: the review skill to apply (e.g., `agentic:skill:review-code`)
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose
-- **Model**: `QA_MODEL`
-- **Output**: as defined by each review skill
-- **Input**: available inputs (plan, implementation log, code diff)
-
-### 2. Aggregate
-
-Read all review outputs. Collect total blocker/major/minor/nit counts across all reviews.
-
-### 3. Exit Check
-
-```
-IF zero blockers AND zero majors → exit PASS
-IF iteration >= max_iterations → ask developer: keep fixing, create draft PR, or stop
-ELSE → proceed to fix phase
-```
-
-### 4. Fix Phase (Parallel)
-
-Collect all blocker + major issues from all reviews. Group into independent fix sets (non-overlapping files).
-
-For each independent group, spawn a subagent **in parallel** per `agentic:skill:delegate-work`:
-
-- **Persona**: `agentic:agent:software-engineer`
-- **Skills**: `technical_skills_prompt`
-- **Agent Type**: general purpose
-- **Model**: `CODE_WRITING_MODEL`
-- **Input**: issues to fix (location, description, suggested fix)
-- **Instructions**: fix issues, run tests to verify no regressions
-
-After all fix subagents complete, increment iteration → return to step 1.
-
-## State
-
-Update parent `workflow-state.yaml` after each iteration:
-
-```yaml
-review_loop:
-  iteration: {n}
-  status: "in_progress" | "passed" | "max_reached"
-  rounds:
-    - iteration: 1
-      blockers: {n}
-      majors: {n}
-      minors: {n}
-      nits: {n}
-      verdict: "PASS" | "CHANGES_REQUESTED"
-```
+`max_rounds: 2` permits two review passes and at most one repair round. Workers never mutate Git, publish, or write shared state. Only `passed` satisfies a repair gate. Exhaustion is an explicit return, not completion or an automatic budget extension; the caller retains its developer escalation choices.

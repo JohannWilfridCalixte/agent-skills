@@ -106,7 +106,18 @@ flowchart LR
 
 ## Configuration
 
-Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (project wins; `steps` and `limits` merged per key).
+Optional: without any file, every step uses the built-in defaults below.
+
+### Where
+
+| File | Scope |
+|---|---|
+| `.agentic.json` at the project root | This project |
+| `~/.agentic/config.json` | All your projects (e.g. which models you have access to) |
+
+Both are read; the project file wins. `steps` and `limits` merge key by key, so a project can override one step without losing your global ones.
+
+### Example
 
 ```json
 {
@@ -122,18 +133,62 @@ Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (projec
       "grill": { "model": "claude-opus-5-5", "effort": "high" },
       "implement": { "model": "composer-2.5" },
       "review": { "model": "composer-2.5" },
-      "review.security": { "model": "claude-opus-5-5", "effort": "high" }
+      "review.security": { "model": "claude-opus-5-5", "effort": "high" },
+      "chore": { "model": "gpt-6-luna" },
+      "explore": { "model": "grok-4.7-medium" }
     },
-    "claude": { "implement": { "model": "sonnet", "effort": "medium" } },
-    "codex": { "implement": { "model": "gpt-5.6", "effort": "medium" } }
+    "claude": { "implement": { "model": "sonnet", "effort": "medium" }, "chore": { "model": "haiku-5-5" } },
+    "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
   "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
 }
 ```
 
-`steps` is a flat map per harness. A key like `review.security` falls back to its parent (`review`), then to the built-in default, then to the harness default. The full list of step keys and built-in defaults lives in [`agentic-use-workflow`](skills/agentic-use-workflow/references/config.md). Config for interactive steps (`triage`, `grill`) is a recommendation: you get a warning if your session runs a different model.
+### Fields
 
-Easy work never runs on the session model: simple tasks (grep, reading a diff or PR, renames…) go to the `chore` key and every exploration subagent to `explore`, both pinned to cheap models by default (`chore`: `gpt-6-luna` / `haiku-5-5`; `explore`: `grok-4.7-medium` / `sonnet` / `gpt-6.1-sol`). Override them in `steps` like any other key.
+| Field | Default | Meaning |
+|---|---|---|
+| `output` | `.agentic/work` | Where work-item folders live (relative to the project root) |
+| `commitWork` | `false` | `false` keeps `output` out of git |
+| `worktrees` | `../{repo}-worktrees` | Where worktrees are created (`{repo}` = repo folder name) |
+| `profiles` | `[]` | Stack → codestyle skills. `detect`: files that identify the stack |
+| `selectedProfiles` | `[]` | Profiles in use. Empty → detected ones are proposed |
+| `steps` | `{}` | Model and effort per step, per harness (`cursor`, `claude`, `codex`) |
+| `limits` | see below | Loop caps |
+
+### Steps
+
+Each entry is `"<step key>": { "model": "<harness model id>", "effort": "<level>" }`, both optional. `effort` is `low | medium | high`, or a harness-native level (`xhigh`, `max`, `ultra`).
+
+Lookup for each step: exact key → parent key (`review` for `review.security`, `explore` for `context.*`) → built-in default → harness default.
+
+| Step key | Runs | Built-in default |
+|---|---|---|
+| `triage` | your session | frontier / medium |
+| `grill` | your session | frontier / high |
+| `context.code`, `context.docs`, `context.runtime` | subagent, read-only | same as `explore` |
+| `tickets` | subagent | fast / low |
+| `implement` | subagent | code / medium |
+| `review.spec`, `review.codestyle`, `review.tests` | subagent | code / medium |
+| `review.security`, `review.access-control` | subagent | frontier / high |
+| `review.secrets` | subagent | frontier / medium |
+| `review.fix`, `babysit.fix` | subagent | code / medium |
+| `chore` | subagent: grep, read a diff or PR, rename, one-line edit… | `gpt-6-luna` (cursor, codex), `haiku-5-5` (claude) / low |
+| `explore` | subagent: every read-only exploration | `grok-4.7-medium` (cursor), `sonnet` (claude), `gpt-6.1-sol` (codex) / medium |
+
+`frontier`, `code` and `fast` are capability classes: the strongest reasoning model, a balanced coding model, and the cheapest fast model your harness offers. `chore` and `explore` pin model ids on purpose, so easy work and exploration never run on your session model, even when that means bypassing the harness's built-in Explore agent.
+
+Steps that run in your session (`triage`, `grill`) can't switch model: the config is a recommendation, and you get a warning if your session runs something else.
+
+### Limits
+
+| Key | Default | When reached |
+|---|---|---|
+| `review.iterations` | 3 | Review fix loop stops and asks |
+| `babysit.rounds` | 5 | PR fix rounds stop and ask (watching the PR isn't capped) |
+| `implement.retries` | 2 | A red task stops and asks |
+
+The agent-facing contract is [`config.md`](skills/agentic-use-workflow/references/config.md); per-harness model/effort mechanics are in [`delegation.md`](skills/agentic-use-workflow/references/delegation.md).
 
 ## Work items and audit
 

@@ -42,7 +42,7 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
 
-`effort` ∈ `low | medium | high`. `model` is a harness model id, passed as-is.
+`effort`: `low | medium | high`, or any harness-native level (`xhigh`, `max`, `ultra`), passed as-is. `model` is a harness model id, passed as-is. How each harness applies them: [delegation.md](delegation.md).
 
 ## Built-in step defaults
 

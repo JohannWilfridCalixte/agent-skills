@@ -42,7 +42,12 @@ Stop at `limits.review.iterations` with blockers or majors left → ask: another
 
 Fetch the PR metadata and diff with the platform's tooling (`gh`, or a Bitbucket / GitLab CLI or MCP). Read code at the PR head without disturbing the user's working tree. Run the lenses once, no fixes.
 
-Verdict: any blocker → request changes; majors only → comment; clean → approve (comment instead if the platform forbids approving). Show verdict and counts, then post one review: the summary as body, one inline comment per blocker and major on the head commit, minors and nits batched in the body.
+Before reviewing, ask the output: **local** (report in `reviews/pr-report.md`, nothing posted) or **post** (PR review on the platform).
+
+Verdict: any blocker → request changes; majors only → comment; clean → approve (comment instead if the platform forbids approving).
+
+- Local: write the verdict, counts and all findings to the report.
+- Post: one review, the summary as body, one inline comment per blocker and major on the head commit, minors and nits batched in the body.
 
 ## Done
 

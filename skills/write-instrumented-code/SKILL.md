@@ -1,5 +1,5 @@
 ---
-name: agentic:skill:write-instrumented-code
+name: write-instrumented-code
 description: Use when writing code in order to add logging, tracing, or instrumentation to any service
 ---
 

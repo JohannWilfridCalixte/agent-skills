@@ -1,5 +1,5 @@
 ---
-name: agentic:skill:clean-architecture
+name: clean-architecture
 description: Use when writing or modifying backend code that has business logic — services, domain models, use cases, APIs with validation/calculations/state transitions. Default for any non-trivial backend work.
 ---
 

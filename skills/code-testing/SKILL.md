@@ -1,5 +1,5 @@
 ---
-name: agentic:skill:code-testing
+name: code-testing
 description: Use when writing tests, reviewing test quality, debugging flaky tests, or deciding what/how to test.
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: agentic:skill:python-engineer
+name: python-engineer
 description: Use when writing Python code - covers typing, error handling, style, imports, and patterns
 ---
 

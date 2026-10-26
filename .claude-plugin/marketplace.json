@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "agentic",
+  "description": "Composable spec-driven development workflows for AI coding assistants.",
+  "owner": {
+    "name": "Johann Wilfrid-Calixte",
+    "url": "https://github.com/JohannWilfridCalixte"
+  },
+  "plugins": [
+    {
+      "name": "agentic",
+      "source": "./",
+      "category": "development",
+      "description": "Composable spec-driven development workflows: spec, plan, tickets, implement, review, babysit PR. Per-step model and effort, auditable work items."
+    }
+  ]
+}

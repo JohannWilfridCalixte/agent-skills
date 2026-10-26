@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agentic",
+  "version": "2.0.0",
+  "description": "Composable spec-driven development workflows: spec, plan, tickets, implement, review, babysit PR. Per-step model and effort, auditable work items.",
+  "author": {
+    "name": "Johann Wilfrid-Calixte",
+    "url": "https://github.com/JohannWilfridCalixte"
+  },
+  "homepage": "https://github.com/JohannWilfridCalixte/agent-skills",
+  "repository": "https://github.com/JohannWilfridCalixte/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "spec-driven-development",
+    "workflow",
+    "planning",
+    "code-review",
+    "pull-request"
+  ]
+}

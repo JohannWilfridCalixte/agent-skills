@@ -1,5 +1,5 @@
 ---
-name: agentic:skill:typescript-engineer
+name: typescript-engineer
 description: Use when writing TypeScript code - covers types, error handling, style, and patterns
 ---
 

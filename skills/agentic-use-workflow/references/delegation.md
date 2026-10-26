@@ -12,8 +12,13 @@ Load skills: {step skill}, {profile codestyle skills}
 Read: {input paths}
 Write: {output path}            # omit for read-only steps
 Goal: {one or two sentences of intent}
+Agent: {agent label, e.g. impl-T2}
+Progress: at each milestone, append one line to {work-item path}/events.jsonl with a single
+          shell append (>>):                                                # omit for read-only steps
+          {"ts":"<UTC now>","work":"{work}","run":"{run}","workflow":"{workflow}","step":"{step key}",
+           "task":"{task}","agent":"{agent}","type":"progress","summary":"<what just happened>","data":{}}
 Return: short summary + output path (read-only: cited findings).
-Do not write events.jsonl or state.json.
+Never rewrite events.jsonl, never write state.json.
 ```
 
 Never paste skill content, file content or a persona.

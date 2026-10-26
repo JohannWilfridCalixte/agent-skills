@@ -47,7 +47,7 @@ Deleted: `agents/`, `use-agentic` (merged into `agentic-use-workflow`), `delegat
 
 - **Interactive steps** (capture, grill, gate, triage) run in the main session. Config for them is a *recommendation*: warn once if the session model differs.
 - **Non-interactive steps** always run as subagents with `{model, effort}` resolved from config.
-- **Single writer:** only the orchestrating session writes `events.jsonl` / `state.json`. Subagents return a short summary + output path.
+- **Writers:** the orchestrating session logs every workflow, step, subagent dispatch and result, gate and decision, and is the only writer of `state.json`. Writing subagents only append `progress` lines (one shell `>>` per line, never a rewrite) at each milestone, so the log shows what each subagent is doing while it runs. Milestones, not tool calls.
 - Subagents receive **paths and skill names, never content**.
 
 ### Step keys and built-in defaults

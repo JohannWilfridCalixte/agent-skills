@@ -212,11 +212,21 @@ Every feature gets one folder, shared by all workflows across sessions:
 
 The folder always lives in the main checkout, even when the code is built in a worktree (`worktrees`, default `../{repo}-worktrees/{slug}`), so each feature keeps a single audit trail.
 
-Follow a run live from another terminal:
+Follow a run live from another terminal. Every workflow, step and subagent logs when it starts, its milestones (tests failing as expected, implemented, checks green, committed…) and how it ends, with the model and effort that ran:
 
 ```bash
-tail -f .agentic/work/*/events.jsonl
+tail -f .agentic/work/*/events.jsonl | jq -r '"\(.ts[11:19]) \(.workflow)/\(.step)\(if .task then "/"+.task else "" end) \(.type) [\(.model // "-")] \(.summary)"'
 ```
+
+```text
+14:02:10 implement/implement/T2 started [composer-2.5] T2 started: DELETE /exports/:id with tenant guard
+14:04:55 implement/implement/T2 progress [-] 3 tests written, failing as expected
+14:09:30 implement/implement/T2 progress [-] Route and service implemented, tests green
+14:10:20 implement/implement/T2 completed [composer-2.5] T2 done: 2 files, 3 tests, commit f14b28c
+14:11:40 implement/checks/T2 completed [-] Green gate after T2: build, lint, typecheck, 214 tests pass
+```
+
+Line format and logging rules: [`state.md`](skills/agentic-use-workflow/references/state.md).
 
 Pass a slug to any workflow to resume it. Add the work folder to `.gitignore` unless you set `commitWork: true`:
 

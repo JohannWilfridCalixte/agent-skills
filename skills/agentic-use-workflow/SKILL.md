@@ -36,7 +36,7 @@ One subagent per step key; parallel when independent (no shared writes, no order
 
 Pass paths and skill names, never content: work-item path, workspace path, inputs, output path, step skill, profile codestyle skills when code is written or judged. `context.*` steps use read-only subagents.
 
-Subagents never touch `events.jsonl` or `state.json`. Writing subagents return a short summary + output path. Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
+Subagents never touch `state.json`. Writing subagents append `progress` lines to `events.jsonl` (see Events) and return a short summary + output path. Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
 
 ## Work item
 
@@ -60,7 +60,16 @@ Branch or path already taken → ask. Log the choice as a `decision` event; it b
 
 ## Events and state
 
-The orchestrating session is the only writer. For every step start/end, decision, artifact, gate, escalation: append one line to `events.jsonl`, then rewrite `state.json` from the log. `state.json` never holds what the log lacks; on disagreement the log wins, rebuild. New 4-hex `run` id per workflow invocation. Log the model and effort actually used.
+`events.jsonl` must let someone outside the session follow the work: who started what, on which model, which milestones it went through, how it ended. Milestones, not tool calls. Every line follows the contract in [references/state.md](references/state.md) exactly; no other types or fields:
+
+```json
+{"ts","work","run","workflow","step","task?","iteration?","agent?","type","model?","effort?","summary","ref?","data?"}
+```
+
+`type` ∈ `started | progress | completed | failed | decision | escalation | artifact | gate | note`. `summary` is a sentence a human understands alone. `model` is the id that actually ran, never `inherit`.
+
+- **You (orchestrator)** log every workflow and step start/end, every subagent dispatch (goal, files, model) and return (result), every green gate, review iteration, PR round, decision, gate, escalation and artifact. Then rewrite `state.json` from the log; it never holds what the log lacks, and on disagreement the log wins. New 4-hex `run` id per workflow invocation.
+- **Writing subagents** append `progress` lines at each milestone of their own work (tests failing as expected, implemented, checks green, committed `abc123`) with their `agent` label: one shell append (`>>`) per line, never rewrite the file, no other type.
 
 Step fails → `failed` event, tell the user, never silently continue.
 

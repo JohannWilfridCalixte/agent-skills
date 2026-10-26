@@ -54,9 +54,9 @@ Capability classes, not model ids: `frontier` (strongest reasoning model availab
 |---|---|---|
 | `triage` | main session | frontier / medium |
 | `grill` | main session | frontier / high |
-| `context.code` | subagent, read-only | fast / medium |
-| `context.docs` | subagent, read-only | fast / low |
-| `context.runtime` | subagent, read-only | fast / medium |
+| `context.code` | subagent, read-only | as `explore` |
+| `context.docs` | subagent, read-only | as `explore` |
+| `context.runtime` | subagent, read-only | as `explore` |
 | `tickets` | subagent | fast / low |
 | `implement` | subagent | code / medium |
 | `review.spec` | subagent | code / medium |
@@ -68,13 +68,22 @@ Capability classes, not model ids: `frontier` (strongest reasoning model availab
 | `review.fix` | subagent | code / medium |
 | `babysit.fix` | subagent | code / medium |
 
+### Routing keys
+
+Used for work outside the steps above. Defaults are model ids per harness, on purpose: these exist to pin cheap models.
+
+| Key | Used for | `cursor` | `claude` | `codex` | Effort |
+|---|---|---|---|---|---|
+| `chore` | Simple tasks: grep, read a file, diff, PR or log, list, rename or move, one-line edit, run a command and summarize | `gpt-6-luna` | `haiku-5-5` | `gpt-6-luna` | low |
+| `explore` | Every read-only exploration subagent, `context.*` included | `grok-4.7-medium` | `sonnet` | `gpt-6.1-sol` | medium |
+
 ## Resolution
 
 For each of `model` and `effort` separately, first hit wins:
 
 1. `steps.{harness}.{key}`
-2. `steps.{harness}.{parent}` — key up to the first `.` (`review` for `review.security`)
-3. Built-in default above
+2. `steps.{harness}.{parent}` — key up to the first `.` (`review` for `review.security`); `context.*` → `explore`
+3. Built-in default above (`context.*` → the `explore` default)
 4. Harness default
 
 Example (cursor, config above): `review.tests` → model `composer-2.5` (from `review`), effort `medium` (built-in). `implement` → model `composer-2.5`, effort `medium` (built-in).

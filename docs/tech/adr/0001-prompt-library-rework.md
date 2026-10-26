@@ -58,9 +58,9 @@ Defaults are capability classes, not model slugs: `frontier` (strongest reasonin
 |---|---|---|
 | `triage` | main session | frontier / medium |
 | `grill` | main session | frontier / high |
-| `context.code` | subagent, read-only | fast / medium |
-| `context.docs` | subagent, read-only | fast / low |
-| `context.runtime` | subagent, read-only | fast / medium |
+| `context.code` | subagent, read-only | as `explore` |
+| `context.docs` | subagent, read-only | as `explore` |
+| `context.runtime` | subagent, read-only | as `explore` |
 | `tickets` | subagent | fast / low |
 | `implement` | subagent | code / medium |
 | `review.spec` | subagent | code / medium |
@@ -72,7 +72,14 @@ Defaults are capability classes, not model slugs: `frontier` (strongest reasonin
 | `review.fix` | subagent | code / medium |
 | `babysit.fix` | subagent | code / medium |
 
-Resolution: `steps.{harness}.{key}` → `steps.{harness}.{parent}` (e.g. `review` for `review.security`) → built-in default → harness default.
+**Cheap routing.** The session model never does easy work. Two routing keys pin cheap models by id (an exception to capability classes, on purpose):
+
+| Key | Used for | `cursor` | `claude` | `codex` |
+|---|---|---|---|---|
+| `chore` | grep, read a file / diff / PR / log, rename, one-line edit, run a command and summarize. Stops if > 2 files or a decision is needed | `gpt-6-luna` | `haiku-5-5` | `gpt-6-luna` |
+| `explore` | every read-only exploration subagent, `context.*` included. Bypasses the harness's built-in Explore agent when it doesn't run the configured model | `grok-4.7-medium` | `sonnet` | `gpt-6.1-sol` |
+
+Resolution: `steps.{harness}.{key}` → `steps.{harness}.{parent}` (e.g. `review` for `review.security`, `explore` for `context.*`) → built-in default → harness default.
 
 ### Config
 

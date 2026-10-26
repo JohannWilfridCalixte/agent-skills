@@ -133,6 +133,8 @@ Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (projec
 
 `steps` is a flat map per harness. A key like `review.security` falls back to its parent (`review`), then to the built-in default, then to the harness default. The full list of step keys and built-in defaults lives in [`agentic-use-workflow`](skills/agentic-use-workflow/references/config.md). Config for interactive steps (`triage`, `grill`) is a recommendation: you get a warning if your session runs a different model.
 
+Easy work never runs on the session model: simple tasks (grep, reading a diff or PR, renames…) go to the `chore` key and every exploration subagent to `explore`, both pinned to cheap models by default (`chore`: `gpt-6-luna` / `haiku-5-5`; `explore`: `grok-4.7-medium` / `sonnet` / `gpt-6.1-sol`). Override them in `steps` like any other key.
+
 ## Work items and audit
 
 Every feature gets one folder, shared by all workflows across sessions:

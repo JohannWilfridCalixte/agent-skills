@@ -17,10 +17,18 @@ Profiles: use `selectedProfiles`. Empty → propose the profiles whose `detect` 
 
 ## Step → model and effort
 
-Every step has a key (`grill`, `implement`, `review.security`, …). Resolve `model` and `effort` each on its own: `steps.{harness}.{key}` → `steps.{harness}.{parent}` → built-in default → harness default. Built-in defaults are capability classes (`frontier`, `code`, `fast`); map each to the closest model the harness offers.
+Every step has a key (`grill`, `implement`, `review.security`, …). Resolve `model` and `effort` each on its own: `steps.{harness}.{key}` → `steps.{harness}.{parent}` → built-in default → harness default. Built-in defaults are capability classes (`frontier`, `code`, `fast`); map each to the closest model the harness offers. Exception: the routing keys `chore` and `explore` default to pinned model ids.
 
 - Interactive steps (capture, grill, gate, triage) stay in the main session. Resolved value is a recommendation: warn once if the session runs something else, then go on.
 - Non-interactive steps always run as subagents with the resolved `{model, effort}`.
+
+## Cheap routing
+
+Don't spend the session model on easy work.
+
+- **Simple tasks** (grep, read a file, diff, PR or log, list folders, rename or move, one-line edit, run a command and summarize) → `chore` subagent. Its brief: do exactly that; touching more than 2 files or needing a decision → stop and report.
+- **Exploration** (any read-only search or analysis, `context.*` included) → subagent on the resolved `explore` model, even if that means bypassing the harness's built-in Explore agent.
+- Keep in the session: talking to the user, decisions, planning, debugging, multi-file changes.
 
 ## Delegation
 

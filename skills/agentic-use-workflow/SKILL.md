@@ -9,7 +9,7 @@ Runtime every workflow loads first. Owns config, delegation, work-item state, th
 
 ## Config
 
-Load `.agentic.json` (project root) then `~/.agentic/config.json`; project wins, `steps` and `limits` merged per key. Nothing found → built-in defaults, say so once. Schema, defaults, limits: [references/config.md](references/config.md).
+Load `.agentic.json` (project root) then `~/.agentic/config.json`; project wins, `steps` and `limits` merged per key. Nothing found → built-in defaults, say so once and suggest `agentic-configure`. Schema, defaults, limits: [references/config.md](references/config.md).
 
 Harness key is `cursor`, `claude` or `codex`, from your own runtime. Unsure → ask.
 

@@ -38,6 +38,7 @@ The v1 library (personas, `agentic:*:*` names, step files, 3 global model consta
 | `agentic-review` | workflow 4 | 6 parallel lenses → fix loop. PR mode = comment instead of fix |
 | `agentic-babysit-pr` | workflow 5 | Push, open PR, watch CI + comments, fix until merge-ready, keep watching until merged → `agentic-cleanup`. Never merges |
 | `agentic-cleanup` | workflow 6 | After merge: remove worktree, delete branches, update default branch, archive the work item. `--all` sweeps |
+| `agentic-configure` | setup | Guided config: detects all installed harnesses and their models (`agent models`, `codex debug models`, Claude Code aliases), proposes per-step models, confirms folders, profiles, limits, writes and validates |
 | `agentic-ship-feature` | orchestrator | Chains 1→6, triage light/full + workspace, resumable by slug |
 | codestyle skills | rulesets | Unchanged content, renamed |
 

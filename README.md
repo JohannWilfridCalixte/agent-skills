@@ -95,6 +95,7 @@ flowchart LR
 | `agentic-review` | workflow | 6 parallel lenses (spec, codestyle, tests, security, access-control, secrets) → fix loop. PR mode comments instead |
 | `agentic-babysit-pr` | workflow | Push, open PR, watch CI + comments, fix until merge-ready, keep watching until merged → cleanup. Never merges |
 | `agentic-cleanup` | workflow | After merge: remove worktree and branches, update the default branch, archive the work item. `--all` sweeps every merged one |
+| `agentic-configure` | setup | Guided config: detects installed harnesses and their models, proposes per-step models, confirms folders, writes and validates the file |
 | `agentic-grill` | building block | One question at a time, with a recommended answer |
 | `agentic-use-workflow` | primitive | Config, step model/effort resolution, delegation, work item, audit log, resume |
 | `agentic-use-knowledge` | primitive | Read and promote project knowledge in `docs/` |
@@ -107,6 +108,8 @@ flowchart LR
 ## Configuration
 
 Optional: without any file, every step uses the built-in defaults below.
+
+The easiest way is `/agentic-configure` (`$agentic-configure` in Codex): it detects which of Cursor, Claude Code and Codex are installed, lists the models each one offers, proposes a config, lets you change any value, confirms the work-output and worktree folders, then writes and validates the file. Run it again anytime to review or edit.
 
 ### Where
 

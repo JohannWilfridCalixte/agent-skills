@@ -134,10 +134,10 @@ Both are read; the project file wins. `steps` and `limits` merge key by key, so 
       "implement": { "model": "composer-2.5" },
       "review": { "model": "composer-2.5" },
       "review.security": { "model": "claude-opus-5-5", "effort": "high" },
-      "chore": { "model": "gpt-6-luna" },
+      "chore": { "model": "gpt-5.6-luna" },
       "explore": { "model": "grok-4.7-medium" }
     },
-    "claude": { "implement": { "model": "sonnet", "effort": "medium" }, "chore": { "model": "haiku-5-5" } },
+    "claude": { "implement": { "model": "sonnet", "effort": "medium" }, "chore": { "model": "haiku" } },
     "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
   "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
@@ -173,7 +173,7 @@ Lookup for each step: exact key → parent key (`review` for `review.security`, 
 | `review.security`, `review.access-control` | subagent | frontier / high |
 | `review.secrets` | subagent | frontier / medium |
 | `review.fix`, `babysit.fix` | subagent | code / medium |
-| `chore` | subagent: grep, read a diff or PR, rename, one-line edit… | `gpt-6-luna` (cursor, codex), `haiku-5-5` (claude) / low |
+| `chore` | subagent: grep, read a diff or PR, rename, one-line edit… | `gpt-5.6-luna` (cursor), `haiku` (claude), `gpt-6-luna` (codex) / low |
 | `explore` | subagent: every read-only exploration | `grok-4.7-medium` (cursor), `sonnet` (claude), `gpt-6.1-sol` (codex) / medium |
 
 `frontier`, `code` and `fast` are capability classes: the strongest reasoning model, a balanced coding model, and the cheapest fast model your harness offers. `chore` and `explore` pin model ids on purpose, so easy work and exploration never run on your session model, even when that means bypassing the harness's built-in Explore agent.

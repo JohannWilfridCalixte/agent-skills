@@ -74,7 +74,7 @@ Used for work outside the steps above. Defaults are model ids per harness, on pu
 
 | Key | Used for | `cursor` | `claude` | `codex` | Effort |
 |---|---|---|---|---|---|
-| `chore` | Simple tasks: grep, read a file, diff, PR or log, list, rename or move, one-line edit, run a command and summarize | `gpt-6-luna` | `haiku-5-5` | `gpt-6-luna` | low |
+| `chore` | Simple tasks: grep, read a file, diff, PR or log, list, rename or move, one-line edit, run a command and summarize | `gpt-5.6-luna` | `haiku` | `gpt-6-luna` | low |
 | `explore` | Every read-only exploration subagent, `context.*` included | `grok-4.7-medium` | `sonnet` | `gpt-6.1-sol` | medium |
 
 ## Resolution

@@ -76,7 +76,7 @@ Defaults are capability classes, not model slugs: `frontier` (strongest reasonin
 
 | Key | Used for | `cursor` | `claude` | `codex` |
 |---|---|---|---|---|
-| `chore` | grep, read a file / diff / PR / log, rename, one-line edit, run a command and summarize. Stops if > 2 files or a decision is needed | `gpt-6-luna` | `haiku-5-5` | `gpt-6-luna` |
+| `chore` | grep, read a file / diff / PR / log, rename, one-line edit, run a command and summarize. Stops if > 2 files or a decision is needed | `gpt-5.6-luna` | `haiku` | `gpt-6-luna` |
 | `explore` | every read-only exploration subagent, `context.*` included. Bypasses the harness's built-in Explore agent when it doesn't run the configured model | `grok-4.7-medium` | `sonnet` | `gpt-6.1-sol` |
 
 Resolution: `steps.{harness}.{key}` → `steps.{harness}.{parent}` (e.g. `review` for `review.security`, `explore` for `context.*`) → built-in default → harness default.

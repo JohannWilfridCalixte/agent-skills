@@ -13,6 +13,7 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 {
   "output": ".agentic/work",
   "commitWork": false,
+  "worktrees": "../{repo}-worktrees",
   "profiles": [
     { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
   ],
@@ -37,6 +38,7 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 |---|---|---|---|
 | `output` | string | `.agentic/work` | Root of work-item folders, relative to project root |
 | `commitWork` | boolean | `false` | `false` → `output` is gitignored |
+| `worktrees` | string | `../{repo}-worktrees` | Root of worktree workspaces, relative to the main checkout. `{repo}` = its folder name |
 | `profiles` | `{name, detect?, skills}[]` | `[]` | `detect`: files/globs at project root. `skills`: skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → propose detected ones |
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
@@ -82,5 +84,5 @@ Example (cursor, config above): `review.tests` → model `composer-2.5` (from `r
 | Key | Default | Hit → |
 |---|---|---|
 | `review.iterations` | 3 | Stop the fix loop, ask the user |
-| `babysit.rounds` | 5 | Stop watching, ask the user |
+| `babysit.rounds` | 5 | Fix rounds on the PR. Stop fixing, ask the user (watching itself isn't capped) |
 | `implement.retries` | 2 | Stop the task, ask the user |

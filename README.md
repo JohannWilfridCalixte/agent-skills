@@ -70,27 +70,31 @@ flowchart LR
     tickets --> implement
     implement --> review[agentic-review]
     review --> babysit[agentic-babysit-pr]
+    babysit -- merged --> cleanup[agentic-cleanup]
 
     ship[agentic-ship-feature] -. orchestrates .-> spec
     ship -. light mode .-> light["combined grill → plan.md"]
     light --> implement
 ```
 
-- **Full mode**: spec → plan → (tickets) → implement → review → babysit PR.
+- **Full mode**: spec → plan → (tickets) → implement → review → babysit PR → cleanup once merged.
 - **Light mode**: one short combined grill → single `plan.md` → implement. `agentic-ship-feature` proposes light or full after triage; override with `--light` / `--full`. Bugs start with a failing regression test. Review and babysit are never skipped.
 - **Escalation gate** at the end of every grill: structural decisions are confirmed (ADR `Accepted`), escalated (ADR `Proposed` / RFC, pipeline waits), or revisited.
+- **Workspace**: before implementing you pick where the code is built: a new worktree (default, `feat/{slug}` or `fix/{slug}`), the current branch, or another branch. `agentic-ship-feature` asks at triage, so the autonomous part never stops for it.
+- **Cleanup**: once the PR merges, `agentic-cleanup` removes the worktree and branches, returns the main checkout to an up-to-date default branch, and archives the work item. Unmerged or uncommitted work is never deleted without asking.
 
 ## Skills
 
 | Skill | Kind | Role |
 |---|---|---|
-| `agentic-ship-feature` | orchestrator | Chains the pipeline, triages light/full, resumable by slug |
+| `agentic-ship-feature` | orchestrator | Chains the pipeline, triages light/full, picks the workspace, resumable by slug |
 | `agentic-to-spec` | workflow | Capture → context → product/functional grill → gate → `spec.md` |
 | `agentic-to-plan` | workflow | Tech context → tech grill → gate → promote to `docs/` → `plan.md` |
 | `agentic-to-tickets` | optional | Idempotent one-way push of spec + plan tasks to any tracker |
-| `agentic-implement` | workflow | One subagent per task, tests first, one commit per task |
+| `agentic-implement` | workflow | Picks the workspace (worktree by default), one subagent per task, tests first, one commit per task |
 | `agentic-review` | workflow | 6 parallel lenses (spec, codestyle, tests, security, access-control, secrets) → fix loop. PR mode comments instead |
-| `agentic-babysit-pr` | workflow | Push, open PR, watch CI + comments, fix, loop until merge-ready. Never merges |
+| `agentic-babysit-pr` | workflow | Push, open PR, watch CI + comments, fix until merge-ready, keep watching until merged → cleanup. Never merges |
+| `agentic-cleanup` | workflow | After merge: remove worktree and branches, update the default branch, archive the work item. `--all` sweeps every merged one |
 | `agentic-grill` | building block | One question at a time, with a recommended answer |
 | `agentic-use-workflow` | primitive | Config, step model/effort resolution, delegation, work item, audit log, resume |
 | `agentic-use-knowledge` | primitive | Read and promote project knowledge in `docs/` |
@@ -108,6 +112,7 @@ Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (projec
 {
   "output": ".agentic/work",
   "commitWork": false,
+  "worktrees": "../{repo}-worktrees",
   "profiles": [
     { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
   ],
@@ -144,7 +149,11 @@ Every feature gets one folder, shared by all workflows across sessions:
 ├── implementation.md
 ├── reviews/{iteration}-{lens}.md
 └── pr.md
+
+.agentic/work/_archive/{YYYYMMDD}-{slug}/   # after cleanup, kept as audit trail
 ```
+
+The folder always lives in the main checkout, even when the code is built in a worktree (`worktrees`, default `../{repo}-worktrees/{slug}`), so each feature keeps a single audit trail.
 
 Follow a run live from another terminal:
 

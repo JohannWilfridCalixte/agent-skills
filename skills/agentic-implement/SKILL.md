@@ -14,6 +14,7 @@ Load `agentic-use-workflow` first. It owns config, step resolution, delegation, 
 
 - Slug → resume that work item. Path to a `plan.md` → new work item seeded with it. No plan → stop and point to `agentic-to-plan`.
 - Open escalations → list them and stop unless the user overrides (logged by `agentic-use-workflow`).
+- No workspace yet → ask where to build: **worktree** (default, recommended), **current branch**, or **another branch** (existing or new). Set it up per `agentic-use-workflow` Workspace. Everything below runs in `workspace.path`.
 - Read the tasks from `plan.md` (`T1..Tn`: goal, files, depends on, acceptance, ticket). Skip tasks already committed and logged. A task without acceptance criteria or files is a plan defect: ask, don't guess.
 - Find the project's checks (build, lint, typecheck, tests) from scripts, Makefile, CI config, docs. Run them. Red → stop and report. Never start a task on a red tree.
 
@@ -21,7 +22,7 @@ Load `agentic-use-workflow` first. It owns config, step resolution, delegation, 
 
 Order by depends-on. Sequential by default; run tasks in parallel only when they are independent **and** their files are disjoint.
 
-One subagent per task, step key `implement`. Give it paths, not content: `plan.md` and the task id, `spec.md` / `context.md` when present, and the skills to load: the profile codestyle skills and `agentic-code-testing`. Its brief:
+One subagent per task, step key `implement`. Give it paths, not content: the workspace path, `plan.md` and the task id, `spec.md` / `context.md` when present, and the skills to load: the profile codestyle skills and `agentic-code-testing`. Its brief:
 
 - Tests first wherever behaviour is testable: failing test, see it fail, make it pass. Bug fix → the first test reproduces the bug.
 - Stay within the task. Unplanned files or decisions go in the summary, not silently into the diff.

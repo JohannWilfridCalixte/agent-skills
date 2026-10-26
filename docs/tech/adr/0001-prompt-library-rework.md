@@ -28,16 +28,17 @@ The v1 library (personas, `agentic:*:*` names, step files, 3 global model consta
 
 | Skill | Kind | Role |
 |---|---|---|
-| `agentic-use-workflow` | primitive | Config, step → `{model, effort}` resolution, delegation, work-item folder, `events.jsonl` + `state.json`, resume, escalation gate, communication mode |
+| `agentic-use-workflow` | primitive | Config, step → `{model, effort}` resolution, delegation, work-item folder, workspace, `events.jsonl` + `state.json`, resume, escalation gate, communication mode |
 | `agentic-use-knowledge` | primitive | Read (context) and write (promotion) `docs/`, incl. `docs/tech/principles.md` |
 | `agentic-grill` | building block | Interview one question at a time with a recommended answer; `focus`: product, functional, tech, combined |
 | `agentic-to-spec` | workflow 1 | capture → context → grill (product + functional) → gate → `spec.md` |
 | `agentic-to-plan` | workflow 2 | context (tech, additive) → grill (tech) → gate → promote to `docs/` → `plan.md` |
 | `agentic-to-tickets` | optional | One-way idempotent push of spec + plan tasks to any tracker |
-| `agentic-implement` | workflow 3 | One subagent per task, tests-first, one commit per task, green gate between tasks |
+| `agentic-implement` | workflow 3 | Asks the workspace if none, one subagent per task, tests-first, one commit per task, green gate between tasks |
 | `agentic-review` | workflow 4 | 6 parallel lenses → fix loop. PR mode = comment instead of fix |
-| `agentic-babysit-pr` | workflow 5 | Push, open PR, watch CI + comments, fix, loop until merge-ready. Never merges |
-| `agentic-ship-feature` | orchestrator | Chains 1→5, triage light/full, resumable by slug |
+| `agentic-babysit-pr` | workflow 5 | Push, open PR, watch CI + comments, fix until merge-ready, keep watching until merged → `agentic-cleanup`. Never merges |
+| `agentic-cleanup` | workflow 6 | After merge: remove worktree, delete branches, update default branch, archive the work item. `--all` sweeps |
+| `agentic-ship-feature` | orchestrator | Chains 1→6, triage light/full + workspace, resumable by slug |
 | codestyle skills | rulesets | Unchanged content, renamed |
 
 Deleted: `agents/`, `use-agentic` (merged into `agentic-use-workflow`), `delegate-work` (merged), `technical-planning`, `implement` (rewritten), `debug` (bugs go through light mode), `pr-review` (→ `agentic-review` PR mode), `review-loop`, `review-code`, `review-tests`, `review-security` (→ `agentic-review` lenses).
@@ -81,6 +82,7 @@ Lookup: `.agentic.json` at project root, then `~/.agentic/config.json` (project 
 {
   "output": ".agentic/work",
   "commitWork": false,
+  "worktrees": "../{repo}-worktrees",
   "profiles": [
     { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
   ],
@@ -115,9 +117,11 @@ The unit of state is the work item (feature), not the run.
 ├── implementation.md
 ├── reviews/{iteration}-{lens}.md
 └── pr.md
+
+{output}/_archive/{YYYYMMDD}-{slug}/   # after agentic-cleanup, never deleted
 ```
 
-- `{output}` defaults to `.agentic/work`, gitignored unless `commitWork: true`.
+- `{output}` defaults to `.agentic/work`, gitignored unless `commitWork: true`. Always in the main checkout, never in a worktree.
 - Standalone workflow without a slug → new work item. With a slug → resume from `state.json`.
 
 `events.jsonl` line:
@@ -138,6 +142,7 @@ The unit of state is the work item (feature), not the run.
   "status": "in_progress",
   "phase": "to-plan",
   "phases": { "to-spec": "done", "to-plan": "in_progress" },
+  "workspace": { "kind": "worktree", "branch": "feat/tenant-export", "base": "main", "path": "/home/me/dev/shop-worktrees/tenant-export" },
   "artifacts": { "spec": "spec.md", "plan": null },
   "escalations": [{ "id": "D4", "summary": "Exports stored 30 days", "status": "open", "ref": "docs/tech/adr/0007-export-retention.md" }],
   "tickets": { "parent": null, "tasks": {} },
@@ -146,7 +151,21 @@ The unit of state is the work item (feature), not the run.
 }
 ```
 
-`status` ∈ `in_progress | awaiting_decision | blocked | done | failed`.
+`status` ∈ `in_progress | awaiting_decision | blocked | done | failed | archived`.
+
+### Workspace
+
+Where the code is built, asked once per work item by the first workflow that writes to the repo: `agentic-ship-feature` at triage (everything after the last gate is autonomous), the promotion after a gate, or `agentic-implement`.
+
+- **worktree** (default, recommended): branch `feat/{slug}` or `fix/{slug}` from the up-to-date default branch, at `{worktrees}/{slug}` (default `../{repo}-worktrees`). Dependencies installed so checks run; untracked local files (`.env`) copied only on consent.
+- **current**: the checked-out branch. On the default branch → warn, recommend worktree or new branch.
+- **branch**: an existing branch or a new one.
+
+Logged as a `decision` event, recorded as `state.workspace` (absolute path). The work-item folder stays in the main checkout; every later repo write (code, `docs/` promotion, committed as `docs: …`) and code operation, subagents included, runs in `workspace.path`, passed by delegation.
+
+### Cleanup
+
+`agentic-cleanup` runs once merged: worktree removed and pruned, local branch deleted, remote branch deleted if still there, main checkout back on an up-to-date default branch if it was on the feature branch, folder archived to `{output}/_archive/`. Merged = PR state merged (authoritative, handles squash merges), else branch merged into the default branch. Unmerged branch, uncommitted or unpushed work, PR closed without merge → ask. Events are logged before the move; final status `archived`. `--all` sweeps every non-archived merged work item and reports cleaned vs skipped with reasons.
 
 ### Escalation gate
 
@@ -177,11 +196,11 @@ Severity: blocker, major (both block) / minor, nit. Fix loop until no blocker/ma
 
 ### Babysit authority
 
-Bot comments: fix if valid, else reply with reason; resolve. Human comments: clear requests → fix, reply with commit link, resolve. Debatable / design-level → escalate to user. Never merges. Moves tickets to *In Review* when PR opens. Defers to a native harness loop (e.g. Cursor `autopilot`) when available.
+Bot comments: fix if valid, else reply with reason; resolve. Human comments: clear requests → fix, reply with commit link, resolve. Debatable / design-level → escalate to user. Never merges. Moves tickets to *In Review* when PR opens. After merge-ready, keeps watching (growing backoff, same rules) until the PR is merged or closed, then hands off to `agentic-cleanup`. `limits.babysit.rounds` caps fix rounds, not watching. Defers to a native harness loop (e.g. Cursor `autopilot` / `loop`) when available. A session ending before merge resumes with `agentic-babysit-pr {slug}` or `agentic-cleanup`.
 
 ### Ship-feature orchestration
 
-Interactive until the last gate, autonomous after. Interrupts only for: limits hit, design-level PR comments, unfixable red tree.
+Interactive until the last gate, autonomous after. Triage also asks tickets and workspace, and sets the workspace up. Interrupts only for: limits hit, design-level PR comments, unfixable red tree, PR closed without merge, cleanup blocked by unmerged or unpushed work. The chain ends after merge with `agentic-cleanup`.
 
 ## Rationale
 
@@ -197,6 +216,8 @@ Interactive until the last gate, autonomous after. Interrupts only for: limits h
 - **YAML-only state / per-run folders**: no cross-run view of a feature.
 - **Plain names + plugin namespacing** (`to-spec`, exposed as `/agentic:to-spec`): rejected. Cursor doesn't namespace plugin skills (`/grill` would sit next to Matt Pocock's `/grill-me`), and team admins may block plugin installs, leaving plain skills with no prefix at all.
 - **Keep `debug`**: light mode with a regression-test-first task covers it.
+- **Work-item folder inside the worktree**: rejected. Splits the audit trail across checkouts and disappears with the worktree.
+- **Delete the work item on cleanup**: rejected for archiving; the log is the audit trail.
 
 ## Consequences
 

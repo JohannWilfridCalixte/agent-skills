@@ -10,14 +10,14 @@ Load `agentic-use-workflow` first. It owns config, step resolution, delegation, 
 
 ## Scope
 
-- Slug → the work item's branch against its base; `spec.md` and `plan.md` are the reference.
+- Slug → `workspace.branch` against `workspace.base`, run in `workspace.path` (`agentic-use-workflow`); `spec.md` and `plan.md` are the reference.
 - No slug → the current branch (or given base ref) as a new work item; the spec lens falls back to PR description, tickets and commit messages.
 - PR number or URL → PR mode.
 - `--only spec,security` → run that subset. Default: all six.
 
 ## Lenses
 
-One subagent per lens, all in parallel, step key `review.<lens>`. Give each: its lens file `reviewers/<lens>.md`, `references/finding.md`, the diff range, the work-item paths (spec, plan, implementation, previous reviews) and the profile codestyle skills. Each writes `reviews/{iteration}-{lens}.md` and returns its counts.
+One subagent per lens, all in parallel, step key `review.<lens>`. Give each: its lens file `reviewers/<lens>.md`, `references/finding.md`, the diff range, the workspace path, the work-item paths (spec, plan, implementation, previous reviews) and the profile codestyle skills. Each writes `reviews/{iteration}-{lens}.md` and returns its counts.
 
 | Lens | Checks against |
 |---|---|

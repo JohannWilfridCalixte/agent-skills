@@ -1,11 +1,11 @@
 ---
 name: agentic-use-workflow
-description: Shared runtime for the agentic workflows (agentic-to-spec, agentic-to-plan, agentic-to-tickets, agentic-implement, agentic-review, agentic-babysit-pr, agentic-ship-feature). Use when running any of them, or when a step needs config, per-step model/effort, subagent delegation, work-item state, resume by slug, or the escalation gate.
+description: Shared runtime for the agentic workflows (agentic-to-spec, agentic-to-plan, agentic-to-tickets, agentic-implement, agentic-review, agentic-babysit-pr, agentic-cleanup, agentic-ship-feature). Use when running any of them, or when a step needs config, per-step model/effort, subagent delegation, work-item state, the workspace (worktree or branch), resume by slug, or the escalation gate.
 ---
 
 # Use Workflow
 
-Runtime every workflow loads first. Owns config, delegation, work-item state, the escalation gate and the communication mode. Contracts read by other steps or outside tooling live in `references/`; follow them exactly.
+Runtime every workflow loads first. Owns config, delegation, work-item state, the workspace, the escalation gate and the communication mode. Contracts read by other steps or outside tooling live in `references/`; follow them exactly.
 
 ## Config
 
@@ -26,7 +26,7 @@ Every step has a key (`grill`, `implement`, `review.security`, …). Resolve `mo
 
 One subagent per step key; parallel when independent (no shared writes, no ordering). Use the harness's native subagent, model and effort controls: [references/delegation.md](references/delegation.md).
 
-Pass paths and skill names, never content: work-item path, inputs, output path, step skill, profile codestyle skills when code is written or judged. `context.*` steps use read-only subagents.
+Pass paths and skill names, never content: work-item path, workspace path, inputs, output path, step skill, profile codestyle skills when code is written or judged. `context.*` steps use read-only subagents.
 
 Subagents never touch `events.jsonl` or `state.json`. Writing subagents return a short summary + output path. Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
 
@@ -36,7 +36,19 @@ Subagents never touch `events.jsonl` or `state.json`. Writing subagents return a
 
 - No slug → new work item: short kebab slug from the request, create the folder, write the raw request to `input.md`.
 - Slug given → folder named `{slug}` or ending in `-{slug}`; resume from `state.json`. Several matches → ask.
+- `{output}` always resolves in the main checkout (first entry of `git worktree list`), even from inside a worktree: one audit trail per work item.
+- `agentic-cleanup` archives merged work items to `{output}/_archive/{work-item}/`. Never deleted; slug lookup skips them.
 - Keep `{output}` in `.gitignore` unless `commitWork: true`.
+
+## Workspace
+
+Where the code is built, chosen once per work item by the first workflow that writes to the repo (`agentic-ship-feature` at triage, `agentic-implement`, or the promotion after a gate):
+
+- **worktree** (default, recommended): new branch `feat/{slug}` (`fix/{slug}` for bugs) from the up-to-date default branch, at `{worktrees}/{slug}`. Install dependencies so the project checks run there. Ask before copying untracked local files (`.env`, …).
+- **current**: the checked-out branch. On the default branch → warn, recommend a worktree or a new branch.
+- **branch**: an existing branch, or a new one from the up-to-date default branch.
+
+Branch or path already taken → ask. Log the choice as a `decision` event; it becomes `workspace` in `state.json` (absolute `path`). From then on every repo write and code operation (implement, review, babysit-pr, `docs/` promotion, their subagents) runs in `workspace.path`. A workflow that doesn't ask (review, babysit-pr) and finds no workspace uses the current checkout, recorded as `current`. Recorded path gone → ask.
 
 ## Events and state
 
@@ -52,7 +64,7 @@ Runs at the end of every grill. From `decisions.md`, list `structural` decisions
 - **escalate** → ADR `Proposed` or RFC via `agentic-use-knowledge`, optionally shared through available tools (chat, tracker). Escalation `open`, status `awaiting_decision`.
 - **revisit** → back to grill on that decision.
 
-Promote to `docs/` via `agentic-use-knowledge` right after the gate; nothing unconfirmed lands there before. A workflow starting on a work item with open escalations refuses unless the user overrides; log the override. When an escalation is settled later, update the ADR/RFC via `agentic-use-knowledge` and log it `resolved`.
+Promote to `docs/` via `agentic-use-knowledge` right after the gate, in `workspace.path`, and commit it there (`docs: …`); nothing unconfirmed lands there before. A workflow starting on a work item with open escalations refuses unless the user overrides; log the override. When an escalation is settled later, update the ADR/RFC via `agentic-use-knowledge` and log it `resolved`.
 
 ## Communication mode
 

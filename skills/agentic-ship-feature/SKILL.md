@@ -1,12 +1,12 @@
 ---
 name: agentic-ship-feature
-description: Take a feature or bug from raw input to a merge-ready PR by chaining agentic-to-spec, agentic-to-plan, optional agentic-to-tickets, agentic-implement, agentic-review, and agentic-babysit-pr, with a light or full track. Interactive until the last gate, autonomous after. Resumable by slug. Use when the user wants a change shipped end to end.
+description: Take a feature or bug from raw input to a merged PR by chaining agentic-to-spec, agentic-to-plan, optional agentic-to-tickets, agentic-implement, agentic-review, agentic-babysit-pr and agentic-cleanup, with a light or full track, in a worktree by default. Interactive until the last gate, autonomous after. Never merges. Resumable by slug. Use when the user wants a change shipped end to end.
 argument-hint: "<text | file | ticket key | URL | slug> [--light | --full]"
 ---
 
 # Ship Feature
 
-Orchestrator. Chains the workflows by name and owns only triage, sequencing, and the hand-offs between them. `agentic-use-workflow` tracks phases, events, state, and escalations.
+Orchestrator. Chains the workflows by name and owns only triage, sequencing, and the hand-offs between them. `agentic-use-workflow` tracks phases, events, state, escalations and the workspace.
 
 ## Start or resume
 
@@ -21,7 +21,12 @@ Propose light or full with a one-line why, then get the user's confirmation. `--
 - **Light**: bug fix or small change, one area, no new data model, public contract, or security surface, behaviour already clear.
 - **Full**: new user-facing behaviour, several areas, data or contract changes, fuzzy scope.
 
-In the same exchange, ask whether to push tickets with `agentic-to-tickets`, and to which tracker.
+In the same exchange, ask:
+
+- whether to push tickets with `agentic-to-tickets`, and to which tracker;
+- where to build the code: **worktree** (default, recommended), **current branch**, or **another branch** (existing or new).
+
+Set the workspace up right away (`agentic-use-workflow` Workspace), including the question about copying untracked local files: nothing may need asking once the chain runs autonomously.
 
 ## Full track
 
@@ -45,10 +50,13 @@ Interactive until the last gate (the `agentic-to-plan` gate in full, the combine
 - a limit from config is hit,
 - a design-level PR comment needs a human,
 - the tree is red and can't be fixed,
-- a new escalation opens.
+- a new escalation opens,
+- the PR is closed without merge, or cleanup finds unmerged, uncommitted or unpushed work.
 
 An escalation during a gate stops the chain with status `awaiting_decision`. Tell the user to re-run `agentic-ship-feature {slug}` once the decision is made.
 
 ## Finish
 
-Report the PR link, ticket keys, artifacts, and anything deferred or escalated. Never merge.
+At merge-ready, report the PR link, ticket keys, artifacts, and anything deferred or escalated. Never merge.
+
+`agentic-babysit-pr` keeps watching until the PR is merged or closed. Then log `ship-feature` completed and run `agentic-cleanup {slug}`: it archives the folder, so nothing is logged after it.

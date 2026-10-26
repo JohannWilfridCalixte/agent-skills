@@ -32,7 +32,7 @@ Repeat until the PR is merged or closed. Rounds that push fixes are capped by `l
    - **Bot comment**: valid → fix; not valid → reply with the reason. Resolve either way.
    - **Human comment**: clear request → fix, reply with the commit link, resolve the thread. Debatable, design-level or disagreement → escalate to the user with a recommendation; don't answer on their behalf.
    - **Conflict with base**: resolve if mechanical, following the repo's merge or rebase convention; otherwise escalate.
-3. Fix: group by disjoint files, one `babysit.fix` subagent per group, with the comment or log references, the work-item and workspace paths, the profile codestyle skills and `agentic-code-testing`. Each commits its fix and returns the sha.
+3. Fix: group by disjoint files, one `babysit.fix` subagent per group, with the comment or log references, the work-item and workspace paths, the codestyle skills and `agentic-code-testing`. Each commits its fix and returns the sha.
 4. Run the project checks, push, post the replies, log the round in `pr.md`.
 
 CI green and no unresolved actionable thread → report merge-ready once (with pending approvals if any), log it, keep watching.

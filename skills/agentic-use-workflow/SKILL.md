@@ -13,7 +13,7 @@ Load `.agentic.json` (project root) then `~/.agentic/config.json`; project wins,
 
 Harness key is `cursor`, `claude` or `codex`, from your own runtime. Unsure → ask.
 
-Profiles: use `selectedProfiles`. Empty → propose the profiles whose `detect` files exist, confirm. Their `skills` are the codestyle skills for every step that writes or judges code.
+Profiles: built-in ones (`typescript`, `python`) plus config `profiles` (same name overrides). Use `selectedProfiles`; empty → every profile whose `detect` files exist, say which once. Their `skills` are the codestyle skills for every step that writes or judges code. Tasks add their own (`Skills` in `plan.md`): a step working on given tasks loads the profile skills plus theirs; a step judging the whole change (review lenses, fixers) loads the union across tasks.
 
 ## Step → model and effort
 
@@ -34,7 +34,7 @@ Don't spend the session model on easy work.
 
 One subagent per step key; parallel when independent (no shared writes, no ordering). Use the harness's native subagent, model and effort controls: [references/delegation.md](references/delegation.md).
 
-Pass paths and skill names, never content: work-item path, workspace path, inputs, output path, step skill, profile codestyle skills when code is written or judged. `context.*` steps use read-only subagents.
+Pass paths and skill names, never content: work-item path, workspace path, inputs, output path, step skill, codestyle skills when code is written or judged. `context.*` steps use read-only subagents.
 
 Subagents never touch `state.json`. Writing subagents append `progress` lines to `events.jsonl` (see Events) and return a short summary + output path. Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
 

@@ -15,9 +15,9 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
   "commitWork": false,
   "worktrees": "../{repo}-worktrees",
   "profiles": [
-    { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
+    { "name": "backend", "detect": ["src/domain"], "skills": ["agentic-clean-architecture"] }
   ],
-  "selectedProfiles": ["typescript"],
+  "selectedProfiles": ["typescript", "backend"],
   "steps": {
     "cursor": {
       "grill": { "model": "claude-opus-5-5", "effort": "high" },
@@ -39,8 +39,17 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 | `output` | string | `.agentic/work` | Root of work-item folders, relative to project root |
 | `commitWork` | boolean | `false` | `false` → `output` is gitignored |
 | `worktrees` | string | `../{repo}-worktrees` | Root of worktree workspaces, relative to the main checkout. `{repo}` = its folder name |
-| `profiles` | `{name, detect?, skills}[]` | `[]` | `detect`: files/globs at project root. `skills`: skill names |
-| `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → propose detected ones |
+| `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: skill names |
+| `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
+
+Built-in profiles:
+
+| Name | `detect` | `skills` |
+|---|---|---|
+| `typescript` | `tsconfig.json` | `agentic-typescript-engineer` |
+| `python` | `pyproject.toml`, `setup.py`, `requirements.txt` | `agentic-python-engineer` |
+
+`agentic-clean-architecture` and `agentic-write-instrumented-code` aren't stack-wide: `agentic-to-plan` assigns them per task (`Skills` in `plan.md`). Put them in a profile only to force them on every task.
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
 

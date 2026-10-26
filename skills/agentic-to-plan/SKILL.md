@@ -40,6 +40,7 @@ Fill [references/plan.md](references/plan.md).
 - Every structural decision is reflected, none reinterpreted. Cite `D#` and ADRs.
 - Tasks are thin vertical slices: each cuts through every layer it needs, is verifiable alone, and fits one commit. Prefer many thin tasks over few thick ones.
 - Every task has acceptance criteria tied to spec IDs. Tests come first.
+- Every task lists the codestyle skills it needs beyond the profile ones: `agentic-clean-architecture` when it touches business logic (domain, use cases, validation, state transitions), `agentic-write-instrumented-code` when it adds logging or tracing.
 - Present the task list and ask: granularity right? dependencies right? anything to split or merge? Iterate until approved.
 
 Log an `artifact` event.

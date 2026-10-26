@@ -17,12 +17,12 @@ Load `agentic-use-workflow` first. It owns config, step resolution, delegation, 
 
 ## Lenses
 
-One subagent per lens, all in parallel, step key `review.<lens>`. Give each: its lens file `reviewers/<lens>.md`, `references/finding.md`, the diff range, the workspace path, the work-item paths (spec, plan, implementation, previous reviews) and the profile codestyle skills. Each writes `reviews/{iteration}-{lens}.md` and returns its counts.
+One subagent per lens, all in parallel, step key `review.<lens>`. Give each: its lens file `reviewers/<lens>.md`, `references/finding.md`, the diff range, the workspace path, the work-item paths (spec, plan, implementation, previous reviews) and the codestyle skills. Each writes `reviews/{iteration}-{lens}.md` and returns its counts.
 
 | Lens | Checks against |
 |---|---|
 | `spec` | acceptance criteria in `spec.md` / `plan.md` |
-| `codestyle` | `docs/tech/principles.md`, ADRs, profile codestyle skills |
+| `codestyle` | `docs/tech/principles.md`, ADRs, codestyle skills |
 | `tests` | `agentic-code-testing` |
 | `security` | OWASP Top 10 |
 | `access-control` | authz on every entry point, IDOR, tenant isolation |
@@ -32,7 +32,7 @@ One subagent per lens, all in parallel, step key `review.<lens>`. Give each: its
 
 Aggregate and dedupe (same location and issue across lenses → keep the highest severity). No blocker or major → done.
 
-Otherwise group blockers and majors by disjoint files and run one `review.fix` subagent per group in parallel, with the findings, the work-item paths, the profile codestyle skills and `agentic-code-testing`. Each fixes, runs the checks, makes one commit referencing the finding ids, and reports each finding as fixed or disputed with a reason. Findings that need a user action (rotating a leaked credential, rewriting history, a design call) are escalated, not attempted.
+Otherwise group blockers and majors by disjoint files and run one `review.fix` subagent per group in parallel, with the findings, the work-item paths, the codestyle skills and `agentic-code-testing`. Each fixes, runs the checks, makes one commit referencing the finding ids, and reports each finding as fixed or disputed with a reason. Findings that need a user action (rotating a leaked credential, rewriting history, a design call) are escalated, not attempted.
 
 Run the project checks, then re-run all selected lenses: a fix for one lens can break another. They judge disputed findings too. Minors and nits are reported, not looped on.
 

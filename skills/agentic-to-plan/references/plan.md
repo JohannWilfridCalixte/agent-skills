@@ -21,12 +21,14 @@
 
 <!-- Ordered. Each task is a thin vertical slice, verifiable alone, one commit, tests first. Bug: T1 is a failing regression test. -->
 <!-- "Ticket" is written by agentic-to-tickets; leave "—". -->
+<!-- "Skills": codestyle skills this task needs on top of the profile ones, e.g. agentic-clean-architecture (business logic, domain, use cases), agentic-write-instrumented-code (logging, tracing). "—" if none. -->
 
 ### T1 — {title}
 
 - **Goal:** {observable outcome}
 - **Files:** `{path}`, `{path}` (new)
 - **Depends on:** none
+- **Skills:** agentic-clean-architecture
 - **Acceptance:**
   - [ ] {criterion} (AC1)
 - **Ticket:** —
@@ -36,6 +38,7 @@
 - **Goal:** {observable outcome}
 - **Files:** `{path}`
 - **Depends on:** T1
+- **Skills:** —
 - **Acceptance:**
   - [ ] {criterion} (AC2)
 - **Ticket:** —

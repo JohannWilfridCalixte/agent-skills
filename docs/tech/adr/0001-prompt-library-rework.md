@@ -92,9 +92,9 @@ Lookup: `.agentic.json` at project root, then `~/.agentic/config.json` (project 
   "commitWork": false,
   "worktrees": "../{repo}-worktrees",
   "profiles": [
-    { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
+    { "name": "backend", "detect": ["src/domain"], "skills": ["agentic-clean-architecture"] }
   ],
-  "selectedProfiles": ["typescript"],
+  "selectedProfiles": ["typescript", "backend"],
   "steps": {
     "cursor": {
       "grill": { "model": "claude-opus-5-5", "effort": "high" },
@@ -194,7 +194,7 @@ Promotion to `docs/` happens right after each gate. Nothing unconfirmed lands in
 | Lens | Checks against |
 |---|---|
 | `spec` | `spec.md` / `plan.md` acceptance criteria |
-| `codestyle` | `docs/tech/principles.md`, ADR index, profile codestyle skills |
+| `codestyle` | `docs/tech/principles.md`, ADR index, codestyle skills |
 | `tests` | `agentic-code-testing` |
 | `security` | OWASP Top 10 |
 | `access-control` | authz on every entry point, IDOR, tenant isolation |

@@ -8,7 +8,7 @@ Names and paths only. The subagent loads skills and reads files itself, so neste
 Step: {step key}
 Work item: {work-item path}
 Workspace: {workspace.path}     # run every code read, write, check and commit here
-Load skills: {step skill}, {profile codestyle skills}
+Load skills: {step skill}, {codestyle skills}
 Read: {input paths}
 Write: {output path}            # omit for read-only steps
 Goal: {one or two sentences of intent}

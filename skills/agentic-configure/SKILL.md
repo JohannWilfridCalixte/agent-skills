@@ -39,7 +39,7 @@ Confirm, with defaults from the contract:
 
 - `output` (work items, default `.agentic/work`) and `commitWork` (default `false`). `false` and `{output}` missing from `.gitignore` → offer to add it.
 - `worktrees` (default `../{repo}-worktrees`). Resolve it for this repo and show the absolute path.
-- Project scope: profiles whose `detect` files exist → propose `selectedProfiles` and their codestyle skills.
+- Project scope: profiles (built-in and configured) whose `detect` files exist → propose `selectedProfiles` and their codestyle skills. Mention that `agentic-clean-architecture` / `agentic-write-instrumented-code` are assigned per task unless the user wants them forced through a profile.
 - `limits`: show defaults, ask if they fit.
 
 ## 5. Write and validate

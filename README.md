@@ -128,9 +128,9 @@ Both are read; the project file wins. `steps` and `limits` merge key by key, so 
   "commitWork": false,
   "worktrees": "../{repo}-worktrees",
   "profiles": [
-    { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
+    { "name": "backend", "detect": ["src/domain"], "skills": ["agentic-clean-architecture"] }
   ],
-  "selectedProfiles": ["typescript"],
+  "selectedProfiles": ["typescript", "backend"],
   "steps": {
     "cursor": {
       "grill": { "model": "claude-opus-5-5", "effort": "high" },
@@ -154,8 +154,10 @@ Both are read; the project file wins. `steps` and `limits` merge key by key, so 
 | `output` | `.agentic/work` | Where work-item folders live (relative to the project root) |
 | `commitWork` | `false` | `false` keeps `output` out of git |
 | `worktrees` | `../{repo}-worktrees` | Where worktrees are created (`{repo}` = repo folder name) |
-| `profiles` | `[]` | Stack → codestyle skills. `detect`: files that identify the stack |
-| `selectedProfiles` | `[]` | Profiles in use. Empty → detected ones are proposed |
+| `profiles` | built-ins | Stack → codestyle skills, added to the built-ins `typescript` (`tsconfig.json` → `agentic-typescript-engineer`) and `python` (`pyproject.toml` … → `agentic-python-engineer`). Same name overrides a built-in |
+| `selectedProfiles` | `[]` | Profiles in use. Empty → every profile whose `detect` files exist |
+
+Profile skills load on every coding step. `agentic-clean-architecture` and `agentic-write-instrumented-code` are assigned per task by `agentic-to-plan` (`Skills` in `plan.md`), so they only load where the task needs them; add them to a profile to force them everywhere.
 | `steps` | `{}` | Model and effort per step, per harness (`cursor`, `claude`, `codex`) |
 | `limits` | see below | Loop caps |
 

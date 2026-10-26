@@ -6,16 +6,36 @@ Composable, spec-driven development workflows for AI coding assistants (Claude C
 
 ## Install
 
-The repo is a plugin named `agentic`, so skills are exposed as `/agentic:to-spec`, `/agentic:ship-feature`, etc.
+Every skill is named `agentic-<name>`, so the prefix shows in every harness, with or without a plugin. Invoke them as `/agentic-ship-feature` in Cursor and Claude Code, `$agentic-ship-feature` in Codex.
 
-**Claude Code**
+### Local skills (recommended)
+
+Clone the repo and symlink each skill folder into the harness's skills directory: `~/.agents/skills` is read by Cursor and Codex (Codex follows symlinks), `~/.claude/skills` by Claude Code.
+
+```bash
+git clone https://github.com/JohannWilfridCalixte/agent-skills.git ~/development/agent-skills
+
+mkdir -p ~/.agents/skills
+for d in ~/development/agent-skills/skills/*/; do ln -s "${d%/}" ~/.agents/skills/; done
+
+mkdir -p ~/.claude/skills
+for d in ~/development/agent-skills/skills/*/; do ln -s "${d%/}" ~/.claude/skills/; done
+```
+
+A `git pull` in the clone updates every harness at once.
+
+### Plugin
+
+Plugins add nothing but distribution; skill names are the same. Team admins can block plugin imports, in which case use local skills.
+
+**Claude Code** (skills show as `/agentic:agentic-ship-feature`)
 
 ```bash
 /plugin marketplace add JohannWilfridCalixte/agent-skills
 /plugin install agentic@agentic
 ```
 
-**Cursor**
+**Cursor** (clone directly: `~/.cursor/plugins/local` ignores symlinks pointing outside it)
 
 ```bash
 git clone https://github.com/JohannWilfridCalixte/agent-skills.git ~/.cursor/plugins/local/agentic
@@ -28,55 +48,57 @@ codex plugin marketplace add JohannWilfridCalixte/agent-skills
 codex plugin add agentic@agentic
 ```
 
-**Single skill** (any harness supported by [`skills`](https://github.com/vercel-labs/skills))
+### Single skill
+
+Any harness supported by [`skills`](https://github.com/vercel-labs/skills):
 
 ```bash
-npx skills add JohannWilfridCalixte/agent-skills --skill typescript-engineer
+npx skills add JohannWilfridCalixte/agent-skills --skill agentic-typescript-engineer
 ```
 
-Workflow skills depend on `use-workflow` and `use-knowledge`; install those alongside.
+Workflow skills depend on `agentic-use-workflow` and `agentic-use-knowledge`; install those alongside.
 
 ## Feature pipeline
 
-Each workflow runs standalone or chained by `ship-feature`. Interactive steps (capture, grill, gate, triage) run in your session; everything else runs as subagents.
+Each workflow runs standalone or chained by `agentic-ship-feature`. Interactive steps (capture, grill, gate, triage) run in your session; everything else runs as subagents.
 
 ```mermaid
 flowchart LR
-    spec[to-spec] --> plan[to-plan]
-    plan --> tickets["to-tickets (optional)"]
-    plan --> implement
+    spec[agentic-to-spec] --> plan[agentic-to-plan]
+    plan --> tickets["agentic-to-tickets (optional)"]
+    plan --> implement[agentic-implement]
     tickets --> implement
-    implement --> review
-    review --> babysit[babysit-pr]
+    implement --> review[agentic-review]
+    review --> babysit[agentic-babysit-pr]
 
-    ship[ship-feature] -. orchestrates .-> spec
+    ship[agentic-ship-feature] -. orchestrates .-> spec
     ship -. light mode .-> light["combined grill → plan.md"]
     light --> implement
 ```
 
 - **Full mode**: spec → plan → (tickets) → implement → review → babysit PR.
-- **Light mode**: one short combined grill → single `plan.md` → implement. `ship-feature` proposes light or full after triage; override with `--light` / `--full`. Bugs start with a failing regression test. Review and babysit are never skipped.
+- **Light mode**: one short combined grill → single `plan.md` → implement. `agentic-ship-feature` proposes light or full after triage; override with `--light` / `--full`. Bugs start with a failing regression test. Review and babysit are never skipped.
 - **Escalation gate** at the end of every grill: structural decisions are confirmed (ADR `Accepted`), escalated (ADR `Proposed` / RFC, pipeline waits), or revisited.
 
 ## Skills
 
 | Skill | Kind | Role |
 |---|---|---|
-| `ship-feature` | orchestrator | Chains the pipeline, triages light/full, resumable by slug |
-| `to-spec` | workflow | Capture → context → product/functional grill → gate → `spec.md` |
-| `to-plan` | workflow | Tech context → tech grill → gate → promote to `docs/` → `plan.md` |
-| `to-tickets` | optional | Idempotent one-way push of spec + plan tasks to any tracker |
-| `implement` | workflow | One subagent per task, tests first, one commit per task |
-| `review` | workflow | 6 parallel lenses (spec, codestyle, tests, security, access-control, secrets) → fix loop. PR mode comments instead |
-| `babysit-pr` | workflow | Push, open PR, watch CI + comments, fix, loop until merge-ready. Never merges |
-| `grill` | building block | One question at a time, with a recommended answer |
-| `use-workflow` | primitive | Config, step model/effort resolution, delegation, work item, audit log, resume |
-| `use-knowledge` | primitive | Read and promote project knowledge in `docs/` |
-| `typescript-engineer` | codestyle | TypeScript type safety, error handling, patterns |
-| `python-engineer` | codestyle | Python 3.12+ typing, error handling, patterns |
-| `clean-architecture` | codestyle | Ports & adapters, domain model, dependency rule |
-| `code-testing` | codestyle | Test philosophy, pyramid, anti-patterns |
-| `write-instrumented-code` | codestyle | Logging, tracing, OpenTelemetry |
+| `agentic-ship-feature` | orchestrator | Chains the pipeline, triages light/full, resumable by slug |
+| `agentic-to-spec` | workflow | Capture → context → product/functional grill → gate → `spec.md` |
+| `agentic-to-plan` | workflow | Tech context → tech grill → gate → promote to `docs/` → `plan.md` |
+| `agentic-to-tickets` | optional | Idempotent one-way push of spec + plan tasks to any tracker |
+| `agentic-implement` | workflow | One subagent per task, tests first, one commit per task |
+| `agentic-review` | workflow | 6 parallel lenses (spec, codestyle, tests, security, access-control, secrets) → fix loop. PR mode comments instead |
+| `agentic-babysit-pr` | workflow | Push, open PR, watch CI + comments, fix, loop until merge-ready. Never merges |
+| `agentic-grill` | building block | One question at a time, with a recommended answer |
+| `agentic-use-workflow` | primitive | Config, step model/effort resolution, delegation, work item, audit log, resume |
+| `agentic-use-knowledge` | primitive | Read and promote project knowledge in `docs/` |
+| `agentic-typescript-engineer` | codestyle | TypeScript type safety, error handling, patterns |
+| `agentic-python-engineer` | codestyle | Python 3.12+ typing, error handling, patterns |
+| `agentic-clean-architecture` | codestyle | Ports & adapters, domain model, dependency rule |
+| `agentic-code-testing` | codestyle | Test philosophy, pyramid, anti-patterns |
+| `agentic-write-instrumented-code` | codestyle | Logging, tracing, OpenTelemetry |
 
 ## Configuration
 
@@ -87,7 +109,7 @@ Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (projec
   "output": ".agentic/work",
   "commitWork": false,
   "profiles": [
-    { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["typescript-engineer", "clean-architecture"] }
+    { "name": "typescript", "detect": ["tsconfig.json"], "skills": ["agentic-typescript-engineer", "agentic-clean-architecture"] }
   ],
   "selectedProfiles": ["typescript"],
   "steps": {
@@ -104,7 +126,7 @@ Optional. `.agentic.json` at project root, then `~/.agentic/config.json` (projec
 }
 ```
 
-`steps` is a flat map per harness. A key like `review.security` falls back to its parent (`review`), then to the built-in default, then to the harness default. The full list of step keys and built-in defaults lives in [`use-workflow`](skills/use-workflow/SKILL.md). Config for interactive steps (`triage`, `grill`) is a recommendation: you get a warning if your session runs a different model.
+`steps` is a flat map per harness. A key like `review.security` falls back to its parent (`review`), then to the built-in default, then to the harness default. The full list of step keys and built-in defaults lives in [`agentic-use-workflow`](skills/agentic-use-workflow/references/config.md). Config for interactive steps (`triage`, `grill`) is a recommendation: you get a warning if your session runs a different model.
 
 ## Work items and audit
 
@@ -142,9 +164,9 @@ v2 is a clean break from v1:
 
 - No personas: `agents/` is gone.
 - No `agentic-cli`.
-- Skill names are plain (`typescript-engineer`, not `agentic:skill:typescript-engineer`); the `/agentic:` prefix now comes from the plugin.
+- Skill names are `agentic-<name>` (`agentic-typescript-engineer`, not `agentic:skill:typescript-engineer`): colons are not valid in the Agent Skills spec, and Cursor doesn't namespace plugin skills, so the prefix is part of the name.
 - Old config keys (`namespace`, `ides`, `*ModelName`, `outputFolder`) are gone; use `steps`, `limits`, `output`.
-- Removed skills: `use-agentic`, `delegate-work` (merged into `use-workflow`), `technical-planning`, `debug`, `pr-review`, `review-loop`, `review-code`, `review-tests`, `review-security`.
+- Removed skills: `use-agentic`, `delegate-work` (merged into `agentic-use-workflow`), `technical-planning`, `debug`, `pr-review`, `review-loop`, `review-code`, `review-tests`, `review-security`.
 
 Rationale and full design: [ADR-0001](docs/tech/adr/0001-prompt-library-rework.md).
 

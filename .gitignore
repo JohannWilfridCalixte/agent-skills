@@ -12,3 +12,5 @@ skills-lock.json
 .local
 .tmp
 .agentic/
+.playwright-mcp/
+REVIEW-writing-for-agents.md

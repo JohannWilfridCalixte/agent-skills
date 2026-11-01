@@ -15,7 +15,7 @@ Tech focus: architecture, contracts, data and migration, failure modes, security
 Ponytail's ladder and never-cut list = `agentic-grill-me`'s Recommend lean (its rung ladder and Never cut line): apply that block. On top:
 
 - **Scope**: ponytail's "before you write" list (callers, tests, fixtures, config, exports, what users lose) is part of the coverage: each item a fact, looked up.
-- **Precedence**: `docs/tech/principles.md` and accepted ADRs count as settled and outrank ponytail.
+- **Precedence**: `{knowledge.root}/tech/principles.md` and accepted ADRs count as settled and outrank ponytail.
 - **Skipped / risk lines**: once, in the handoff summary, not every round.
 
 ## Handoff

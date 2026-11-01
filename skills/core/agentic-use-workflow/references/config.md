@@ -14,6 +14,7 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
   "output": ".agentic/work",
   "commitWork": false,
   "worktrees": "../{repo}-worktrees",
+  "knowledge": { "root": "docs" },
   "profiles": [
     { "name": "backend", "detect": ["src/domain"], "skills": ["agentic-clean-architecture"] }
   ],
@@ -40,11 +41,14 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 | `output` | string | `.agentic/work` | Root of work-item folders, relative to project root |
 | `commitWork` | boolean | `false` | `false` → `output` is gitignored |
 | `worktrees` | string | `../{repo}-worktrees` | Root of worktree workspaces, relative to the main checkout. `{repo}` = its folder name |
+| `knowledge.root` | string | `docs` | Knowledge base folder (agentic-use-knowledge), relative to the repo root |
 | `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: codestyle skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
 | `reviewers` | string[] | see below | Skill names; `agentic-review` runs one subagent per entry, step key `review.<name>` |
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
+
+`{field}` in any skill = that field's resolved value; a dot names a nested key (`{knowledge.root}` → `knowledge.root`). `{knowledge.root}` resolves in the checkout being read or written (`workspace.path` once recorded).
 
 Every skill name (`profiles[].skills`, `reviewers`, a unit's `Skills`) may be any skill the harness can load (agentic, vendored, or installed separately); it is reached per the Skills section of `agentic-use-workflow`.
 

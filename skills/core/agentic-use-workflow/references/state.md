@@ -69,7 +69,7 @@ One JSON object per line, appended, never edited. Exactly the fields and `type` 
 | `agent` | subagent events | Stable label of the subagent (`impl-T2`, `review.ub-mode-2`), same on all its lines |
 | `model`, `effort` | when a model ran | Resolved model id and effort that actually ran; the requested ones when the harness doesn't report them |
 | `summary` | yes | One line a human understands without context: what happened and to what |
-| `ref` | no | Path + optional `#anchor`. Relative to the work-item folder; repo files (`docs/…`) relative to repo root |
+| `ref` | no | Path + optional `#anchor`. Relative to the work-item folder; repo files (`{knowledge.root}/…`) relative to repo root |
 | `data` | no | Object, shapes below |
 
 `data` by type:

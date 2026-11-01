@@ -28,8 +28,6 @@ Plugin manifests (`.claude-plugin`, `.cursor-plugin`, `.codex-plugin`) list ever
 
 Root `vendor.json` lists each copy (`source`, `skill`, `into`): `grilling`, `to-spec`, `to-tickets`, `implement`, `tdd`, `codebase-design` (transitive, called by `tdd`), `diagnosing-bugs`, `code-review` (mattpocock/skills), `ub-mode` (unclebob/ub-mode), `super-review`, `pr-security-review` (EricTechPro/super-board). `scripts/vendor-skills.mjs update` fetches them with `npx skills add <source>#<sha> … --copy` at upstream HEAD into `<into>/<skill>/`, plus the upstream `LICENSE` at that commit when the folder has none. Copies stay byte-identical; agentic adds details only in its wrappers.
 
-2026-11-01 amendment: vendored `grill-me` removed; `agentic-grill-me` calls `grilling` directly, so nothing used it.
-
 Root `vendor.lock.json` pins each copy, same schema as `skills-lock.json` and taken from the one `npx` writes: commit SHA (`ref`) + `computedHash`. `check` (read-only, exit 1 when upstream changed a skill) and `verify` (copies match their hash) run on it. Native `npx skills check|update` not used: they apply updates instead of reporting, turn `--copy` copies into symlinks, and see nothing once pinned to a SHA.
 
 Reaching a skill:
@@ -78,3 +76,12 @@ Added `reviewers`. Step keys `review.<reviewer>`; removed `triage`, `review.fix`
 - Matt's `implement` runs with its code-review step skipped; `agentic-review` covers it once per change, with every configured reviewer.
 - More default reviewers → more subagents per review iteration; tune with `reviewers` and `steps`.
 - v2 configs with `review.<lens>`, `review.fix`, `babysit.fix` or `triage` keys no longer apply; rename them to the new keys.
+
+## History
+
+| Date | Change |
+|---|---|
+| 2026-11-01 | Created |
+| 2026-11-01 | Vendored `grill-me` removed: `agentic-grill-me` calls `grilling` directly |
+| 2026-11-01 | Partially superseded by [0003](0003-implement-feature-light-mode.md): light mode |
+| 2026-11-01 | Partially superseded by [0004](0004-security-audit-and-review.md): default reviewers |

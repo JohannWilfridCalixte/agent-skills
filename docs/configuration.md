@@ -20,6 +20,7 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
   "output": ".agentic/work",
   "commitWork": false,
   "worktrees": "../{repo}-worktrees",
+  "knowledge": { "root": "docs" },
   "reviewers": ["code-review", "ub-mode", "claude-security-review", "super-review", "agentic-review-secrets", "agentic-review-access-control"],
   "profiles": [
     { "name": "backend", "detect": ["src/domain"], "skills": ["agentic-clean-architecture"] }
@@ -46,6 +47,7 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
 | `output` | `.agentic/work` | Work item folders, relative to the project root |
 | `commitWork` | `false` | `false` keeps `output` out of git (gitignore it) |
 | `worktrees` | `../{repo}-worktrees` | Root for worktrees, relative to the main checkout. `{repo}` is that checkout's folder name |
+| `knowledge.root` | `docs` | Knowledge base folder (ADRs, principles, glossary, product, RFCs), relative to the repo root. Read and written by `agentic-use-knowledge` |
 | `reviewers` | see [Reviewers](#reviewers) | Skill names. One review subagent runs per entry, with step key `review.<name>` |
 | `profiles` | built-ins | `{name, detect?, skills}[]`, added to the built-ins. Stack → codestyle skills. `detect` is a list of files or globs at the project root |
 | `selectedProfiles` | `[]` | Profiles in use. When empty, every profile whose `detect` matches is used |

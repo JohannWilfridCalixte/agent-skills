@@ -64,7 +64,7 @@ Where the code is built, chosen once per work item by the first skill that write
 - **current**: the checked-out branch. On the default branch → warn, recommend a worktree or a new branch.
 - **branch**: an existing branch, or a new one from the up-to-date default branch.
 
-Branch or path already taken → ask. Before the first write, check `workspace.path` (for a new worktree, `{worktrees}`) is writable; not writable under Codex's sandbox (worktrees sit outside the repo) → ask the user to restart Codex with `--add-dir <path>` or add the path to `sandbox_workspace_write.writable_roots` in `~/.codex/config.toml`. Log the choice as a `decision` event; it becomes `workspace` in `state.json` (absolute `path`). From then on every repo write and code operation (implement, review, babysit-pr, `docs/` promotion, their subagents) runs in `workspace.path`. A skill that doesn't ask (review, babysit-pr) and finds no workspace uses the current checkout, recorded as `current`. Recorded path gone → ask.
+Branch or path already taken → ask. Before the first write, check `workspace.path` (for a new worktree, `{worktrees}`) is writable; not writable under Codex's sandbox (worktrees sit outside the repo) → ask the user to restart Codex with `--add-dir <path>` or add the path to `sandbox_workspace_write.writable_roots` in `~/.codex/config.toml`. Log the choice as a `decision` event; it becomes `workspace` in `state.json` (absolute `path`). From then on every repo write and code operation (implement, review, babysit-pr, knowledge promotion, their subagents) runs in `workspace.path`. A skill that doesn't ask (review, babysit-pr) and finds no workspace uses the current checkout, recorded as `current`. Recorded path gone → ask.
 
 ## Events and state
 

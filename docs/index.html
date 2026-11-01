@@ -675,7 +675,7 @@ codex plugin add agentic@agentic</code></pre></div></dd>
           <dt>Code</dt>
           <dd>The workspace branch and the PR.</dd>
           <dt>Decisions</dt>
-          <dd>Decisions promoted at gates are committed to <code>docs/</code>.</dd>
+          <dd>Decisions promoted at gates are committed to <code>docs/</code> (configurable via <code>knowledge.root</code>).</dd>
           <dt>Archive</dt>
           <dd><code>.agentic/work/_archive/{YYYYMMDD}-{slug}/</code> after cleanup, never deleted.</dd>
         </dl>
@@ -853,7 +853,7 @@ codex plugin add agentic@agentic</code></pre></div></dd>
           <dt>Revisited</dt>
           <dd>Goes back to grilling.</dd>
         </dl>
-        <p>Confirmed knowledge is promoted by <code>agentic-use-knowledge</code>, which commits it as <code>docs: …</code> into <code>docs/</code>: <code>tech/principles.md</code>, <code>tech/adr/</code>, <code>tech/rfc/</code>, <code>product/</code>, <code>ubiquitous-language/</code>, <code>landing-zone/</code>.</p>
+        <p>Confirmed knowledge is promoted by <code>agentic-use-knowledge</code>, which commits it as <code>docs: …</code> into <code>docs/</code> (configurable via <code>knowledge.root</code>): <code>tech/principles.md</code>, <code>tech/adr/</code>, <code>tech/rfc/</code>, <code>product/</code>, <code>ubiquitous-language/</code>, <code>landing-zone/</code>.</p>
         <p>After the last gate, only these interrupt the run: a limit hit, a design-level PR comment, a red tree that can't be fixed, a new escalation, or the PR closed unmerged. A new escalation always stops the run; resuming settles it first. Contract: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/escalation.md">escalation.md</a>.</p>
 
         <h3 id="reviewers">Reviewers and loops</h3>
@@ -934,6 +934,7 @@ codex plugin add agentic@agentic</code></pre></div></dd>
               <tr><td>Output</td><td><code>.agentic/work</code>, not committed</td></tr>
               <tr><td>Worktrees</td><td><code>../{repo}-worktrees</code></td></tr>
               <tr><td>Profiles</td><td><code>typescript</code>, <code>python</code></td></tr>
+              <tr><td>Knowledge</td><td><code>knowledge.root</code> <code>docs</code>: knowledge base folder (<code>agentic-use-knowledge</code>), relative to the repo root</td></tr>
               <tr><td>Limits</td><td class="wrap-code"><code>review.iterations</code> 3, <code>babysit.rounds</code> 5, <code>implement.retries</code> 2</td></tr>
             </tbody>
           </table>

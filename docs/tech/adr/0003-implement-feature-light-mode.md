@@ -61,3 +61,9 @@ Tail unchanged: implement → review (fix loop) → babysit-pr → cleanup. Ligh
 - Thresholds (5 questions, 5 tasks) are judgement calls; tune them in to-plan's light branch.
 - A failed check costs a context pass before full mode; the context is kept (`context.md` is additive).
 - A light run has no escalation gate: any answer tagged `structural` sends the feature to full mode, where the gate runs.
+
+## History
+
+| Date | Change |
+|---|---|
+| 2026-11-01 | Created |

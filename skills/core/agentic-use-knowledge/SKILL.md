@@ -1,18 +1,18 @@
 ---
 name: agentic-use-knowledge
-description: The project's `docs/` knowledge base (ADRs, principles, glossary, product, RFCs). Use to gather project context before work (read mode), or to record decisions, terms or debates the code can't show (write mode).
+description: The project's knowledge base (ADRs, principles, glossary, product, RFCs). Use to gather project context before work (read mode), or to record decisions, terms or debates the code can't show (write mode), also when a conversation that settled one ends.
 ---
 
 # Use Knowledge
 
-`docs/` holds what can't be derived from code: decisions, standing rules, domain language, product intent, open debates.
+`{knowledge.root}` holds what can't be derived from code: decisions, standing rules, domain language, product intent, open debates. Resolve it per [config.md](../agentic-use-workflow/references/config.md); paths below are relative to it.
 
 ## Structure
 
 Every folder has a `README.md` index.
 
 ```
-docs/
+{knowledge.root}/
 ├── tech/
 │   ├── principles.md          # standing rules, each linking its ADR
 │   ├── adr/NNNN-slug.md
@@ -27,13 +27,13 @@ docs/
 
 Indexes first, details on demand:
 
-1. `docs/tech/principles.md`
-2. `docs/tech/adr/README.md`, then only the ADRs relevant to the task
-3. `docs/ubiquitous-language/README.md`
-4. `docs/product/README.md`, then relevant topics
-5. `docs/tech/rfc/README.md` and `docs/landing-zone/README.md` for open debates touching the task
+1. `tech/principles.md`
+2. `tech/adr/README.md`, then only the ADRs relevant to the task
+3. `ubiquitous-language/README.md`
+4. `product/README.md`, then relevant topics
+5. `tech/rfc/README.md` and `landing-zone/README.md` for open debates touching the task
 
-Return findings cited by path (`docs/tech/adr/0003-…md`). Flag contradictions between docs and code; don't fix them in read mode. Missing `docs/` → say so, carry on.
+Return findings cited by repo path (`{knowledge.root}/tech/adr/0003-…md`). Flag contradictions between docs and code; don't fix them in read mode. Missing `{knowledge.root}` → say so, carry on.
 
 ## Write mode
 
@@ -48,17 +48,21 @@ Classify:
 
 Inside a workflow, write only confirmed content: decisions the escalation gate confirmed or escalated (or resolved at agentic-use-workflow references/state.md Resume step 0), and content of a `spec.md` or `plan.md` written after its escalation gate passed (it restates gated decisions and the user's answers).
 
+Outside a workflow, at the end of a conversation that decided or learned something the code can't show: propose capturing it, one line per item (classification → target path). Write only what the user confirms.
+
 Rules:
 
 - `ls` the folder for the next ADR/RFC number; never guess.
 - Update the section `README.md` on every add, rename or removal. An unindexed doc is lost.
-- Superseding an ADR: mark the old one `Superseded by [NNNN]`, update `principles.md`.
+- Changing an ADR (refinement, partial reversal, status) → edit it in place, add a `History` row. Never write a new ADR to override part of one.
+- Decision fully retired → new ADR; old one `Superseded by [NNNN]` plus a `History` row.
+- ADR rule changed or retired → update `principles.md`.
 - RFC decided → write the ADR, mark the RFC `Decided → ADR-NNNN`.
 - Concise. Tables and short paragraphs over prose.
 
 ## Formats
 
-### ADR — `docs/tech/adr/NNNN-slug.md`
+### ADR — `tech/adr/NNNN-slug.md`
 
 ```markdown
 # NNNN - Title
@@ -85,9 +89,15 @@ Discarded options and why.
 ## Consequences
 
 What follows, positive and negative.
+
+## History
+
+| Date | Change |
+|---|---|
+| YYYY-MM-DD | Created |
 ```
 
-### RFC — `docs/tech/rfc/NNNN-slug.md`
+### RFC — `tech/rfc/NNNN-slug.md`
 
 ```markdown
 # NNNN - Title
@@ -112,7 +122,7 @@ Pros / Cons
 - Unresolved points
 ```
 
-### Principles — `docs/tech/principles.md`
+### Principles — `tech/principles.md`
 
 ```markdown
 # Principles

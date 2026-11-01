@@ -86,3 +86,9 @@ If the destination is public, or its visibility is unknown, the skill warns, rec
 - Audit runs accumulate under the work item until cleanup archives it, and they're never committed while `{output}` stays git-ignored.
 - On a public repo, a local or private tracker is the safe default. The user can still override it.
 - Single-file vendoring is now a general mechanism for prompt-only upstreams.
+
+## History
+
+| Date | Change |
+|---|---|
+| 2026-11-01 | Created |

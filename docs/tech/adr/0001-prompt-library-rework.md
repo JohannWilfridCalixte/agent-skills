@@ -232,3 +232,17 @@ Interactive until the last gate, autonomous after. Triage also asks tickets and 
 - Existing `.agentic.json` files and `agentic-cli` stop working.
 - Interactive steps' model depends on how the user launched the session.
 - No formal verification yet; validated in real use, eval harness later.
+
+## History
+
+| Date | Change |
+|---|---|
+| 2026-10-26 | Created |
+| 2026-10-26 | Skills renamed `agentic-<name>`; plain skills as primary install |
+| 2026-10-26 | Workspace choice (worktree default) and `agentic-cleanup` |
+| 2026-10-26 | Cheap routing: `chore` and `explore` keys; `context.*` as `explore` |
+| 2026-10-26 | Writing subagents append `progress` lines |
+| 2026-10-26 | `chore` defaults: `gpt-5.6-luna` (cursor), `haiku` (claude) |
+| 2026-10-26 | `agentic-configure` added |
+| 2026-10-26 | Config example: `backend` profile instead of `typescript` |
+| 2026-11-01 | Partially superseded by [0002](0002-skill-composition.md); root `plugin.json` dropped |

@@ -28,7 +28,7 @@ Call the Skill tool with "grilling" (no Skill tool → open `../grilling/SKILL.m
 - Deferral ("whatever", "you decide") → restate the options and trade-offs once before accepting it.
 - An answer that breaks an earlier decision reopens it.
 - Speak the project's ubiquitous language; a new or conflicting term is a question.
-- `docs/` stays untouched: promotion follows the gate.
+- `{knowledge.root}` stays untouched: promotion follows the gate.
 
 ### Recommend lean
 

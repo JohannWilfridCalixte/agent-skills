@@ -15,7 +15,7 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 - PR number or URL → PR mode (below).
 - Reviewers = config `reviewers`, each reached per agentic-use-workflow Skills; `--only` narrows to a subset. A reviewer not reachable → warn, record it `skipped` for the summary, continue with the rest.
 - Spec sources: `spec.md`, `plan.md`, tickets; none → PR description, ticket links, commit messages.
-- Standards: the codestyle union (agentic-use-workflow Config, Profiles) as skills; `docs/tech/principles.md` and ADRs as paths.
+- Standards: the codestyle union (agentic-use-workflow Config, Profiles) as skills; `{knowledge.root}/tech/principles.md` and ADRs as paths.
 - Diff command `git diff <base>...HEAD`, commit list `git log <base>..HEAD --oneline`. Confirm the base resolves and the diff is non-empty.
 
 Done when every reviewer is reachable or recorded skipped, and the diff, spec sources and standards are pinned.

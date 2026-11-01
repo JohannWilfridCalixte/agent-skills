@@ -1,0 +1,955 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "agentic, back to top" [ref=e5] [cursor=pointer]:
+        - /url: "#top"
+        - text: agentic
+      - navigation "Sections" [ref=e7]:
+        - link "Install" [ref=e8] [cursor=pointer]:
+          - /url: "#install"
+        - link "Use" [ref=e9] [cursor=pointer]:
+          - /url: "#use"
+        - link "How it works" [ref=e10] [cursor=pointer]:
+          - /url: "#how"
+        - link "GitHub" [ref=e11] [cursor=pointer]:
+          - /url: https://github.com/JohannWilfridCalixte/agent-skills
+      - button "Switch to dark theme" [ref=e12] [cursor=pointer]
+  - main [ref=e16]:
+    - region [ref=e17]:
+      - heading "A software factory for Claude Code, Cursor and Codex" [level=1] [ref=e18]
+      - paragraph [ref=e19]: You describe a feature; agentic takes it through grill, spec, plan, implement, review, PR babysitting and cleanup, and stops short of merging.
+      - generic [ref=e20]:
+        - link "View on GitHub" [ref=e21] [cursor=pointer]:
+          - /url: https://github.com/JohannWilfridCalixte/agent-skills
+        - link "Read the install guide" [ref=e24] [cursor=pointer]:
+          - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#install
+      - list "The stations of a playbook run" [ref=e25]:
+        - listitem [ref=e26]:
+          - generic [ref=e28]: grill
+        - listitem [ref=e29]:
+          - generic [ref=e31]: spec
+        - listitem [ref=e32]:
+          - generic [ref=e34]: plan
+        - listitem [ref=e35]:
+          - generic [ref=e37]: last gate
+        - listitem [ref=e38]:
+          - generic [ref=e40]: implement
+        - listitem [ref=e41]:
+          - generic [ref=e43]: review
+        - listitem [ref=e44]:
+          - generic [ref=e46]: PR babysit
+        - listitem [ref=e47]:
+          - generic [ref=e49]: you merge
+        - listitem [ref=e50]:
+          - generic [ref=e52]: cleanup
+      - paragraph [ref=e53]:
+        - generic [ref=e54]: You answer questions and approve
+        - generic [ref=e56]: "Gate: you confirm decisions"
+        - generic [ref=e58]: Runs alone until the PR is merge-ready
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - heading "Playbooks, end to end" [level=2] [ref=e62]
+          - paragraph [ref=e63]: One command takes you from an idea or a bug report to a merge-ready PR. It is interactive until the last gate and autonomous after it.
+        - generic [ref=e64]:
+          - heading "Best-in-class skills, composed" [level=2] [ref=e65]
+          - paragraph [ref=e66]: Proven third-party skills (Matt Pocock, Cloudflare, Anthropic and others) are vendored verbatim. Thin agentic wrappers add the work item, model routing, gates and loops.
+        - generic [ref=e67]:
+          - heading "Auditable and resumable" [level=2] [ref=e68]
+          - paragraph [ref=e69]: Every run lives in one work item folder with an append-only event log. Re-run with the slug and it picks up where it stopped.
+    - region [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - heading "Install" [level=2] [ref=e73]
+          - paragraph [ref=e74]:
+            - text: "Prerequisites, alternatives and updates:"
+            - link "README install section" [ref=e75] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#install
+            - text: .
+        - generic [ref=e76]:
+          - term [ref=e77]: Claude Code
+          - definition [ref=e78]:
+            - generic [ref=e79]:
+              - code [ref=e81]: /plugin marketplace add JohannWilfridCalixte/agent-skills /plugin install agentic@agentic
+              - button "Copy code" [ref=e82] [cursor=pointer]
+          - term [ref=e86]: Codex
+          - definition [ref=e87]:
+            - generic [ref=e88]:
+              - code [ref=e90]: codex plugin marketplace add JohannWilfridCalixte/agent-skills codex plugin add agentic@agentic
+              - button "Copy code" [ref=e91] [cursor=pointer]
+          - term [ref=e95]: Cursor
+          - definition [ref=e96]:
+            - generic [ref=e97]:
+              - code [ref=e99]: git clone https://github.com/JohannWilfridCalixte/agent-skills.git ~/.cursor/plugins/local/agentic
+              - button "Copy code" [ref=e100] [cursor=pointer]
+          - term [ref=e104]: Any harness
+          - definition [ref=e105]:
+            - generic [ref=e106]:
+              - code [ref=e108]: npx skills add JohannWilfridCalixte/agent-skills
+              - button "Copy code" [ref=e109] [cursor=pointer]
+    - complementary [ref=e114]:
+      - generic [ref=e120]:
+        - heading "Frontier models think, smaller models build" [level=2] [ref=e121]
+        - paragraph [ref=e122]: "Agentic is built for frontier models to do the heavy thinking: grilling, spec, plan and security review. Implementation can then go to smaller, cheaper models."
+        - paragraph [ref=e123]:
+          - text: Pick a model and effort per step in config, under
+          - code [ref=e124]: steps.<harness>.<step>
+          - text: . See
+          - link "model routing" [ref=e125] [cursor=pointer]:
+            - /url: "#routing"
+          - text: .
+    - generic [ref=e126]:
+      - navigation "On this page" [ref=e127]:
+        - paragraph [ref=e128]: Use
+        - list [ref=e129]:
+          - listitem [ref=e130]:
+            - link "First 5 minutes" [ref=e131] [cursor=pointer]:
+              - /url: "#first-5-minutes"
+          - listitem [ref=e132]:
+            - link "Playbooks" [ref=e133] [cursor=pointer]:
+              - /url: "#playbooks"
+          - listitem [ref=e134]:
+            - link "Light vs full mode" [ref=e135] [cursor=pointer]:
+              - /url: "#light-vs-full"
+          - listitem [ref=e136]:
+            - link "Asked vs runs alone" [ref=e137] [cursor=pointer]:
+              - /url: "#asked-vs-alone"
+          - listitem [ref=e138]:
+            - link "Resume" [ref=e139] [cursor=pointer]:
+              - /url: "#resume"
+          - listitem [ref=e140]:
+            - link "Where outputs land" [ref=e141] [cursor=pointer]:
+              - /url: "#outputs"
+        - paragraph [ref=e142]: How it works
+        - list [ref=e143]:
+          - listitem [ref=e144]:
+            - link "Composition" [ref=e145] [cursor=pointer]:
+              - /url: "#composition"
+          - listitem [ref=e146]:
+            - link "A playbook, end to end" [ref=e147] [cursor=pointer]:
+              - /url: "#flow"
+          - listitem [ref=e148]:
+            - link "Work item and audit log" [ref=e149] [cursor=pointer]:
+              - /url: "#work-item"
+          - listitem [ref=e150]:
+            - link "Gates and escalations" [ref=e151] [cursor=pointer]:
+              - /url: "#gates"
+          - listitem [ref=e152]:
+            - link "Reviewers and loops" [ref=e153] [cursor=pointer]:
+              - /url: "#reviewers"
+          - listitem [ref=e154]:
+            - link "Model routing" [ref=e155] [cursor=pointer]:
+              - /url: "#routing"
+          - listitem [ref=e156]:
+            - link "Configuration" [ref=e157] [cursor=pointer]:
+              - /url: "#config"
+          - listitem [ref=e158]:
+            - link "Decisions and docs" [ref=e159] [cursor=pointer]:
+              - /url: "#decisions"
+      - generic [ref=e160]:
+        - region [ref=e161]:
+          - heading "Use" [level=2] [ref=e162]
+          - paragraph [ref=e163]: Pick a playbook, answer its questions, then let it run until the PR is merge-ready. You merge.
+          - group "Show commands for" [ref=e164]:
+            - generic [ref=e166]:
+              - generic [ref=e167] [cursor=pointer]:
+                - radio "Claude Code, Cursor /" [checked]
+                - generic [ref=e168]:
+                  - text: Claude Code, Cursor
+                  - code [ref=e169]: /
+              - generic [ref=e170] [cursor=pointer]:
+                - radio "Claude Code plugin /agentic:"
+                - generic [ref=e171]:
+                  - text: Claude Code plugin
+                  - code [ref=e172]: "/agentic:"
+              - generic [ref=e173] [cursor=pointer]:
+                - radio "Codex $"
+                - generic [ref=e174]:
+                  - text: Codex
+                  - code [ref=e175]: $
+          - heading "First 5 minutes" [level=3] [ref=e176]
+          - list [ref=e177]:
+            - listitem [ref=e178]:
+              - text: "Open a repo with a green build, then run:"
+              - generic [ref=e179]:
+                - code [ref=e181]: /agentic-implement-feature light add a --version flag to the CLI
+                - button "Copy code" [ref=e182] [cursor=pointer]
+            - listitem [ref=e186]:
+              - text: "Answer the start questions, asked in one exchange: the"
+              - strong [ref=e187]: workspace
+              - text: (a new worktree
+              - code [ref=e188]: "feat/{slug}"
+              - text: ", recommended; the current branch; or another branch), and whether to copy untracked files such as"
+              - code [ref=e189]: .env
+              - text: into the worktree.
+            - listitem [ref=e190]:
+              - text: Light mode reads the code and checks the feature really is small. It then asks every blocking question in one go and writes
+              - code [ref=e191]: plan.md
+              - text: .
+            - listitem [ref=e192]: From here the run is autonomous. It gives you the resume command once, then implements one commit per task with a green gate after each, runs the reviewers and loops until no blocker or major is left, pushes, opens a PR, watches CI and comments, and reports when the PR is merge-ready.
+            - listitem [ref=e193]: You merge. The skill sees the merge, then cleans up the worktree and branches and archives the work item.
+          - paragraph [ref=e194]:
+            - text: Watch it happen with
+            - code [ref=e195]: tail -f
+            - text: on the
+            - link "event log" [ref=e196] [cursor=pointer]:
+              - /url: "#work-item"
+            - text: ", or read"
+            - code [ref=e197]: ".agentic/work/{YYYYMMDD}-{slug}/"
+            - text: .
+          - heading "Playbooks" [level=3] [ref=e198]
+          - paragraph [ref=e199]:
+            - text: "Playbooks are user-invoked: the model never starts them on its own. In Codex, playbooks and"
+            - code [ref=e200]: agentic-configure
+            - text: set
+            - code [ref=e201]: "policy.allow_implicit_invocation: false"
+            - text: .
+          - list [ref=e202]:
+            - listitem [ref=e203]:
+              - heading "agentic-implement-feature" [level=4] [ref=e204]
+              - generic [ref=e205]:
+                - paragraph [ref=e206]:
+                  - text: Building something new. Input can be text, a file, a ticket key, a URL or a slug. Add
+                  - code [ref=e207]: light
+                  - text: for small, obvious features.
+                - generic [ref=e208]:
+                  - code [ref=e210]: /agentic-implement-feature add CSV export to reports
+                  - button "Copy code" [ref=e211] [cursor=pointer]
+            - listitem [ref=e215]:
+              - heading "agentic-change-feature" [level=4] [ref=e216]
+              - generic [ref=e217]:
+                - paragraph [ref=e218]: Changing existing behaviour. Spec and plan record current vs target behaviour.
+                - generic [ref=e219]:
+                  - code [ref=e221]: /agentic-change-feature light make session timeout 30 min
+                  - button "Copy code" [ref=e222] [cursor=pointer]
+                - list [ref=e226]:
+                  - listitem [ref=e227]:
+                    - text: A thin alias of
+                    - code [ref=e228]: agentic-implement-feature
+                    - text: with branch
+                    - code [ref=e229]: change
+                    - text: .
+                  - listitem [ref=e230]:
+                    - text: In light mode its ACs show
+                    - code [ref=e231]: "(was: …)"
+                    - text: ", and T1 pins any kept behaviour that tests don't cover yet."
+            - listitem [ref=e232]:
+              - heading "agentic-debug" [level=4] [ref=e233]
+              - generic [ref=e234]:
+                - paragraph [ref=e235]: "Fixing a bug: diagnose first, then a regression test, then the fix."
+                - generic [ref=e236]:
+                  - code [ref=e238]: /agentic-debug PROJ-123
+                  - button "Copy code" [ref=e239] [cursor=pointer]
+                - list [ref=e243]:
+                  - listitem [ref=e244]:
+                    - text: Start asks only about the workspace (
+                    - code [ref=e245]: "fix/{slug}"
+                    - text: ).
+                  - listitem [ref=e246]:
+                    - code [ref=e247]: diagnosing-bugs
+                    - text: runs interactively and produces
+                    - code [ref=e248]: diagnosis.md
+                    - text: ": symptom, repro, root cause ("
+                    - code [ref=e249]: file:line
+                    - text: ), ruled-out hypotheses and seam.
+                  - listitem [ref=e250]: T1 is a failing regression test, then one approval round. The autonomous tail follows, and the merge-ready report includes the root cause.
+            - listitem [ref=e251]:
+              - heading "agentic-pr-review" [level=4] [ref=e252]
+              - generic [ref=e253]:
+                - paragraph [ref=e254]: Reviewing a PR once, with no fixes. With no argument, it uses the current branch's PR.
+                - generic [ref=e255]:
+                  - code [ref=e257]: /agentic-pr-review 42
+                  - button "Copy code" [ref=e258] [cursor=pointer]
+                - list [ref=e262]:
+                  - listitem [ref=e263]:
+                    - text: Output is a local
+                    - code [ref=e264]: reviews/pr-report.md
+                    - text: or one posted PR review.
+                  - listitem [ref=e265]: "Verdict: any blocker requests changes; any major or needs-user finding comments; otherwise it approves."
+                  - listitem [ref=e266]: Security findings go through the disclosure guard before anything is posted.
+            - listitem [ref=e267]:
+              - heading "agentic-security-audit" [level=4] [ref=e268]
+              - generic [ref=e269]:
+                - paragraph [ref=e270]: Running a whole-repo or path-scoped security audit that files issues, with no fixes.
+                - generic [ref=e271]:
+                  - code [ref=e273]: /agentic-security-audit src/api
+                  - button "Copy code" [ref=e274] [cursor=pointer]
+                - list [ref=e278]:
+                  - listitem [ref=e279]:
+                    - text: Start asks for scope, profile (
+                    - code [ref=e280]: quick
+                    - text: ","
+                    - code [ref=e281]: standard
+                    - text: or
+                    - code [ref=e282]: deep
+                    - text: "), output dir and destination: local,"
+                    - code [ref=e283]: github:owner/repo
+                    - text: ","
+                    - code [ref=e284]: jira:KEY
+                    - text: ","
+                    - code [ref=e285]: linear:TEAM
+                    - text: or other.
+                  - listitem [ref=e286]: Publishing creates a parent issue plus one child per confirmed finding.
+                  - listitem [ref=e287]:
+                    - text: To fix, hand the parent to
+                    - code [ref=e288]: agentic-change-feature
+                    - text: ", which runs full mode with tickets."
+            - listitem [ref=e289]:
+              - heading "agentic-configure" [level=4] [ref=e290]
+              - generic [ref=e291]:
+                - paragraph [ref=e292]: "Writing your config: models, reviewers, folders, profiles, limits. Optional: without a config, built-in defaults apply."
+                - generic [ref=e293]:
+                  - code [ref=e295]: /agentic-configure --project
+                  - button "Copy code" [ref=e296] [cursor=pointer]
+                - list [ref=e300]:
+                  - listitem [ref=e301]: Detects your harnesses and their models, then walks through reviewers, the model table, folders, profiles and limits.
+                  - listitem [ref=e302]: Writes only what differs from the defaults, and only after a yes. Models go in global config, everything else in project config.
+          - heading "Arguments" [level=4] [ref=e303]
+          - table [ref=e305]:
+            - rowgroup [ref=e306]:
+              - row [ref=e307]:
+                - columnheader "Skill" [ref=e308]
+                - columnheader "Arguments" [ref=e309]
+            - rowgroup [ref=e310]:
+              - row [ref=e311]:
+                - cell [ref=e312]:
+                  - code [ref=e313]: agentic-implement-feature
+                  - text: ","
+                  - code [ref=e314]: agentic-change-feature
+                - cell [ref=e315]:
+                  - code [ref=e316]: "[light] <text | file | ticket key | URL | slug>"
+              - row [ref=e317]:
+                - cell [ref=e318]:
+                  - code [ref=e319]: agentic-debug
+                - cell [ref=e320]:
+                  - code [ref=e321]: <bug report | file | ticket key | URL | slug>
+              - row [ref=e322]:
+                - cell [ref=e323]:
+                  - code [ref=e324]: agentic-pr-review
+                - cell [ref=e325]:
+                  - code [ref=e326]: "[<PR number | URL>]"
+              - row [ref=e327]:
+                - cell [ref=e328]:
+                  - code [ref=e329]: agentic-security-audit
+                - cell [ref=e330]:
+                  - code [ref=e331]: "[<paths> | <slug>]"
+              - row [ref=e332]:
+                - cell [ref=e333]:
+                  - code [ref=e334]: agentic-configure
+                - cell [ref=e335]:
+                  - code [ref=e336]: "[--global | --project]"
+          - heading "Light vs full mode" [level=3] [ref=e337]
+          - table [ref=e339]:
+            - rowgroup [ref=e340]:
+              - row [ref=e341]:
+                - columnheader [ref=e342]
+                - columnheader "Full (default)" [ref=e343]
+                - columnheader "Light" [ref=e344]
+            - rowgroup [ref=e345]:
+              - row [ref=e346]:
+                - rowheader "Invoke" [ref=e347]
+                - cell [ref=e348]:
+                  - code [ref=e349]: agentic-implement-feature <input>
+                - cell [ref=e350]:
+                  - code [ref=e351]: agentic-implement-feature light <input>
+                  - text: ", or pick light at start"
+              - row [ref=e352]:
+                - rowheader "Steps" [ref=e353]
+                - cell [ref=e354]:
+                  - text: grill product + functional,
+                  - code [ref=e355]: spec.md
+                  - text: ", grill tech,"
+                  - code [ref=e356]: plan.md
+                  - text: ", tickets if chosen"
+                - cell [ref=e357]:
+                  - text: code read, straightforward check, one exchange of blocking questions,
+                  - code [ref=e358]: plan.md
+                  - text: with its own ACs
+              - row [ref=e359]:
+                - rowheader "Approvals" [ref=e360]
+                - cell "spec gate, plan gate, escalation gates" [ref=e361]
+                - cell "none" [ref=e362]
+              - row [ref=e363]:
+                - rowheader "Tickets" [ref=e364]
+                - cell "optional (asked at start)" [ref=e365]
+                - cell "no" [ref=e366]
+              - row [ref=e367]:
+                - rowheader "Best for" [ref=e368]
+                - cell "Anything with design choices" [ref=e369]
+                - cell "Small, obvious features" [ref=e370]
+          - paragraph [ref=e371]: "A feature counts as straightforward only if all of these hold: 5 blocking questions or fewer; no ADR-worthy decision; no data migration or public contract change; no new domain term; about 5 tasks or fewer."
+          - paragraph [ref=e372]: If it isn't straightforward, light mode says why and offers full mode; it never switches silently. Saying no stops the run and prints the resume command.
+          - heading "What you're asked vs what runs alone" [level=3] [ref=e373]
+          - generic [ref=e374]:
+            - generic [ref=e375]:
+              - heading "You're asked" [level=4] [ref=e376]
+              - list [ref=e378]:
+                - listitem [ref=e379]: "Start: workspace, mode, tickets, untracked-file copy (only what you haven't already answered)"
+                - listitem [ref=e380]: Grill questions (product, functional, tech), each with a recommended answer
+                - listitem [ref=e381]: Spec and plan approval (full mode)
+                - listitem [ref=e382]: "Escalation gate: confirm, escalate or revisit each structural decision"
+                - listitem [ref=e383]: "Interrupts after the last gate: a limit hit, a design-level PR comment, an unfixable red tree, a new escalation, a PR closed unmerged"
+            - generic [ref=e384]:
+              - heading "Runs autonomously" [level=4] [ref=e385]
+              - list [ref=e387]:
+                - listitem [ref=e388]: Context gathering by read-only subagents
+                - listitem [ref=e389]:
+                  - code [ref=e390]: implement
+                  - text: ": one subagent and one conventional commit per unit, with a green gate (build, lint, typecheck, tests) after each"
+                - listitem [ref=e391]:
+                  - code [ref=e392]: review
+                  - text: ": every reviewer, dedupe, fix list, re-review"
+                - listitem [ref=e393]:
+                  - code [ref=e394]: babysit-pr
+                  - text: ": push, open the PR, poll CI and comments, fix"
+                - listitem [ref=e395]:
+                  - code [ref=e396]: cleanup
+                  - text: after merge
+          - heading "Hard rules" [level=4] [ref=e397]
+          - list [ref=e398]:
+            - listitem [ref=e399]: It never merges
+            - listitem [ref=e400]: It force-pushes only after a yes
+            - listitem [ref=e401]: The implement baseline must be green before work starts
+          - heading "Resume" [level=3] [ref=e402]
+          - paragraph [ref=e403]: After a usage limit, a crash or a closed session, re-run the same playbook with the work item slug. This works from any harness on the same machine.
+          - generic [ref=e404]:
+            - code [ref=e406]: /agentic-implement-feature 20261101-csv-export
+            - button "Copy code" [ref=e407] [cursor=pointer]
+          - paragraph [ref=e411]: "On resume, it:"
+          - list [ref=e412]:
+            - listitem [ref=e413]: resolves open escalations first (decided, override or stop);
+            - listitem [ref=e414]: asks you to confirm when another session still looks active;
+            - listitem [ref=e415]: reuses the recorded workspace and earlier answers;
+            - listitem [ref=e416]: finishes any unfinished fix list, and skips steps that are already done;
+            - listitem [ref=e417]: for a unit cut off mid-edit, asks whether to finish it or stash it, and never discards work.
+          - paragraph [ref=e418]: An abrupt stop loses at most the units that were in flight. Work items live in the gitignored output folder and workspace paths are absolute, so resume works on the same machine only. Pass a slug to any flow skill to resume it.
+          - heading "Where outputs land" [level=3] [ref=e419]
+          - generic [ref=e420]:
+            - term [ref=e421]: Work item
+            - definition [ref=e422]:
+              - code [ref=e423]: ".agentic/work/{YYYYMMDD}-{slug}/"
+              - text: ", one per run. It stays in the main checkout even when the code is built in a worktree."
+            - term [ref=e424]: Code
+            - definition [ref=e425]: The workspace branch and the PR.
+            - term [ref=e426]: Decisions
+            - definition [ref=e427]:
+              - text: Decisions promoted at gates are committed to
+              - code [ref=e428]: docs/
+              - text: .
+            - term [ref=e429]: Archive
+            - definition [ref=e430]:
+              - code [ref=e431]: ".agentic/work/_archive/{YYYYMMDD}-{slug}/"
+              - text: after cleanup, never deleted.
+        - region [ref=e432]:
+          - heading "How it works" [level=2] [ref=e433]
+          - paragraph [ref=e434]: "Agentic is pure composition: proven skills do the craft, thin wrappers add state, routing, gates and loops, and playbooks chain them."
+          - heading "Composition" [level=3] [ref=e435]
+          - generic [ref=e436]:
+            - generic [ref=e437]:
+              - heading "Playbooks" [level=4] [ref=e438]
+              - paragraph [ref=e439]:
+                - text: User-invoked end-to-end chains in
+                - code [ref=e440]: skills/playbooks
+                - text: . Each one calls flow skills in order.
+              - list "Playbooks" [ref=e441]:
+                - listitem [ref=e442]: agentic-implement-feature
+                - listitem [ref=e443]: agentic-change-feature
+                - listitem [ref=e444]: agentic-debug
+                - listitem [ref=e445]: agentic-pr-review
+                - listitem [ref=e446]: agentic-security-audit
+            - generic [aria-hidden] [ref=e447]: calls
+            - generic [ref=e448]:
+              - heading "Agentic wrappers" [level=4] [ref=e449]
+              - paragraph [ref=e450]: Thin skills that sit next to the copy they wrap. They add the work item, config, model routing, subagent delegation, gates, project knowledge, the audit log and loops.
+              - list "Agentic wrappers" [ref=e451]:
+                - listitem [ref=e452]: agentic-grill-me
+                - listitem [ref=e453]: agentic-grill-product
+                - listitem [ref=e454]: agentic-grill-functional
+                - listitem [ref=e455]: agentic-grill-tech
+                - listitem [ref=e456]: agentic-to-spec
+                - listitem [ref=e457]: agentic-to-plan
+                - listitem [ref=e458]: agentic-to-tickets
+                - listitem [ref=e459]: agentic-implement
+                - listitem [ref=e460]: agentic-review
+                - listitem [ref=e461]: agentic-babysit-pr
+                - listitem [ref=e462]: agentic-cleanup
+                - listitem [ref=e463]: agentic-use-workflow
+                - listitem [ref=e464]: agentic-use-knowledge
+                - listitem [ref=e465]: agentic-configure
+            - generic [aria-hidden] [ref=e466]: delegates the craft to
+            - generic [ref=e467]:
+              - heading "Vendored craft skills" [level=4] [ref=e468]
+              - paragraph [ref=e469]:
+                - text: Third-party skills copied byte-identical from upstream and pinned in
+                - code [ref=e470]: vendor.lock.json
+                - text: ": grilling, spec, tickets, TDD, code review, diagnosis, security audit."
+              - list "Vendored skills" [ref=e471]:
+                - listitem [ref=e472]: grilling
+                - listitem [ref=e473]: to-spec
+                - listitem [ref=e474]: to-tickets
+                - listitem [ref=e475]: implement
+                - listitem [ref=e476]: tdd
+                - listitem [ref=e477]: diagnosing-bugs
+                - listitem [ref=e478]: codebase-design
+                - listitem [ref=e479]: code-review
+                - listitem [ref=e480]: ponytail
+                - listitem [ref=e481]: super-review
+                - listitem [ref=e482]: pr-security-review
+                - listitem [ref=e483]: security-audit
+                - listitem [ref=e484]: ub-mode
+                - listitem [ref=e485]: security-review.md
+          - paragraph [ref=e486]:
+            - text: Reviewers and codestyle are swapped in config. Codestyle comes from profile skills, applied to every coding step, and from per-task
+            - code [ref=e487]: Skills
+            - text: in
+            - code [ref=e488]: plan.md
+            - text: ". Rationale:"
+            - link "ADR-0002" [ref=e489] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0002-skill-composition.md
+            - text: .
+          - generic [ref=e490]:
+            - code [ref=e492]: skills/ core/ agentic-use-workflow, agentic-use-knowledge, agentic-configure codestyle/ typescript, python, clean architecture, instrumentation, testing flow/ agentic steps playbooks call + vendored craft skills review/ agentic-review + reviewers, vendored security-audit playbooks/ user-invoked end-to-end chains
+            - button "Copy code" [ref=e493] [cursor=pointer]
+          - heading "A playbook, end to end" [level=3] [ref=e497]
+          - paragraph [ref=e498]:
+            - code [ref=e499]: agentic-implement-feature
+            - text: ", from start to cleanup. Everything up to the last gate is interactive; the tail is autonomous."
+          - figure [ref=e500]:
+            - 'img "agentic-implement-feature, end to end Start asks for mode, tickets and workspace. In full mode, agentic-to-spec grills product and functional decisions and passes the spec gate, then agentic-to-plan grills tech decisions and passes the plan gate, then agentic-to-tickets runs if tickets were chosen. In light mode, agentic-to-plan light runs a straightforward check; if the feature is not straightforward you can switch to full mode. Once the last gate passes, the run is autonomous: agentic-implement, then agentic-review, which loops back to implement on blocker or major findings, then agentic-babysit-pr, which loops back to implement on CI failures or comments. You merge, then agentic-cleanup runs." [ref=e501]':
+              - generic [ref=e502]: Interactive
+              - generic [ref=e504]: Start
+              - generic [ref=e505]: mode, tickets,
+              - generic [ref=e506]: workspace
+              - generic [ref=e508]: mode?
+              - generic [ref=e510]: full
+              - generic [ref=e512]: light
+              - generic [ref=e514]: agentic-to-spec
+              - generic [ref=e515]: grill product + functional
+              - generic [ref=e517]: spec gate
+              - generic [ref=e519]: agentic-to-plan
+              - generic [ref=e520]: grill tech
+              - generic [ref=e522]: plan gate
+              - generic [ref=e524]: agentic-to-tickets
+              - generic [ref=e525]: only if chosen at start
+              - generic [ref=e527]: agentic-to-plan light
+              - generic [ref=e528]: straightforward check
+              - generic [ref=e529]: "not straightforward:"
+              - generic [ref=e530]: you switch to full
+              - generic [ref=e535]: last gate passed
+              - generic [ref=e536]: Autonomous
+              - generic [ref=e538]: agentic-implement
+              - generic [ref=e539]: one commit per unit
+              - generic [ref=e541]: agentic-review
+              - generic [ref=e542]: reviewers, fix list
+              - generic [ref=e544]: agentic-babysit-pr
+              - generic [ref=e545]: push, PR, CI, comments
+              - generic [ref=e547]: you merge
+              - generic [ref=e549]: agentic-cleanup
+              - generic [ref=e550]: archive work item
+              - generic [ref=e552]: blocker / major
+              - generic [ref=e554]: CI failure / comment
+            - generic [ref=e555]:
+              - text: "Gates are escalation gates on structural decisions, plus your approval of the spec and the plan. Full contract:"
+              - link "playbook.md" [ref=e556] [cursor=pointer]:
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/playbook.md
+              - text: .
+          - paragraph [ref=e557]:
+            - text: Grilling happens inside
+            - code [ref=e558]: agentic-to-spec
+            - text: (product, functional) and
+            - code [ref=e559]: agentic-to-plan
+            - text: (tech). Every answer is logged to
+            - code [ref=e560]: decisions.md
+            - text: ", tagged"
+            - code [ref=e561]: structural
+            - text: or
+            - code [ref=e562]: minor
+            - text: . Every focus recommends the leanest complete option, and never cuts validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything you asked for.
+          - heading "Work item, state, audit log" [level=3] [ref=e563]
+          - paragraph [ref=e564]: There is one folder per feature, shared by every skill across sessions.
+          - generic [ref=e565]:
+            - code [ref=e567]: ".agentic/work/{YYYYMMDD}-{slug}/ ├── events.jsonl # append-only audit log (source of truth) ├── state.json # snapshot derived from the log, used to resume ├── input.md context.md decisions.md ├── spec.md plan.md ├── diagnosis.md debug/ # agentic-debug ├── tickets/NN-slug.md # local tracker ├── implementation.md ├── reviews/{n}-{reviewer}.md reviews/{n}-fix.md reviews/pr-report.md ├── pr.md └── audit/run-N/ audit/issues/ # agentic-security-audit"
+            - button "Copy code" [ref=e568] [cursor=pointer]
+          - generic [ref=e572]:
+            - term [ref=e573]: Events
+            - definition [ref=e574]:
+              - code [ref=e575]: started
+              - text: ","
+              - code [ref=e576]: progress
+              - text: ","
+              - code [ref=e577]: completed
+              - text: ","
+              - code [ref=e578]: failed
+              - text: ","
+              - code [ref=e579]: decision
+              - text: ","
+              - code [ref=e580]: escalation
+              - text: ","
+              - code [ref=e581]: artifact
+              - text: ","
+              - code [ref=e582]: gate
+              - text: ","
+              - code [ref=e583]: note
+            - term [ref=e584]: Status
+            - definition [ref=e585]:
+              - code [ref=e586]: in_progress
+              - text: ","
+              - code [ref=e587]: awaiting_decision
+              - text: ","
+              - code [ref=e588]: blocked
+              - text: ","
+              - code [ref=e589]: failed
+              - text: ","
+              - code [ref=e590]: done
+              - text: ","
+              - code [ref=e591]: archived
+              - text: . If the log and the snapshot disagree, the log wins.
+            - term [ref=e592]: Git
+            - definition [ref=e593]:
+              - text: Gitignore
+              - code [ref=e594]: .agentic/work
+              - text: unless
+              - code [ref=e595]: "commitWork: true"
+              - text: .
+          - paragraph [ref=e596]:
+            - text: Follow a run live (needs
+            - code [ref=e597]: jq
+            - text: "):"
+          - generic [ref=e598]:
+            - code [ref=e600]: tail -f .agentic/work/*/events.jsonl | jq -r '"\(.ts[11:19]) \(.workflow)/\(.step)\(if .task then "/"+.task else "" end) \(.type) [\(.model // "-")] \(.summary)"'
+            - button "Copy code" [ref=e601] [cursor=pointer]
+          - paragraph [ref=e605]:
+            - text: "Line contract:"
+            - link "state.md" [ref=e606] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/state.md
+            - text: .
+          - heading "Gates and escalations" [level=3] [ref=e607]
+          - paragraph [ref=e608]:
+            - text: After the grills in
+            - code [ref=e609]: agentic-to-spec
+            - text: and
+            - code [ref=e610]: agentic-to-plan
+            - text: ", each structural decision goes through a gate, where it is:"
+          - generic [ref=e611]:
+            - term [ref=e612]: Confirmed
+            - definition [ref=e613]:
+              - text: Becomes an ADR with status
+              - code [ref=e614]: Accepted
+              - text: .
+            - term [ref=e615]: Escalated
+            - definition [ref=e616]:
+              - text: Becomes an ADR with status
+              - code [ref=e617]: Proposed
+              - text: ", or an RFC. The run waits with status"
+              - code [ref=e618]: awaiting_decision
+              - text: .
+            - term [ref=e619]: Revisited
+            - definition [ref=e620]: Goes back to grilling.
+          - paragraph [ref=e621]:
+            - text: Confirmed knowledge is promoted by
+            - code [ref=e622]: agentic-use-knowledge
+            - text: ", which commits it as"
+            - code [ref=e623]: "docs: …"
+            - text: into
+            - code [ref=e624]: docs/
+            - text: ":"
+            - code [ref=e625]: tech/principles.md
+            - text: ","
+            - code [ref=e626]: tech/adr/
+            - text: ","
+            - code [ref=e627]: tech/rfc/
+            - text: ","
+            - code [ref=e628]: product/
+            - text: ","
+            - code [ref=e629]: ubiquitous-language/
+            - text: ","
+            - code [ref=e630]: landing-zone/
+            - text: .
+          - paragraph [ref=e631]:
+            - text: "After the last gate, only these interrupt the run: a limit hit, a design-level PR comment, a red tree that can't be fixed, a new escalation, or the PR closed unmerged. A new escalation always stops the run; resuming settles it first. Contract:"
+            - link "escalation.md" [ref=e632] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/escalation.md
+            - text: .
+          - heading "Reviewers and loops" [level=3] [ref=e633]
+          - generic [ref=e634]:
+            - term [ref=e635]: Implement
+            - definition [ref=e636]:
+              - text: "Work is split into units: the fix list first, then tickets, then plan tasks. Each unit gets one subagent following Matt Pocock's"
+              - code [ref=e637]: implement
+              - text: and one conventional commit. A green gate (build, lint, typecheck, tests) runs after each unit; a red unit is retried
+              - code [ref=e638]: implement.retries
+              - text: times, then you're asked.
+            - term [ref=e639]: Review
+            - definition [ref=e640]:
+              - text: One report-only subagent per
+              - code [ref=e641]: reviewers
+              - text: entry runs on the branch diff and writes
+              - code [ref=e642]: "reviews/{n}-{name}.md"
+              - text: . Findings are deduped into a fix list for
+              - code [ref=e643]: agentic-implement
+              - text: ", then every reviewer re-runs. Only"
+              - code [ref=e644]: blocker
+              - text: and
+              - code [ref=e645]: major
+              - text: loop;
+              - code [ref=e646]: minor
+              - text: and
+              - code [ref=e647]: nit
+              - text: are reported only. At
+              - code [ref=e648]: review.iterations
+              - text: "you're asked: another round, accept, or stop."
+            - term [ref=e649]: Babysit
+            - definition [ref=e650]:
+              - text: Pushes, opens the PR against base, polls CI and comments with backoff, and fixes through implement and review. Never merges. Uses
+              - code [ref=e651]: gh
+              - text: or a Bitbucket/GitLab CLI or MCP.
+            - term [ref=e652]: Cleanup
+            - definition [ref=e653]: Removes the worktree and the local and remote branches, fast-forwards the default branch, and archives the work item. Asks first if the PR was closed unmerged or work is unpushed.
+          - heading "Default reviewers" [level=4] [ref=e654]
+          - table [ref=e656]:
+            - rowgroup [ref=e657]:
+              - row [ref=e658]:
+                - columnheader "Reviewer" [ref=e659]
+                - columnheader "Looks at" [ref=e660]
+            - rowgroup [ref=e661]:
+              - row [ref=e662]:
+                - cell [ref=e663]:
+                  - code [ref=e664]: code-review
+                - cell "General code review (Matt Pocock)" [ref=e665]
+              - row [ref=e666]:
+                - cell [ref=e667]:
+                  - code [ref=e668]: ub-mode
+                - 'cell "Make it work, then make it right: TDD, root causes, complexity and duplication gates (Uncle Bob)" [ref=e669]'
+              - row [ref=e670]:
+                - cell [ref=e671]:
+                  - code [ref=e672]: claude-security-review
+                - cell "Anthropic's security-review prompt on the diff" [ref=e673]
+              - row [ref=e674]:
+                - cell [ref=e675]:
+                  - code [ref=e676]: super-review
+                - 'cell "PR readiness: own hypotheses first, file:line proof, adversarial truth-check (super-board)" [ref=e677]'
+              - row [ref=e678]:
+                - cell [ref=e679]:
+                  - code [ref=e680]: agentic-review-secrets
+                - cell "Credential leaks" [ref=e681]
+              - row [ref=e682]:
+                - cell [ref=e683]:
+                  - code [ref=e684]: agentic-review-access-control
+                - cell "Authz, IDOR, tenant isolation" [ref=e685]
+          - paragraph [ref=e686]:
+            - code [ref=e687]: pr-security-review
+            - text: is vendored but opt-in, because it overlaps
+            - code [ref=e688]: claude-security-review
+            - text: ". Any review skill works as a reviewer: vendored, installed with"
+            - code [ref=e689]: npx skills add
+            - text: ", or your own. Finding contract:"
+            - link "finding.md" [ref=e690] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/review/agentic-review/references/finding.md
+            - text: .
+          - heading "Model routing" [level=3] [ref=e691]
+          - paragraph [ref=e692]: Every step resolves its own model and effort. Built-in defaults are capability classes, not model ids, so the thinking lands on the strongest model and the volume work on cheaper ones.
+          - table [ref=e694]:
+            - rowgroup [ref=e695]:
+              - row [ref=e696]:
+                - columnheader "Step key" [ref=e697]
+                - columnheader "Runs" [ref=e698]
+                - columnheader "Built-in default" [ref=e699]
+            - rowgroup [ref=e700]:
+              - row [ref=e701]:
+                - cell [ref=e702]:
+                  - code [ref=e703]: grill
+                - cell "your session" [ref=e704]
+                - cell "frontier high" [ref=e705]:
+                  - generic [ref=e706]: frontier
+                  - text: high
+              - row [ref=e707]:
+                - cell [ref=e708]:
+                  - code [ref=e709]: review.claude-security-review
+                  - text: ","
+                  - code [ref=e710]: review.super-review
+                  - text: ","
+                  - code [ref=e711]: review.agentic-review-access-control
+                - cell "subagent" [ref=e712]
+                - cell "frontier high" [ref=e713]:
+                  - generic [ref=e714]: frontier
+                  - text: high
+              - row [ref=e715]:
+                - cell [ref=e716]:
+                  - code [ref=e717]: review.agentic-review-secrets
+                - cell "subagent" [ref=e718]
+                - cell "frontier medium" [ref=e719]:
+                  - generic [ref=e720]: frontier
+                  - text: medium
+              - row [ref=e721]:
+                - cell [ref=e722]:
+                  - code [ref=e723]: audit
+                - cell [ref=e724]:
+                  - text: every agent
+                  - code [ref=e725]: security-audit
+                  - text: launches
+                - cell "frontier high" [ref=e726]:
+                  - generic [ref=e727]: frontier
+                  - text: high
+              - row [ref=e728]:
+                - cell [ref=e729]:
+                  - code [ref=e730]: implement
+                - cell "one subagent per unit, including every review and babysit fix" [ref=e731]
+                - cell "code medium" [ref=e732]:
+                  - generic [ref=e733]: code
+                  - text: medium
+              - row [ref=e734]:
+                - cell [ref=e735]:
+                  - code [ref=e736]: review
+                - cell [ref=e737]:
+                  - text: parent of
+                  - code [ref=e738]: review.<reviewer>
+                - cell "code medium" [ref=e739]:
+                  - generic [ref=e740]: code
+                  - text: medium
+              - row [ref=e741]:
+                - cell [ref=e742]:
+                  - code [ref=e743]: tickets
+                - cell "subagent" [ref=e744]
+                - cell "fast low" [ref=e745]:
+                  - generic [ref=e746]: fast
+                  - text: low
+              - row [ref=e747]:
+                - cell [ref=e748]:
+                  - code [ref=e749]: context.code
+                  - text: ","
+                  - code [ref=e750]: context.docs
+                  - text: ","
+                  - code [ref=e751]: context.runtime
+                - cell "read-only subagent" [ref=e752]
+                - cell [ref=e753]:
+                  - text: as
+                  - code [ref=e754]: explore
+          - generic [ref=e755]:
+            - term [ref=e756]:
+              - generic [ref=e757]: frontier
+            - definition [ref=e758]: The strongest reasoning model available.
+            - term [ref=e759]:
+              - generic [ref=e760]: code
+            - definition [ref=e761]: A strong, balanced coding model.
+            - term [ref=e762]:
+              - generic [ref=e763]: fast
+            - definition [ref=e764]: The cheapest fast model.
+          - paragraph [ref=e765]:
+            - text: "Two routing keys cover work outside the steps and pin cheap models per harness:"
+            - code [ref=e766]: chore
+            - text: (grep, read a diff, rename, one-line edit) and
+            - code [ref=e767]: explore
+            - text: (every read-only exploration).
+            - code [ref=e768]: grill
+            - text: runs in your own session, so its value is a recommendation; you get a warning if your session runs a different model.
+          - heading "Resolution" [level=4] [ref=e769]
+          - paragraph [ref=e770]:
+            - code [ref=e771]: model
+            - text: and
+            - code [ref=e772]: effort
+            - text: "each resolve separately. The first hit wins:"
+          - list [ref=e773]:
+            - listitem [ref=e774]:
+              - code [ref=e775]: "steps.{harness}.{key}"
+            - listitem [ref=e776]:
+              - code [ref=e777]: "steps.{harness}.{parent}"
+              - text: ": the key up to its first dot ("
+              - code [ref=e778]: review
+              - text: for
+              - code [ref=e779]: review.ub-mode
+              - text: )
+            - listitem [ref=e780]: "The built-in default: the key's own row, otherwise its parent's"
+            - listitem [ref=e781]: The harness default
+          - heading "Configuration" [level=3] [ref=e782]
+          - paragraph [ref=e783]:
+            - text: "Configuration is optional. Two files are read:"
+            - code [ref=e784]: .agentic.json
+            - text: in the project, which wins, and
+            - code [ref=e785]: ~/.agentic/config.json
+            - text: globally.
+            - code [ref=e786]: steps
+            - text: merges per harness and key, and
+            - code [ref=e787]: limits
+            - text: per key; other keys replace. A file only needs to hold what differs from the defaults.
+          - generic [ref=e788]:
+            - code [ref=e790]: "{ \"reviewers\": [\"code-review\", \"claude-security-review\", \"agentic-review-secrets\"], \"steps\": { \"claude\": { \"grill\": { \"model\": \"opus\", \"effort\": \"high\" }, \"implement\": { \"model\": \"sonnet\", \"effort\": \"medium\" } } }, \"limits\": { \"review.iterations\": 3 } }"
+            - button "Copy code" [ref=e791] [cursor=pointer]
+          - table [ref=e796]:
+            - rowgroup [ref=e797]:
+              - row [ref=e798]:
+                - columnheader "Default" [ref=e799]
+                - columnheader "Value" [ref=e800]
+            - rowgroup [ref=e801]:
+              - row [ref=e802]:
+                - cell "Output" [ref=e803]
+                - cell [ref=e804]:
+                  - code [ref=e805]: .agentic/work
+                  - text: ", not committed"
+              - row [ref=e806]:
+                - cell "Worktrees" [ref=e807]
+                - cell [ref=e808]:
+                  - code [ref=e809]: "../{repo}-worktrees"
+              - row [ref=e810]:
+                - cell "Profiles" [ref=e811]
+                - cell [ref=e812]:
+                  - code [ref=e813]: typescript
+                  - text: ","
+                  - code [ref=e814]: python
+              - row [ref=e815]:
+                - cell "Limits" [ref=e816]
+                - cell [ref=e817]:
+                  - code [ref=e818]: review.iterations
+                  - text: 3,
+                  - code [ref=e819]: babysit.rounds
+                  - text: 5,
+                  - code [ref=e820]: implement.retries
+                  - text: "2"
+          - paragraph [ref=e821]:
+            - text: "Every field, profile, step key and harness note:"
+            - link "docs/configuration.md" [ref=e822] [cursor=pointer]:
+              - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/configuration.md
+            - text: .
+          - heading "Decisions and docs" [level=3] [ref=e823]
+          - list [ref=e824]:
+            - listitem [ref=e825]:
+              - 'link "ADR-0001: prompt library rework" [ref=e826] [cursor=pointer]':
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0001-prompt-library-rework.md
+            - listitem [ref=e827]:
+              - 'link "ADR-0002: skill composition" [ref=e828] [cursor=pointer]':
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0002-skill-composition.md
+            - listitem [ref=e829]:
+              - 'link "ADR-0003: implement-feature light mode" [ref=e830] [cursor=pointer]':
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0003-implement-feature-light-mode.md
+            - listitem [ref=e831]:
+              - 'link "ADR-0004: security audit and review" [ref=e832] [cursor=pointer]':
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0004-security-audit-and-review.md
+            - listitem [ref=e833]:
+              - 'link "ADR-0005: ponytail in grills" [ref=e834] [cursor=pointer]':
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0005-ponytail-in-grills.md
+            - listitem [ref=e835]:
+              - link "ADR index" [ref=e836] [cursor=pointer]:
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/README.md
+            - listitem [ref=e837]:
+              - link "Configuration reference" [ref=e838] [cursor=pointer]:
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/configuration.md
+            - listitem [ref=e839]:
+              - link "Full README" [ref=e840] [cursor=pointer]:
+                - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md
+  - contentinfo [ref=e841]:
+    - generic [ref=e842]:
+      - generic [ref=e843]:
+        - heading "Credits" [level=2] [ref=e844]
+        - paragraph [ref=e845]:
+          - text: "Agentic stands on other people's work: skills from Matt Pocock, Dietrich Gebert, Eric Tech, Cloudflare, Anthropic and Robert C. Martin, vendored from upstream. Full list:"
+          - link "README credits" [ref=e846] [cursor=pointer]:
+            - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#credits
+          - text: .
+      - generic [ref=e847]:
+        - heading "Licence" [level=2] [ref=e848]
+        - paragraph [ref=e849]:
+          - link "MIT" [ref=e850] [cursor=pointer]:
+            - /url: https://github.com/JohannWilfridCalixte/agent-skills/blob/main/LICENSE
+          - text: ", © 2026 Johann Wilfrid-Calixte. Vendored skills keep their upstream licences."
+        - paragraph [ref=e851]: Use at your own risk. This is a personal project exploring AI-driven development, with no guarantees, support or liability.
+  - status [ref=e852]

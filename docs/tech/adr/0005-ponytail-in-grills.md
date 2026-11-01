@@ -37,3 +37,9 @@ Grill recommendations drift toward the complete-looking option: extra settings, 
 - Tech grill rounds are shorter and push back more; the user may need to argue for scope they want.
 - `ponytail` is session-persistent: a grill interrupted before handoff leaves it on for the rest of that session.
 - Installing upstream `ponytail` too gives two skills with one name: keep one copy per harness.
+
+## History
+
+| Date | Change |
+|---|---|
+| 2026-11-01 | Created |

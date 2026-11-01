@@ -61,9 +61,9 @@ Done when every user story is covered by at least one acceptance criterion and e
 
 ## 6. Promote
 
-The gate promoted the decisions; now the spec's knowledge. Call the Skill tool with "agentic-use-knowledge" (write mode): the spec's product behaviour → `docs/product/`, terms the gate left out → glossary. Same workspace and commit rule as the gate's promotion (`agentic-use-workflow`).
+The gate promoted the decisions; now the spec's knowledge. Call the Skill tool with "agentic-use-knowledge" (write mode): the spec's product behaviour → `{knowledge.root}/product/`, terms the gate left out → glossary. Same workspace and commit rule as the gate's promotion (`agentic-use-workflow`).
 
-Done when the spec's product behaviour and every new term are in `docs/`, indexed and committed.
+Done when the spec's product behaviour and every new term are in `{knowledge.root}`, indexed and committed.
 
 ## Handoff
 

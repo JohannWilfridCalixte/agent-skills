@@ -260,7 +260,7 @@ It works on the same machine only: work items live in the gitignored `output` fo
 
 ### Where outputs land
 
-Each run gets one work item folder, `.agentic/work/{YYYYMMDD}-{slug}/`, which stays in the main checkout even when the code is built in a worktree. Code goes to the workspace branch and the PR. Decisions promoted at gates are committed to `docs/`. See [Work item, state, audit log](#work-item-state-audit-log).
+Each run gets one work item folder, `.agentic/work/{YYYYMMDD}-{slug}/`, which stays in the main checkout even when the code is built in a worktree. Code goes to the workspace branch and the PR. Decisions promoted at gates are committed to the knowledge base (`knowledge.root`, default `docs/`). See [Work item, state, audit log](#work-item-state-audit-log).
 
 ## How it works
 
@@ -368,7 +368,9 @@ After the grills in `agentic-to-spec` and `agentic-to-plan`, each structural dec
 - **Escalated**: becomes an ADR with status `Proposed`, or an RFC. The run waits with status `awaiting_decision`.
 - **Revisited**: goes back to grilling.
 
-Confirmed knowledge is promoted by `agentic-use-knowledge`, which commits it as `docs: …` into `docs/`: `tech/principles.md`, `tech/adr/`, `tech/rfc/`, `product/`, `ubiquitous-language/`, `landing-zone/`. Contract: [escalation.md](skills/core/agentic-use-workflow/references/escalation.md).
+Confirmed knowledge is promoted by `agentic-use-knowledge`, which commits it as `docs: …` into `knowledge.root` (default `docs/`): `tech/principles.md`, `tech/adr/`, `tech/rfc/`, `product/`, `ubiquitous-language/`, `landing-zone/`. Contract: [escalation.md](skills/core/agentic-use-workflow/references/escalation.md).
+
+ADRs are refined in place, each change a `History` row; `Superseded` only when a decision is fully retired. Outside a workflow, `agentic-use-knowledge` offers at the end of a conversation to capture what it settled.
 
 ### Implement and review loops
 
@@ -431,6 +433,7 @@ Defaults:
 
 - **Output**: `.agentic/work`, not committed.
 - **Worktrees**: `../{repo}-worktrees`.
+- **Knowledge**: `docs`.
 - **Profiles**: `typescript`, `python`.
 - **Models**: frontier for grill, security reviews and audit; code for implement and review; fast for tickets.
 
@@ -517,7 +520,7 @@ Agentic flow skills are all model-invoked, and each one can be used standalone.
 | `agentic-grill-me` | Matt's `grilling` plus project knowledge, `context.md` and `decisions.md`. Every answer is logged to `decisions.md` |
 | `agentic-grill-product` / `-functional` / `-tech` | `agentic-grill-me` scoped to one focus. Every focus recommends the smallest complete option; tech also loads `ponytail` at ultra and turns it off at handoff |
 | `agentic-to-spec` | capture → context → grill product + functional → gate → matt's `to-spec` → `spec.md` |
-| `agentic-to-plan` | tech context → grill tech → gate → promote to `docs/` → `plan.md` ([plan.md contract](skills/flow/agentic-to-plan/references/plan.md)). The light branch (debug, and light mode) has no grill or gate. Without `diagnosis.md`: straightforward check plus one exchange of blocking questions, no approval. With `diagnosis.md`: T1 is a failing regression test |
+| `agentic-to-plan` | tech context → grill tech → gate → promote to knowledge → `plan.md` ([plan.md contract](skills/flow/agentic-to-plan/references/plan.md)). The light branch (debug, and light mode) has no grill or gate. Without `diagnosis.md`: straightforward check plus one exchange of blocking questions, no approval. With `diagnosis.md`: T1 is a failing regression test |
 | `agentic-to-tickets` | Matt's `to-tickets` on spec + plan, local (`tickets/NN-slug.md`) or in a real tracker. When the input has child items (an audit parent), they are reused as tickets, and local ones are copied into the work item |
 | `agentic-implement` | One subagent per ticket, task or fix list, following matt's `implement`, with one commit each and a green gate between |
 | `agentic-review` | One subagent per `reviewers` entry, report-only, with a fix loop through `agentic-implement`. PR mode: report or post. Args: `[<slug> \| <PR number/url> \| <base ref>] [--only <reviewer,reviewer>]` |
@@ -528,7 +531,7 @@ Other skills:
 
 - **Core.**
   - `agentic-use-workflow`: config, routing, [delegation](skills/core/agentic-use-workflow/references/delegation.md), work item, events, gate, disclosure guard.
-  - `agentic-use-knowledge`: reads and promotes `docs/`.
+  - `agentic-use-knowledge`: reads, promotes and captures the knowledge base (`knowledge.root`).
   - `agentic-configure`: config.
 - **Review** (`skills/review`).
   - `agentic-review`: the review step; owns the finding contract.

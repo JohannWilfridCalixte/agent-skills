@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Change Feature"
+  short_description: "Change an existing feature, from request to merged PR"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic PR Review"
+  short_description: "Review a pull request with every configured reviewer"
+policy:
+  allow_implicit_invocation: false

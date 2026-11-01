@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic To Plan"
+  short_description: "Turn a spec into plan.md, vertical-slice tasks"

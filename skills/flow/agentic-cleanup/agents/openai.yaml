@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Cleanup"
+  short_description: "Clean up worktrees and branches after a merged PR"

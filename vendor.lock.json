@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "skills": {
+    "claude-security-review": {
+      "source": "anthropics/claude-code-security-review",
+      "ref": "0c6a49f1fa56a1d472575da86a94dbc1edb78eda",
+      "sourceType": "file",
+      "filePath": ".claude/commands/security-review.md",
+      "computedHash": "dd1d451f909dbb8798f4a4de010c35e7dd9152f02bb2f7988442cdd138f29e39"
+    },
+    "code-review": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-review/SKILL.md",
+      "computedHash": "c2745e2be960b82b9fddd82cf45265f42431e7b045c403f297b25f0f311e9210"
+    },
+    "codebase-design": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/codebase-design/SKILL.md",
+      "computedHash": "aa11a96c08451f4ff86052d5da94004a8c97bb4ea41b2ac8a4300c189f66c89c"
+    },
+    "diagnosing-bugs": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "computedHash": "ede7254edbd22fcab97a0941511f7d440d8f9a249348fea97c50987ad5501674"
+    },
+    "grilling": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grilling/SKILL.md",
+      "computedHash": "e40cc1d348f6d935e28f1e24474302d7368f0a400429271a43b35fe154891dc5"
+    },
+    "implement": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/implement/SKILL.md",
+      "computedHash": "b6371a0a6723bad551f3adc721e3729a6a97acfc3670dc2bdea198bbe78408c0"
+    },
+    "ponytail": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "061f887d9e3e735f85db3be3655a8936a00f24d5fb65ac4ab74a968a770fe342"
+    },
+    "pr-security-review": {
+      "source": "EricTechPro/super-board",
+      "ref": "d0b7d5a6850614ca809477c1af43d5d7da408726",
+      "sourceType": "github",
+      "skillPath": "skills/pr-security-review/SKILL.md",
+      "computedHash": "062d38d4748523e57e962c8ae97e5433a10082c9be725eb1edb2a28e321aa3db"
+    },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "ref": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "98b97aad2873b3b9a8e064007c25e7827b493ba27fda8bfbdb41dab586767973"
+    },
+    "super-review": {
+      "source": "EricTechPro/super-board",
+      "ref": "d0b7d5a6850614ca809477c1af43d5d7da408726",
+      "sourceType": "github",
+      "skillPath": "skills/super-review/SKILL.md",
+      "computedHash": "920065164f08733db5676d90826e43ad0ce2aa2401f735f42935d590df5db90a"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "daf55026f456af104a72fa43247f7bcec89e5127316dc5b1b8d675d6a9d8ce94"
+    },
+    "to-spec": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "computedHash": "3fa1a0695d4ea242fae9e569e4d22aa1788623197abb33bfadafae7315789bbf"
+    },
+    "to-tickets": {
+      "source": "mattpocock/skills",
+      "ref": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "5f871bdc46a9212222214ba399be4965374208af1bd7f48f1271bef72841dd31"
+    },
+    "ub-mode": {
+      "source": "unclebob/ub-mode",
+      "ref": "57a8bdd28e45ed41900ace0bafa2ff76dd9ed70f",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e2e28ad6f12ce3bc1e5be6676b0dcd88c217957c79c512b418c241fa2e5825a0"
+    }
+  }
+}

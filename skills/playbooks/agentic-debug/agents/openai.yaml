@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Debug"
+  short_description: "Diagnose and fix a bug, regression test first"
+policy:
+  allow_implicit_invocation: false

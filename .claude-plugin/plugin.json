@@ -1,7 +1,7 @@
 {
   "name": "agentic",
   "description": "Composable spec-driven development workflows: spec, plan, tickets, implement, review, babysit PR. Per-step model and effort, auditable work items.",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "author": {
     "name": "Johann Wilfrid-Calixte",
     "url": "https://github.com/JohannWilfridCalixte"
@@ -20,5 +20,46 @@
     "clean-architecture",
     "testing"
   ],
-  "skills": "./skills/"
+  "skills": [
+    "./skills/core/agentic-use-workflow",
+    "./skills/core/agentic-use-knowledge",
+    "./skills/core/agentic-configure",
+    "./skills/codestyle/agentic-typescript-engineer",
+    "./skills/codestyle/agentic-python-engineer",
+    "./skills/codestyle/agentic-clean-architecture",
+    "./skills/codestyle/agentic-write-instrumented-code",
+    "./skills/codestyle/agentic-code-testing",
+    "./skills/flow/agentic-grill-me",
+    "./skills/flow/agentic-grill-product",
+    "./skills/flow/agentic-grill-functional",
+    "./skills/flow/agentic-grill-tech",
+    "./skills/flow/agentic-to-spec",
+    "./skills/flow/agentic-to-plan",
+    "./skills/flow/agentic-to-tickets",
+    "./skills/flow/agentic-implement",
+    "./skills/flow/agentic-babysit-pr",
+    "./skills/flow/agentic-cleanup",
+    "./skills/flow/grilling",
+    "./skills/flow/to-spec",
+    "./skills/flow/to-tickets",
+    "./skills/flow/implement",
+    "./skills/flow/tdd",
+    "./skills/flow/diagnosing-bugs",
+    "./skills/flow/codebase-design",
+    "./skills/flow/ponytail",
+    "./skills/review/agentic-review",
+    "./skills/review/code-review",
+    "./skills/review/ub-mode",
+    "./skills/review/super-review",
+    "./skills/review/pr-security-review",
+    "./skills/review/security-audit",
+    "./skills/review/claude-security-review",
+    "./skills/review/agentic-review-secrets",
+    "./skills/review/agentic-review-access-control",
+    "./skills/playbooks/agentic-implement-feature",
+    "./skills/playbooks/agentic-change-feature",
+    "./skills/playbooks/agentic-debug",
+    "./skills/playbooks/agentic-pr-review",
+    "./skills/playbooks/agentic-security-audit"
+  ]
 }

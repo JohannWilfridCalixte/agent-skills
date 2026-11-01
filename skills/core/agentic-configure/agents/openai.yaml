@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Configure"
+  short_description: "Write the agentic config"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,23 @@
+{
+  "skills": [
+    { "source": "mattpocock/skills", "skill": "grilling", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "to-spec", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "to-tickets", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "implement", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "tdd", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "diagnosing-bugs", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "codebase-design", "into": "skills/flow" },
+    { "source": "DietrichGebert/ponytail", "skill": "ponytail", "into": "skills/flow" },
+    { "source": "mattpocock/skills", "skill": "code-review", "into": "skills/review" },
+    { "source": "unclebob/ub-mode", "skill": "ub-mode", "into": "skills/review" },
+    { "source": "EricTechPro/super-board", "skill": "super-review", "into": "skills/review" },
+    { "source": "EricTechPro/super-board", "skill": "pr-security-review", "into": "skills/review" },
+    { "source": "cloudflare/security-audit-skill", "skill": "security-audit", "into": "skills/review" },
+    {
+      "source": "anthropics/claude-code-security-review",
+      "name": "claude-security-review",
+      "file": ".claude/commands/security-review.md",
+      "into": "skills/review/claude-security-review/upstream"
+    }
+  ]
+}

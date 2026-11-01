@@ -1,6 +1,6 @@
 # 0001 - Prompt library rework: composable, intent-level, per-step configurable
 
-**Status:** Accepted
+**Status:** Accepted. Partially superseded by [0002](0002-skill-composition.md)
 **Date:** 2026-10-26
 
 ## Context
@@ -20,7 +20,7 @@ The v1 library (personas, `agentic:*:*` names, step files, 3 global model consta
 
 - Every skill is named `agentic-<name>` (`agentic-to-spec`, `agentic-grill`): spec-valid (`a-z0-9-`, matches the folder name), and the prefix is visible in every harness without relying on plugins. Colons stay forbidden by the Agent Skills spec.
 - Primary install: plain skills, symlinked into `~/.agents/skills` (read by Cursor and Codex) and/or `~/.claude/skills` (Claude Code).
-- Plugin manifests stay for Claude Code / Codex distribution: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`, `.cursor-plugin/plugin.json`, root `plugin.json` (portable Agent Plugins schema, read by Codex). Claude Code then shows `/agentic:agentic-grill`; the doubled prefix is accepted.
+- Plugin manifests stay for Claude Code / Codex distribution: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`, `.cursor-plugin/plugin.json`, root `plugin.json` (portable Agent Plugins schema, read by Codex; dropped per [0002](0002-skill-composition.md), Codex now reads `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json`). Claude Code then shows `/agentic:agentic-grill`; the doubled prefix is accepted.
 - Also installable skill-by-skill with `npx skills add`.
 - Workflow and phase ids in `events.jsonl` / `state.json` are the skill names without the prefix (`to-spec`).
 

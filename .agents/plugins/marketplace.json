@@ -1,0 +1,20 @@
+{
+  "name": "agentic",
+  "interface": {
+    "displayName": "Agentic"
+  },
+  "plugins": [
+    {
+      "name": "agentic",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    }
+  ]
+}

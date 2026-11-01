@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Use Workflow"
+  short_description: "Runtime every agentic skill loads first"

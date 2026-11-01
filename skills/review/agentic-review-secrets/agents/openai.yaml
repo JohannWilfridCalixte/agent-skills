@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Review Secrets"
+  short_description: "Find leaked credentials in a change and its history"

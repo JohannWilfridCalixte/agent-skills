@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic To Tickets"
+  short_description: "Slice spec and plan into tickets, local or tracker"

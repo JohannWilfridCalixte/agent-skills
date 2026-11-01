@@ -1,5 +1,6 @@
 # Agents / Editors
-.agents
+.agents/*
+!.agents/plugins/
 .claude
 .cursor
 .codex

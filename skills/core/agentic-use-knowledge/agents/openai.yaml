@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Use Knowledge"
+  short_description: "Read and write the docs/ knowledge base"

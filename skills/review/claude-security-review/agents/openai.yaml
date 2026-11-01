@@ -1,0 +1,3 @@
+interface:
+  display_name: "Claude Security Review"
+  short_description: "Anthropic security review prompt on a change"

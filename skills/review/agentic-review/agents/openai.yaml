@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Review"
+  short_description: "Review a change with every configured reviewer, fix until clean"

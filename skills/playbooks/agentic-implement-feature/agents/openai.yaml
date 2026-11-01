@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Implement Feature"
+  short_description: "Take a new feature from idea to merged PR"
+policy:
+  allow_implicit_invocation: false

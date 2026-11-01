@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic To Spec"
+  short_description: "Turn a request into spec.md"

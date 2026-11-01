@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Review Access Control"
+  short_description: "Check authn, authz and tenant isolation in a change"

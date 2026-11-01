@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Security Audit"
+  short_description: "Audit the codebase, log findings as parent and child issues"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Grill Me"
+  short_description: "Grill a work item, every answer logged to decisions"

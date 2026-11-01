@@ -1,0 +1,3 @@
+interface:
+  display_name: "Agentic Implement"
+  short_description: "Build plan tasks, tickets or a fix list, one commit per unit"

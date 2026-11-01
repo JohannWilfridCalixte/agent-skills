@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>agentic: a software factory for Claude Code, Cursor and Codex</title>
+<meta name="description" content="You describe a feature; agentic takes it through grill, spec, plan, implement, review, PR babysitting and cleanup, and stops short of merging.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2317202A'/%3E%3Cpath d='M4 28 28 4M-4 20 20-4M12 36 36 12' stroke='%23F2C01A' stroke-width='5'/%3E%3C/svg%3E">
+<script>
+  try {
+    var savedTheme = localStorage.getItem("agentic-theme");
+    if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #EFF2F1;
+  --surface: #E3E9E7;
+  --raised: #F8FAF9;
+  --ink: #17202A;
+  --ink-2: #333E4A;
+  --muted: #55606C;
+  --rule: #C3CCCB;
+  --auto: #0A6A62;
+  --auto-soft: #D3E7E3;
+  --you: #F2C01A;
+  --you-soft: #F7E7AE;
+  --on-you: #17202A;
+  --stripe: #17202A;
+  --display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --top: 3.5rem;
+  --gutter: clamp(1rem, 4vw, 3rem);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121821;
+    --surface: #1B2330;
+    --raised: #171E29;
+    --ink: #E4E8EE;
+    --ink-2: #C3CAD4;
+    --muted: #9AA5B4;
+    --rule: #2D3747;
+    --auto: #4CC9BB;
+    --auto-soft: #16343A;
+    --you: #F5C842;
+    --you-soft: #3A3218;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121821;
+  --surface: #1B2330;
+  --raised: #171E29;
+  --ink: #E4E8EE;
+  --ink-2: #C3CAD4;
+  --muted: #9AA5B4;
+  --rule: #2D3747;
+  --auto: #4CC9BB;
+  --auto-soft: #16343A;
+  --you: #F5C842;
+  --you-soft: #3A3218;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: calc(var(--top) + 1rem); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--sans);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+img, svg { max-width: 100%; }
+a { color: inherit; text-decoration-color: var(--auto); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+a:hover { color: var(--auto); }
+:focus-visible { outline: 3px solid var(--auto); outline-offset: 2px; border-radius: 2px; }
+code, pre { font-family: var(--mono); font-size: 0.86em; }
+:not(pre) > code { background: var(--surface); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+p, ul, ol, dl { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.25rem; }
+li + li { margin-top: 0.35rem; }
+strong { font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.skip { position: absolute; left: 1rem; top: -4rem; z-index: 20; background: var(--you); color: var(--on-you); padding: 0.5rem 0.9rem; border-radius: 4px; font-weight: 600; }
+.skip:focus { top: calc(env(safe-area-inset-top, 0px) + 0.5rem); }
+
+/* Top bar */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.topbar-inner {
+  display: flex; align-items: center; gap: 1rem;
+  height: var(--top);
+  padding-inline: var(--gutter);
+  max-width: 82rem; margin: 0 auto;
+}
+.brand { font: 800 1.6rem/1 var(--display); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }
+.brand-mark { width: 1.1rem; height: 1.1rem; border-radius: 3px; background: repeating-linear-gradient(-45deg, var(--you) 0 4px, var(--stripe) 4px 8px); }
+.topnav { display: flex; gap: 0.25rem; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a { white-space: nowrap; text-decoration: none; font-weight: 500; font-size: 0.95rem; padding: 0.35rem 0.6rem; border-radius: 4px; color: var(--ink-2); }
+.topnav a:hover { background: var(--surface); color: var(--ink); }
+.theme-toggle {
+  flex: none; width: 2.25rem; height: 2.25rem; display: grid; place-items: center;
+  background: transparent; border: 1px solid var(--rule); border-radius: 50%; color: var(--ink); cursor: pointer;
+}
+.theme-toggle:hover { background: var(--surface); }
+.theme-toggle svg { width: 1.1rem; height: 1.1rem; }
+
+/* Shared */
+.wrap { max-width: 82rem; margin: 0 auto; padding-inline: var(--gutter); }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; text-decoration: none; padding: 0.7rem 1.1rem; border-radius: 6px;
+  border: 2px solid var(--ink);
+}
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-primary:hover { background: var(--auto); border-color: var(--auto); color: var(--bg); }
+.btn-ghost:hover { color: var(--ink); background: var(--surface); }
+.btn svg { width: 1.1rem; height: 1.1rem; }
+
+/* Hero */
+.hero { padding-block: clamp(2rem, 5vw, 4rem) 2.5rem; }
+.hero h1 {
+  font: 800 clamp(3rem, 7vw, 6.25rem)/0.92 var(--display);
+  letter-spacing: -0.005em;
+  margin: 0 0 1.5rem;
+  max-width: 18ch;
+}
+.lede { font-size: clamp(1.1rem, 1.8vw, 1.3rem); line-height: 1.5; max-width: 40rem; color: var(--ink-2); margin-bottom: 1.75rem; }
+.ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+.route { list-style: none; padding: 0; margin: 3.5rem 0 0; display: flex; position: relative; }
+.route::before { content: ""; position: absolute; left: 1.5%; right: 1.5%; top: 0.62rem; height: 2px; background: var(--rule); }
+.route li { margin: 0; flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.6rem; }
+.route .nm { font: 600 1.4rem/1.05 var(--display); }
+.route .dot { width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 3px solid var(--bg); box-shadow: 0 0 0 2px var(--rule); background: var(--rule); position: relative; }
+.route .you .dot { background: var(--you); box-shadow: 0 0 0 2px var(--you); }
+.route .auto .dot { background: var(--auto); box-shadow: 0 0 0 2px var(--auto); }
+.route .gate .bar { width: 1.25rem; height: 2.5rem; margin-top: -0.6rem; border-radius: 3px; background: repeating-linear-gradient(-45deg, var(--you) 0 5px, var(--stripe) 5px 10px); position: relative; }
+.route .gate .nm { margin-top: -0.6rem; }
+.route .merge .dot { background: var(--bg); box-shadow: 0 0 0 2px var(--you); }
+.route-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.75rem; margin: 1.5rem 0 0; color: var(--muted); font-size: 0.95rem; }
+.route-legend span { display: inline-flex; align-items: center; gap: 0.5rem; }
+.swatch { width: 0.8rem; height: 0.8rem; border-radius: 50%; display: inline-block; }
+.swatch-you { background: var(--you); }
+.swatch-auto { background: var(--auto); }
+.swatch-gate { border-radius: 2px; background: repeating-linear-gradient(-45deg, var(--you) 0 3px, var(--stripe) 3px 6px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .route li { animation: station 0.5s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }
+  @keyframes station { from { opacity: 0; transform: translateY(6px); } }
+}
+
+.gets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; margin-top: 3.5rem; padding-top: 2rem; border-top: 2px solid var(--ink); }
+.gets h2 { font: 600 1.05rem/1.3 var(--sans); margin: 0 0 0.4rem; }
+.gets p { margin: 0; color: var(--ink-2); font-size: 0.98rem; }
+
+/* Install strip */
+.install { background: var(--surface); border-block: 1px solid var(--rule); padding-block: 2rem; }
+.install-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 2rem; margin-bottom: 1rem; }
+.install-head h2 { font: 800 2rem/1 var(--display); margin: 0; }
+.install-head p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.install-rows { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.5rem 1rem; align-items: center; }
+.install-rows dt { font-weight: 600; }
+.install-rows dd { margin: 0; min-width: 0; }
+.install-rows .code { margin: 0; }
+.install-rows pre { background: var(--raised); }
+.install-note { margin: 0.3rem 0 0; font-size: 0.9rem; color: var(--muted); }
+
+/* Callout */
+.callout {
+  margin-block: 3rem 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.25rem;
+  padding: 1.5rem; border-radius: 8px;
+  background: var(--auto-soft);
+  border-left: 6px solid var(--auto);
+}
+.callout svg { width: 3rem; height: 3rem; color: var(--auto); }
+.callout h2 { font: 800 1.75rem/1.05 var(--display); margin: 0 0 0.5rem; }
+.callout p { margin: 0; max-width: 46rem; }
+.callout p + p { margin-top: 0.5rem; }
+
+/* Document layout */
+.doc { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 3.5rem; padding-block: 3rem 4rem; }
+.toc { position: sticky; top: calc(var(--top) + env(safe-area-inset-top, 0px) + 1.5rem); align-self: start; font-size: 0.92rem; max-height: calc(100vh - var(--top) - 3rem); overflow-y: auto; }
+.toc p { font: 600 1.3rem/1 var(--display); margin: 1.25rem 0 0.4rem; }
+.toc p:first-child { margin-top: 0; }
+.toc ul { list-style: none; padding: 0; margin: 0; border-left: 2px solid var(--rule); }
+.toc li { margin: 0; }
+.toc a { display: block; text-decoration: none; padding: 0.22rem 0 0.22rem 0.85rem; margin-left: -2px; border-left: 2px solid transparent; color: var(--muted); }
+.toc a:hover { color: var(--ink); }
+.toc a[aria-current="true"] { color: var(--ink); border-left-color: var(--auto); font-weight: 600; }
+
+.doc-body { max-width: 62rem; min-width: 0; }
+.part > * { max-width: 46rem; }
+.part > .wide { max-width: none; }
+.part + .part { margin-top: 5rem; }
+.part > h2 {
+  font: 800 clamp(3rem, 6vw, 4.5rem)/0.95 var(--display);
+  margin: 0 0 0.75rem;
+}
+.part-lede { font-size: 1.15rem; color: var(--ink-2); margin-bottom: 2rem; }
+.doc-body h3 { font: 600 clamp(1.7rem, 3vw, 2.1rem)/1.05 var(--display); margin: 3.25rem 0 1rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); }
+.doc-body h4 { font: 600 1.05rem/1.35 var(--sans); margin: 1.75rem 0 0.5rem; }
+
+/* Code blocks */
+.code { position: relative; margin: 0 0 1.25rem; }
+.code pre {
+  margin: 0; padding: 0.85rem 3.25rem 0.85rem 1rem;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+  overflow-x: auto; line-height: 1.55; tab-size: 2;
+}
+.copy {
+  position: absolute; top: 0.45rem; right: 0.45rem;
+  width: 2rem; height: 2rem; display: grid; place-items: center;
+  background: var(--raised); color: var(--muted); border: 1px solid var(--rule); border-radius: 5px; cursor: pointer;
+}
+.copy:hover { color: var(--ink); }
+.copy svg { width: 1rem; height: 1rem; }
+.copy[data-copied] { color: var(--auto); border-color: var(--auto); }
+.c-dim { color: var(--muted); }
+
+/* Prefix switcher */
+.prefix {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+  padding: 0.85rem 1rem; margin: 0 0 2rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--raised);
+}
+.prefix legend { float: left; font-weight: 600; margin-right: 0.25rem; padding: 0; }
+.prefix-opts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.prefix label { display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; padding: 0.3rem 0.7rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.92rem; }
+.prefix label:has(input:checked) { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.prefix label:has(input:focus-visible) { outline: 3px solid var(--auto); outline-offset: 2px; }
+.prefix input { position: absolute; opacity: 0; pointer-events: none; }
+.prefix code { background: none; padding: 0; font-weight: 500; }
+
+/* Steps */
+.steps { list-style: none; padding: 0; counter-reset: s; }
+.steps > li { counter-increment: s; position: relative; padding-left: 3rem; margin: 0 0 1.25rem; }
+.steps > li::before {
+  content: counter(s); position: absolute; left: 0; top: -0.1rem;
+  width: 2rem; height: 2rem; display: grid; place-items: center;
+  font: 800 1.25rem/1 var(--display); border: 2px solid var(--ink); border-radius: 50%;
+}
+.steps > li.is-auto::before { border-color: var(--auto); color: var(--auto); }
+.steps .code { margin-top: 0.6rem; }
+
+/* Playbooks */
+.pbs { list-style: none; padding: 0; margin: 0 0 1.5rem; border-top: 2px solid var(--ink); }
+.pbs > li { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 0.25rem 1.5rem; padding: 1.25rem 0; margin: 0; border-bottom: 1px solid var(--rule); }
+.pbs h4 { margin: 0; font: 500 0.95rem/1.4 var(--mono); overflow-wrap: anywhere; }
+.pbs p { margin: 0 0 0.6rem; }
+.pbs .code { margin: 0 0 0.6rem; }
+.pbs .more { font-size: 0.95rem; color: var(--ink-2); margin: 0; }
+.pbs .more li + li { margin-top: 0.2rem; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 0 0 1.5rem; border-top: 2px solid var(--ink); }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--rule); }
+th { font-weight: 600; }
+thead th { border-bottom-width: 2px; }
+td code { white-space: nowrap; }
+td.wrap-code code { white-space: normal; }
+
+/* Asked vs alone */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+.split > div { padding: 1.1rem 1.25rem; border-radius: 8px; }
+.split h4 { margin: 0 0 0.6rem; display: flex; align-items: center; gap: 0.5rem; }
+.split ul { margin: 0; font-size: 0.97rem; }
+.split .is-you { background: var(--you-soft); }
+.split .is-auto { background: var(--auto-soft); }
+.rules { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.rules li { margin: 0; padding: 0.35rem 0.8rem; border: 2px solid var(--ink); border-radius: 999px; font-weight: 600; font-size: 0.93rem; }
+
+/* Composition */
+.layers { margin: 0 0 1.5rem; display: grid; gap: 0; }
+.layer { padding: 1.1rem 1.25rem; border: 1px solid var(--rule); background: var(--raised); }
+.layer + .layer { border-top: none; }
+.layer:first-child { border-radius: 8px 8px 0 0; }
+.layer:last-child { border-radius: 0 0 8px 8px; }
+.layer h4 { margin: 0 0 0.25rem; }
+.layer p { margin: 0 0 0.6rem; color: var(--ink-2); font-size: 0.97rem; }
+.layer-play { border-left: 6px solid var(--you); }
+.layer-wrap { border-left: 6px solid var(--auto); }
+.layer-craft { border-left: 6px solid var(--muted); }
+.chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chips li { margin: 0; font: 0.8rem/1.4 var(--mono); padding: 0.15rem 0.5rem; background: var(--surface); border-radius: 4px; }
+.calls { font-size: 0.85rem; color: var(--muted); padding: 0.35rem 1.25rem; border-inline: 1px solid var(--rule); background: var(--bg); }
+.layer + .calls, .calls + .layer { border-top: none; }
+
+/* Diagram */
+.diagram { margin: 0 0 1.5rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--raised); overflow-x: auto; }
+.diagram svg { display: block; min-width: 860px; width: 100%; height: auto; }
+.diagram figcaption, .fig-note { font-size: 0.9rem; color: var(--muted); }
+.diagram figcaption { padding: 0.75rem 1rem; border-top: 1px solid var(--rule); position: sticky; left: 0; }
+svg .n { fill: var(--raised); stroke: var(--ink-2); stroke-width: 1.5; }
+svg .n-auto { stroke: var(--auto); stroke-width: 2; }
+svg .n-opt { stroke-dasharray: 5 4; }
+svg .t { fill: var(--ink); font: 500 13px var(--mono); }
+svg .ts { fill: var(--muted); font: 400 11.5px var(--sans); }
+svg .tr { fill: var(--ink); font: 600 17px var(--display); }
+svg .ta { fill: var(--auto); font: 600 17px var(--display); }
+svg .tk { fill: #17202A; font: 600 13px var(--sans); }
+svg .l { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+svg .l-dash { stroke-dasharray: 5 4; }
+svg .l-auto { stroke: var(--auto); }
+svg .ah { fill: var(--muted); }
+svg .ah-auto { fill: var(--auto); }
+svg .hz-a { fill: var(--you); }
+svg .hz-b { fill: var(--stripe); }
+svg .merge { fill: var(--you); }
+svg .junction { fill: var(--muted); }
+svg .dia { fill: var(--raised); stroke: var(--ink-2); stroke-width: 1.5; }
+
+/* Definition rows */
+.defs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.5rem 1.25rem; margin: 0 0 1.5rem; }
+.defs dt { font-weight: 600; }
+.defs dd { margin: 0; }
+.tag { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 0.05rem 0.5rem; border-radius: 999px; }
+.tag-frontier { background: var(--ink); color: var(--bg); }
+.tag-code { background: var(--auto-soft); color: var(--ink); border: 1px solid var(--auto); }
+.tag-fast { border: 1px solid var(--muted); color: var(--ink); }
+
+.links { list-style: none; padding: 0; columns: 2 16rem; column-gap: 2rem; }
+.links li { break-inside: avoid; margin: 0 0 0.5rem; }
+
+/* Footer */
+.footer { border-top: 2px solid var(--ink); padding-block: 2.5rem 3rem; font-size: 0.95rem; color: var(--ink-2); }
+.footer-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 3rem; }
+.footer h2 { font: 800 1.5rem/1 var(--display); margin: 0 0 0.5rem; color: var(--ink); }
+.footer p { margin: 0 0 0.5rem; max-width: 34rem; }
+.risk { color: var(--muted); }
+
+@media (max-width: 1000px) {
+  .doc { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .toc { display: none; }
+}
+@media (max-width: 760px) {
+  .gets { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  .install-rows { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .install-rows dd + dt { margin-top: 0.75rem; }
+  .pbs > li { grid-template-columns: minmax(0, 1fr); }
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .footer-inner { grid-template-columns: minmax(0, 1fr); }
+  .topnav a.hide-sm { display: none; }
+  .callout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .route { flex-direction: column; gap: 0.85rem; margin-top: 2.5rem; }
+  .route::before { left: 0.57rem; right: auto; top: 0.6rem; bottom: 0.6rem; width: 2px; height: auto; }
+  .route li { flex-direction: row; text-align: left; gap: 0.9rem; }
+  .route .gate .bar { margin: -0.3rem 0; height: 1.9rem; }
+  .route .gate .nm { margin-top: 0; }
+  .defs { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+  .defs dd + dt { margin-top: 0.6rem; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#top" aria-label="agentic, back to top"><span class="brand-mark" aria-hidden="true"></span>agentic</a>
+    <nav class="topnav" aria-label="Sections">
+      <a href="#install" class="hide-sm">Install</a>
+      <a href="#use">Use</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/JohannWilfridCalixte/agent-skills">GitHub</a>
+    </nav>
+    <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero wrap" id="top" aria-labelledby="hero-title">
+    <h1 id="hero-title">A software factory for Claude Code, Cursor and Codex</h1>
+    <p class="lede">You describe a feature; agentic takes it through grill, spec, plan, implement, review, PR babysitting and cleanup, and stops short of merging.</p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="https://github.com/JohannWilfridCalixte/agent-skills">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#install">Read the install guide</a>
+    </div>
+
+    <ol class="route" aria-label="The stations of a playbook run">
+      <li class="you" style="--i:0"><span class="dot" aria-hidden="true"></span><span class="nm">grill</span></li>
+      <li class="you" style="--i:1"><span class="dot" aria-hidden="true"></span><span class="nm">spec</span></li>
+      <li class="you" style="--i:2"><span class="dot" aria-hidden="true"></span><span class="nm">plan</span></li>
+      <li class="gate" style="--i:3"><span class="bar" aria-hidden="true"></span><span class="nm">last gate</span></li>
+      <li class="auto" style="--i:4"><span class="dot" aria-hidden="true"></span><span class="nm">implement</span></li>
+      <li class="auto" style="--i:5"><span class="dot" aria-hidden="true"></span><span class="nm">review</span></li>
+      <li class="auto" style="--i:6"><span class="dot" aria-hidden="true"></span><span class="nm">PR babysit</span></li>
+      <li class="merge" style="--i:7"><span class="dot" aria-hidden="true"></span><span class="nm">you merge</span></li>
+      <li class="auto" style="--i:8"><span class="dot" aria-hidden="true"></span><span class="nm">cleanup</span></li>
+    </ol>
+    <p class="route-legend">
+      <span><i class="swatch swatch-you" aria-hidden="true"></i>You answer questions and approve</span>
+      <span><i class="swatch swatch-gate" aria-hidden="true"></i>Gate: you confirm decisions</span>
+      <span><i class="swatch swatch-auto" aria-hidden="true"></i>Runs alone until the PR is merge-ready</span>
+    </p>
+
+    <div class="gets">
+      <div>
+        <h2>Playbooks, end to end</h2>
+        <p>One command takes you from an idea or a bug report to a merge-ready PR. It is interactive until the last gate and autonomous after it.</p>
+      </div>
+      <div>
+        <h2>Best-in-class skills, composed</h2>
+        <p>Proven third-party skills (Matt Pocock, Cloudflare, Anthropic and others) are vendored verbatim. Thin agentic wrappers add the work item, model routing, gates and loops.</p>
+      </div>
+      <div>
+        <h2>Auditable and resumable</h2>
+        <p>Every run lives in one work item folder with an append-only event log. Re-run with the slug and it picks up where it stopped.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="install" id="install" aria-labelledby="install-title">
+    <div class="wrap">
+      <div class="install-head">
+        <h2 id="install-title">Install</h2>
+        <p>Prerequisites, alternatives and updates: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#install">README install section</a>.</p>
+      </div>
+      <dl class="install-rows">
+        <dt>Claude Code</dt>
+        <dd><div class="code"><pre><code>/plugin marketplace add JohannWilfridCalixte/agent-skills
+/plugin install agentic@agentic</code></pre></div></dd>
+        <dt>Codex</dt>
+        <dd><div class="code"><pre><code>codex plugin marketplace add JohannWilfridCalixte/agent-skills
+codex plugin add agentic@agentic</code></pre></div></dd>
+        <dt>Cursor</dt>
+        <dd><div class="code"><pre><code>git clone https://github.com/JohannWilfridCalixte/agent-skills.git ~/.cursor/plugins/local/agentic</code></pre></div><p class="install-note">Then run <strong>Developer: Reload Window</strong>.</p></dd>
+        <dt>Any harness</dt>
+        <dd><div class="code"><pre><code>npx skills add JohannWilfridCalixte/agent-skills</code></pre></div></dd>
+      </dl>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <aside class="callout" aria-labelledby="callout-title">
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="14" cy="14" r="9"/><circle cx="34" cy="34" r="5"/><circle cx="40" cy="14" r="3.5"/><path d="M21 21l8.5 8.5M23 14h13.5"/></svg>
+      <div>
+        <h2 id="callout-title">Frontier models think, smaller models build</h2>
+        <p>Agentic is built for frontier models to do the heavy thinking: grilling, spec, plan and security review. Implementation can then go to smaller, cheaper models.</p>
+        <p>Pick a model and effort per step in config, under <code>steps.&lt;harness&gt;.&lt;step&gt;</code>. See <a href="#routing">model routing</a>.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="wrap doc">
+    <nav class="toc" aria-label="On this page">
+      <p>Use</p>
+      <ul>
+        <li><a href="#first-5-minutes">First 5 minutes</a></li>
+        <li><a href="#playbooks">Playbooks</a></li>
+        <li><a href="#light-vs-full">Light vs full mode</a></li>
+        <li><a href="#asked-vs-alone">Asked vs runs alone</a></li>
+        <li><a href="#resume">Resume</a></li>
+        <li><a href="#outputs">Where outputs land</a></li>
+      </ul>
+      <p>How it works</p>
+      <ul>
+        <li><a href="#composition">Composition</a></li>
+        <li><a href="#flow">A playbook, end to end</a></li>
+        <li><a href="#work-item">Work item and audit log</a></li>
+        <li><a href="#gates">Gates and escalations</a></li>
+        <li><a href="#reviewers">Reviewers and loops</a></li>
+        <li><a href="#routing">Model routing</a></li>
+        <li><a href="#config">Configuration</a></li>
+        <li><a href="#decisions">Decisions and docs</a></li>
+      </ul>
+    </nav>
+
+    <div class="doc-body">
+      <section class="part" id="use" aria-labelledby="use-title">
+        <h2 id="use-title">Use</h2>
+        <p class="part-lede">Pick a playbook, answer its questions, then let it run until the PR is merge-ready. You merge.</p>
+
+        <fieldset class="prefix" id="prefix">
+          <legend>Show commands for</legend>
+          <div class="prefix-opts">
+            <label><input type="radio" name="prefix" value="/" checked><span>Claude Code, Cursor <code>/</code></span></label>
+            <label><input type="radio" name="prefix" value="/agentic:"><span>Claude Code plugin <code>/agentic:</code></span></label>
+            <label><input type="radio" name="prefix" value="$"><span>Codex <code>$</code></span></label>
+          </div>
+        </fieldset>
+
+        <h3 id="first-5-minutes">First 5 minutes</h3>
+        <ol class="steps">
+          <li>
+            Open a repo with a green build, then run:
+            <div class="code"><pre><code data-cmd="agentic-implement-feature light add a --version flag to the CLI">/agentic-implement-feature light add a --version flag to the CLI</code></pre></div>
+          </li>
+          <li>
+            Answer the start questions, asked in one exchange: the <strong>workspace</strong> (a new worktree <code>feat/{slug}</code>, recommended; the current branch; or another branch), and whether to copy untracked files such as <code>.env</code> into the worktree.
+          </li>
+          <li>
+            Light mode reads the code and checks the feature really is small. It then asks every blocking question in one go and writes <code>plan.md</code>.
+          </li>
+          <li class="is-auto">
+            From here the run is autonomous. It gives you the resume command once, then implements one commit per task with a green gate after each, runs the reviewers and loops until no blocker or major is left, pushes, opens a PR, watches CI and comments, and reports when the PR is merge-ready.
+          </li>
+          <li>
+            You merge. The skill sees the merge, then cleans up the worktree and branches and archives the work item.
+          </li>
+        </ol>
+        <p>Watch it happen with <code>tail -f</code> on the <a href="#work-item">event log</a>, or read <code>.agentic/work/{YYYYMMDD}-{slug}/</code>.</p>
+
+        <h3 id="playbooks">Playbooks</h3>
+        <p>Playbooks are user-invoked: the model never starts them on its own. In Codex, playbooks and <code>agentic-configure</code> set <code>policy.allow_implicit_invocation: false</code>.</p>
+        <ul class="pbs">
+          <li>
+            <h4>agentic-implement-feature</h4>
+            <div>
+              <p>Building something new. Input can be text, a file, a ticket key, a URL or a slug. Add <code>light</code> for small, obvious features.</p>
+              <div class="code"><pre><code data-cmd="agentic-implement-feature add CSV export to reports">/agentic-implement-feature add CSV export to reports</code></pre></div>
+            </div>
+          </li>
+          <li>
+            <h4>agentic-change-feature</h4>
+            <div>
+              <p>Changing existing behaviour. Spec and plan record current vs target behaviour.</p>
+              <div class="code"><pre><code data-cmd="agentic-change-feature light make session timeout 30 min">/agentic-change-feature light make session timeout 30 min</code></pre></div>
+              <ul class="more">
+                <li>A thin alias of <code>agentic-implement-feature</code> with branch <code>change</code>.</li>
+                <li>In light mode its ACs show <code>(was: …)</code>, and T1 pins any kept behaviour that tests don't cover yet.</li>
+              </ul>
+            </div>
+          </li>
+          <li>
+            <h4>agentic-debug</h4>
+            <div>
+              <p>Fixing a bug: diagnose first, then a regression test, then the fix.</p>
+              <div class="code"><pre><code data-cmd="agentic-debug PROJ-123">/agentic-debug PROJ-123</code></pre></div>
+              <ul class="more">
+                <li>Start asks only about the workspace (<code>fix/{slug}</code>).</li>
+                <li><code>diagnosing-bugs</code> runs interactively and produces <code>diagnosis.md</code>: symptom, repro, root cause (<code>file:line</code>), ruled-out hypotheses and seam.</li>
+                <li>T1 is a failing regression test, then one approval round. The autonomous tail follows, and the merge-ready report includes the root cause.</li>
+              </ul>
+            </div>
+          </li>
+          <li>
+            <h4>agentic-pr-review</h4>
+            <div>
+              <p>Reviewing a PR once, with no fixes. With no argument, it uses the current branch's PR.</p>
+              <div class="code"><pre><code data-cmd="agentic-pr-review 42">/agentic-pr-review 42</code></pre></div>
+              <ul class="more">
+                <li>Output is a local <code>reviews/pr-report.md</code> or one posted PR review.</li>
+                <li>Verdict: any blocker requests changes; any major or needs-user finding comments; otherwise it approves.</li>
+                <li>Security findings go through the disclosure guard before anything is posted.</li>
+              </ul>
+            </div>
+          </li>
+          <li>
+            <h4>agentic-security-audit</h4>
+            <div>
+              <p>Running a whole-repo or path-scoped security audit that files issues, with no fixes.</p>
+              <div class="code"><pre><code data-cmd="agentic-security-audit src/api">/agentic-security-audit src/api</code></pre></div>
+              <ul class="more">
+                <li>Start asks for scope, profile (<code>quick</code>, <code>standard</code> or <code>deep</code>), output dir and destination: local, <code>github:owner/repo</code>, <code>jira:KEY</code>, <code>linear:TEAM</code> or other.</li>
+                <li>Publishing creates a parent issue plus one child per confirmed finding.</li>
+                <li>To fix, hand the parent to <code>agentic-change-feature</code>, which runs full mode with tickets.</li>
+              </ul>
+            </div>
+          </li>
+          <li>
+            <h4>agentic-configure</h4>
+            <div>
+              <p>Writing your config: models, reviewers, folders, profiles, limits. Optional: without a config, built-in defaults apply.</p>
+              <div class="code"><pre><code data-cmd="agentic-configure --project">/agentic-configure --project</code></pre></div>
+              <ul class="more">
+                <li>Detects your harnesses and their models, then walks through reviewers, the model table, folders, profiles and limits.</li>
+                <li>Writes only what differs from the defaults, and only after a yes. Models go in global config, everything else in project config.</li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+
+        <h4>Arguments</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Skill</th><th scope="col">Arguments</th></tr></thead>
+            <tbody>
+              <tr><td class="wrap-code"><code>agentic-implement-feature</code>, <code>agentic-change-feature</code></td><td><code>[light] &lt;text | file | ticket key | URL | slug&gt;</code></td></tr>
+              <tr><td><code>agentic-debug</code></td><td class="wrap-code"><code>&lt;bug report | file | ticket key | URL | slug&gt;</code></td></tr>
+              <tr><td><code>agentic-pr-review</code></td><td><code>[&lt;PR number | URL&gt;]</code></td></tr>
+              <tr><td><code>agentic-security-audit</code></td><td><code>[&lt;paths&gt; | &lt;slug&gt;]</code></td></tr>
+              <tr><td><code>agentic-configure</code></td><td><code>[--global | --project]</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="light-vs-full">Light vs full mode</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col">Full (default)</th><th scope="col">Light</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Invoke</th><td class="wrap-code"><code>agentic-implement-feature &lt;input&gt;</code></td><td class="wrap-code"><code>agentic-implement-feature light &lt;input&gt;</code>, or pick light at start</td></tr>
+              <tr><th scope="row">Steps</th><td>grill product + functional, <code>spec.md</code>, grill tech, <code>plan.md</code>, tickets if chosen</td><td>code read, straightforward check, one exchange of blocking questions, <code>plan.md</code> with its own ACs</td></tr>
+              <tr><th scope="row">Approvals</th><td>spec gate, plan gate, escalation gates</td><td>none</td></tr>
+              <tr><th scope="row">Tickets</th><td>optional (asked at start)</td><td>no</td></tr>
+              <tr><th scope="row">Best for</th><td>Anything with design choices</td><td>Small, obvious features</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A feature counts as straightforward only if all of these hold: 5 blocking questions or fewer; no ADR-worthy decision; no data migration or public contract change; no new domain term; about 5 tasks or fewer.</p>
+        <p>If it isn't straightforward, light mode says why and offers full mode; it never switches silently. Saying no stops the run and prints the resume command.</p>
+
+        <h3 id="asked-vs-alone">What you're asked vs what runs alone</h3>
+        <div class="split wide">
+          <div class="is-you">
+            <h4><i class="swatch swatch-you" aria-hidden="true"></i>You're asked</h4>
+            <ul>
+              <li>Start: workspace, mode, tickets, untracked-file copy (only what you haven't already answered)</li>
+              <li>Grill questions (product, functional, tech), each with a recommended answer</li>
+              <li>Spec and plan approval (full mode)</li>
+              <li>Escalation gate: confirm, escalate or revisit each structural decision</li>
+              <li>Interrupts after the last gate: a limit hit, a design-level PR comment, an unfixable red tree, a new escalation, a PR closed unmerged</li>
+            </ul>
+          </div>
+          <div class="is-auto">
+            <h4><i class="swatch swatch-auto" aria-hidden="true"></i>Runs autonomously</h4>
+            <ul>
+              <li>Context gathering by read-only subagents</li>
+              <li><code>implement</code>: one subagent and one conventional commit per unit, with a green gate (build, lint, typecheck, tests) after each</li>
+              <li><code>review</code>: every reviewer, dedupe, fix list, re-review</li>
+              <li><code>babysit-pr</code>: push, open the PR, poll CI and comments, fix</li>
+              <li><code>cleanup</code> after merge</li>
+            </ul>
+          </div>
+        </div>
+        <h4>Hard rules</h4>
+        <ul class="rules">
+          <li>It never merges</li>
+          <li>It force-pushes only after a yes</li>
+          <li>The implement baseline must be green before work starts</li>
+        </ul>
+
+        <h3 id="resume">Resume</h3>
+        <p>After a usage limit, a crash or a closed session, re-run the same playbook with the work item slug. This works from any harness on the same machine.</p>
+        <div class="code"><pre><code data-cmd="agentic-implement-feature 20261101-csv-export">/agentic-implement-feature 20261101-csv-export</code></pre></div>
+        <p>On resume, it:</p>
+        <ul>
+          <li>resolves open escalations first (decided, override or stop);</li>
+          <li>asks you to confirm when another session still looks active;</li>
+          <li>reuses the recorded workspace and earlier answers;</li>
+          <li>finishes any unfinished fix list, and skips steps that are already done;</li>
+          <li>for a unit cut off mid-edit, asks whether to finish it or stash it, and never discards work.</li>
+        </ul>
+        <p>An abrupt stop loses at most the units that were in flight. Work items live in the gitignored output folder and workspace paths are absolute, so resume works on the same machine only. Pass a slug to any flow skill to resume it.</p>
+
+        <h3 id="outputs">Where outputs land</h3>
+        <dl class="defs">
+          <dt>Work item</dt>
+          <dd><code>.agentic/work/{YYYYMMDD}-{slug}/</code>, one per run. It stays in the main checkout even when the code is built in a worktree.</dd>
+          <dt>Code</dt>
+          <dd>The workspace branch and the PR.</dd>
+          <dt>Decisions</dt>
+          <dd>Decisions promoted at gates are committed to <code>docs/</code>.</dd>
+          <dt>Archive</dt>
+          <dd><code>.agentic/work/_archive/{YYYYMMDD}-{slug}/</code> after cleanup, never deleted.</dd>
+        </dl>
+      </section>
+
+      <section class="part" id="how" aria-labelledby="how-title">
+        <h2 id="how-title">How it works</h2>
+        <p class="part-lede">Agentic is pure composition: proven skills do the craft, thin wrappers add state, routing, gates and loops, and playbooks chain them.</p>
+
+        <h3 id="composition">Composition</h3>
+        <div class="layers wide">
+          <div class="layer layer-play">
+            <h4>Playbooks</h4>
+            <p>User-invoked end-to-end chains in <code>skills/playbooks</code>. Each one calls flow skills in order.</p>
+            <ul class="chips" aria-label="Playbooks">
+              <li>agentic-implement-feature</li><li>agentic-change-feature</li><li>agentic-debug</li><li>agentic-pr-review</li><li>agentic-security-audit</li>
+            </ul>
+          </div>
+          <div class="calls" aria-hidden="true">calls</div>
+          <div class="layer layer-wrap">
+            <h4>Agentic wrappers</h4>
+            <p>Thin skills that sit next to the copy they wrap. They add the work item, config, model routing, subagent delegation, gates, project knowledge, the audit log and loops.</p>
+            <ul class="chips" aria-label="Agentic wrappers">
+              <li>agentic-grill-me</li><li>agentic-grill-product</li><li>agentic-grill-functional</li><li>agentic-grill-tech</li><li>agentic-to-spec</li><li>agentic-to-plan</li><li>agentic-to-tickets</li><li>agentic-implement</li><li>agentic-review</li><li>agentic-babysit-pr</li><li>agentic-cleanup</li><li>agentic-use-workflow</li><li>agentic-use-knowledge</li><li>agentic-configure</li>
+            </ul>
+          </div>
+          <div class="calls" aria-hidden="true">delegates the craft to</div>
+          <div class="layer layer-craft">
+            <h4>Vendored craft skills</h4>
+            <p>Third-party skills copied byte-identical from upstream and pinned in <code>vendor.lock.json</code>: grilling, spec, tickets, TDD, code review, diagnosis, security audit.</p>
+            <ul class="chips" aria-label="Vendored skills">
+              <li>grilling</li><li>to-spec</li><li>to-tickets</li><li>implement</li><li>tdd</li><li>diagnosing-bugs</li><li>codebase-design</li><li>code-review</li><li>ponytail</li><li>super-review</li><li>pr-security-review</li><li>security-audit</li><li>ub-mode</li><li>security-review.md</li>
+            </ul>
+          </div>
+        </div>
+        <p>Reviewers and codestyle are swapped in config. Codestyle comes from profile skills, applied to every coding step, and from per-task <code>Skills</code> in <code>plan.md</code>. Rationale: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0002-skill-composition.md">ADR-0002</a>.</p>
+        <div class="code"><pre><code>skills/
+  core/        agentic-use-workflow, agentic-use-knowledge, agentic-configure
+  codestyle/   typescript, python, clean architecture, instrumentation, testing
+  flow/        agentic steps playbooks call + vendored craft skills
+  review/      agentic-review + reviewers, vendored security-audit
+  playbooks/   user-invoked end-to-end chains</code></pre></div>
+
+        <h3 id="flow">A playbook, end to end</h3>
+        <p><code>agentic-implement-feature</code>, from start to cleanup. Everything up to the last gate is interactive; the tail is autonomous.</p>
+        <figure class="diagram wide">
+          <svg viewBox="0 0 1000 510" role="img" aria-labelledby="flow-title flow-desc">
+            <title id="flow-title">agentic-implement-feature, end to end</title>
+            <desc id="flow-desc">Start asks for mode, tickets and workspace. In full mode, agentic-to-spec grills product and functional decisions and passes the spec gate, then agentic-to-plan grills tech decisions and passes the plan gate, then agentic-to-tickets runs if tickets were chosen. In light mode, agentic-to-plan light runs a straightforward check; if the feature is not straightforward you can switch to full mode. Once the last gate passes, the run is autonomous: agentic-implement, then agentic-review, which loops back to implement on blocker or major findings, then agentic-babysit-pr, which loops back to implement on CI failures or comments. You merge, then agentic-cleanup runs.</desc>
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+              <marker id="ah-auto" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah-auto"/></marker>
+              <pattern id="hz" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="10" class="hz-a"/><rect x="5" width="5" height="10" class="hz-b"/></pattern>
+            </defs>
+
+            <text x="20" y="26" class="tr">Interactive</text>
+
+            <rect x="20" y="130" width="130" height="64" rx="6" class="n"/>
+            <text x="85" y="157" text-anchor="middle" class="t">Start</text>
+            <text x="85" y="175" text-anchor="middle" class="ts">mode, tickets,</text>
+            <text x="85" y="188" text-anchor="middle" class="ts">workspace</text>
+
+            <path d="M150 162H177" class="l" marker-end="url(#ah)"/>
+            <polygon points="205,136 231,162 205,188 179,162" class="dia"/>
+            <text x="205" y="166" text-anchor="middle" class="ts">mode?</text>
+
+            <path d="M205 136V72H268" class="l" marker-end="url(#ah)"/>
+            <text x="213" y="104" class="ts">full</text>
+            <path d="M205 188V232H268" class="l" marker-end="url(#ah)"/>
+            <text x="213" y="216" class="ts">light</text>
+
+            <rect x="270" y="40" width="170" height="64" rx="6" class="n"/>
+            <text x="355" y="67" text-anchor="middle" class="t">agentic-to-spec</text>
+            <text x="355" y="86" text-anchor="middle" class="ts">grill product + functional</text>
+
+            <path d="M440 72H455" class="l"/>
+            <rect x="455" y="44" width="14" height="56" rx="2" fill="url(#hz)"/>
+            <text x="462" y="34" text-anchor="middle" class="ts">spec gate</text>
+            <path d="M469 72H488" class="l" marker-end="url(#ah)"/>
+
+            <rect x="490" y="40" width="170" height="64" rx="6" class="n"/>
+            <text x="575" y="67" text-anchor="middle" class="t">agentic-to-plan</text>
+            <text x="575" y="86" text-anchor="middle" class="ts">grill tech</text>
+
+            <path d="M660 72H675" class="l"/>
+            <rect x="675" y="44" width="14" height="56" rx="2" fill="url(#hz)"/>
+            <text x="682" y="34" text-anchor="middle" class="ts">plan gate</text>
+            <path d="M689 72H703" class="l" marker-end="url(#ah)"/>
+
+            <rect x="705" y="40" width="170" height="64" rx="6" class="n n-opt"/>
+            <text x="790" y="67" text-anchor="middle" class="t">agentic-to-tickets</text>
+            <text x="790" y="86" text-anchor="middle" class="ts">only if chosen at start</text>
+
+            <rect x="270" y="200" width="190" height="64" rx="6" class="n"/>
+            <text x="365" y="227" text-anchor="middle" class="t">agentic-to-plan light</text>
+            <text x="365" y="246" text-anchor="middle" class="ts">straightforward check</text>
+
+            <path d="M330 200V108" class="l l-dash" marker-end="url(#ah)"/>
+            <text x="340" y="148" class="ts">not straightforward:</text>
+            <text x="340" y="163" class="ts">you switch to full</text>
+
+            <path d="M875 72H945V284H100V376" class="l"/>
+            <path d="M460 232H520V284" class="l"/>
+            <circle cx="520" cy="284" r="3.5" class="junction"/>
+            <path d="M100 340V376" class="l l-auto" marker-end="url(#ah-auto)"/>
+
+            <rect x="20" y="314" width="960" height="10" fill="url(#hz)"/>
+            <text x="980" y="306" text-anchor="end" class="ts">last gate passed</text>
+            <text x="20" y="356" class="ta">Autonomous</text>
+
+            <rect x="20" y="380" width="160" height="64" rx="6" class="n n-auto"/>
+            <text x="100" y="407" text-anchor="middle" class="t">agentic-implement</text>
+            <text x="100" y="426" text-anchor="middle" class="ts">one commit per unit</text>
+
+            <path d="M180 412H238" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <rect x="240" y="380" width="160" height="64" rx="6" class="n n-auto"/>
+            <text x="320" y="407" text-anchor="middle" class="t">agentic-review</text>
+            <text x="320" y="426" text-anchor="middle" class="ts">reviewers, fix list</text>
+
+            <path d="M400 412H458" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <rect x="460" y="380" width="175" height="64" rx="6" class="n n-auto"/>
+            <text x="547" y="407" text-anchor="middle" class="t">agentic-babysit-pr</text>
+            <text x="547" y="426" text-anchor="middle" class="ts">push, PR, CI, comments</text>
+
+            <path d="M635 412H683" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <rect x="685" y="392" width="110" height="40" rx="20" class="merge"/>
+            <text x="740" y="417" text-anchor="middle" class="tk">you merge</text>
+
+            <path d="M795 412H828" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <rect x="830" y="380" width="150" height="64" rx="6" class="n n-auto"/>
+            <text x="905" y="407" text-anchor="middle" class="t">agentic-cleanup</text>
+            <text x="905" y="426" text-anchor="middle" class="ts">archive work item</text>
+
+            <path d="M320 444V470H125V448" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <text x="222" y="463" text-anchor="middle" class="ts">blocker / major</text>
+            <path d="M547 444V494H75V448" class="l l-auto" marker-end="url(#ah-auto)"/>
+            <text x="440" y="487" text-anchor="middle" class="ts">CI failure / comment</text>
+          </svg>
+          <figcaption>Gates are escalation gates on structural decisions, plus your approval of the spec and the plan. Full contract: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/playbook.md">playbook.md</a>.</figcaption>
+        </figure>
+        <p>Grilling happens inside <code>agentic-to-spec</code> (product, functional) and <code>agentic-to-plan</code> (tech). Every answer is logged to <code>decisions.md</code>, tagged <code>structural</code> or <code>minor</code>. Every focus recommends the leanest complete option, and never cuts validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything you asked for.</p>
+
+        <h3 id="work-item">Work item, state, audit log</h3>
+        <p>There is one folder per feature, shared by every skill across sessions.</p>
+        <div class="code"><pre><code>.agentic/work/{YYYYMMDD}-{slug}/
+├── events.jsonl          <span class="c-dim"># append-only audit log (source of truth)</span>
+├── state.json            <span class="c-dim"># snapshot derived from the log, used to resume</span>
+├── input.md  context.md  decisions.md
+├── spec.md  plan.md
+├── diagnosis.md  debug/  <span class="c-dim"># agentic-debug</span>
+├── tickets/NN-slug.md    <span class="c-dim"># local tracker</span>
+├── implementation.md
+├── reviews/{n}-{reviewer}.md  reviews/{n}-fix.md  reviews/pr-report.md
+├── pr.md
+└── audit/run-N/  audit/issues/   <span class="c-dim"># agentic-security-audit</span></code></pre></div>
+        <dl class="defs">
+          <dt>Events</dt>
+          <dd><code>started</code>, <code>progress</code>, <code>completed</code>, <code>failed</code>, <code>decision</code>, <code>escalation</code>, <code>artifact</code>, <code>gate</code>, <code>note</code></dd>
+          <dt>Status</dt>
+          <dd><code>in_progress</code>, <code>awaiting_decision</code>, <code>blocked</code>, <code>failed</code>, <code>done</code>, <code>archived</code>. If the log and the snapshot disagree, the log wins.</dd>
+          <dt>Git</dt>
+          <dd>Gitignore <code>.agentic/work</code> unless <code>commitWork: true</code>.</dd>
+        </dl>
+        <p>Follow a run live (needs <code>jq</code>):</p>
+        <div class="code"><pre><code>tail -f .agentic/work/*/events.jsonl | jq -r '"\(.ts[11:19]) \(.workflow)/\(.step)\(if .task then "/"+.task else "" end) \(.type) [\(.model // "-")] \(.summary)"'</code></pre></div>
+        <p class="fig-note">Line contract: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/state.md">state.md</a>.</p>
+
+        <h3 id="gates">Gates and escalations</h3>
+        <p>After the grills in <code>agentic-to-spec</code> and <code>agentic-to-plan</code>, each structural decision goes through a gate, where it is:</p>
+        <dl class="defs">
+          <dt>Confirmed</dt>
+          <dd>Becomes an ADR with status <code>Accepted</code>.</dd>
+          <dt>Escalated</dt>
+          <dd>Becomes an ADR with status <code>Proposed</code>, or an RFC. The run waits with status <code>awaiting_decision</code>.</dd>
+          <dt>Revisited</dt>
+          <dd>Goes back to grilling.</dd>
+        </dl>
+        <p>Confirmed knowledge is promoted by <code>agentic-use-knowledge</code>, which commits it as <code>docs: …</code> into <code>docs/</code>: <code>tech/principles.md</code>, <code>tech/adr/</code>, <code>tech/rfc/</code>, <code>product/</code>, <code>ubiquitous-language/</code>, <code>landing-zone/</code>.</p>
+        <p>After the last gate, only these interrupt the run: a limit hit, a design-level PR comment, a red tree that can't be fixed, a new escalation, or the PR closed unmerged. A new escalation always stops the run; resuming settles it first. Contract: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/core/agentic-use-workflow/references/escalation.md">escalation.md</a>.</p>
+
+        <h3 id="reviewers">Reviewers and loops</h3>
+        <dl class="defs">
+          <dt>Implement</dt>
+          <dd>Work is split into units: the fix list first, then tickets, then plan tasks. Each unit gets one subagent following Matt Pocock's <code>implement</code> and one conventional commit. A green gate (build, lint, typecheck, tests) runs after each unit; a red unit is retried <code>implement.retries</code> times, then you're asked.</dd>
+          <dt>Review</dt>
+          <dd>One report-only subagent per <code>reviewers</code> entry runs on the branch diff and writes <code>reviews/{n}-{name}.md</code>. Findings are deduped into a fix list for <code>agentic-implement</code>, then every reviewer re-runs. Only <code>blocker</code> and <code>major</code> loop; <code>minor</code> and <code>nit</code> are reported only. At <code>review.iterations</code> you're asked: another round, accept, or stop.</dd>
+          <dt>Babysit</dt>
+          <dd>Pushes, opens the PR against base, polls CI and comments with backoff, and fixes through implement and review. Never merges. Uses <code>gh</code> or a Bitbucket/GitLab CLI or MCP.</dd>
+          <dt>Cleanup</dt>
+          <dd>Removes the worktree and the local and remote branches, fast-forwards the default branch, and archives the work item. Asks first if the PR was closed unmerged or work is unpushed.</dd>
+        </dl>
+        <h4>Default reviewers</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Reviewer</th><th scope="col">Looks at</th></tr></thead>
+            <tbody>
+              <tr><td><code>code-review</code></td><td>General code review (Matt Pocock)</td></tr>
+              <tr><td><code>ub-mode</code></td><td>Make it work, then make it right: TDD, root causes, complexity and duplication gates (Uncle Bob)</td></tr>
+              <tr><td><code>claude-security-review</code></td><td>Anthropic's security-review prompt on the diff</td></tr>
+              <tr><td><code>super-review</code></td><td>PR readiness: own hypotheses first, file:line proof, adversarial truth-check (super-board)</td></tr>
+              <tr><td><code>agentic-review-secrets</code></td><td>Credential leaks</td></tr>
+              <tr><td><code>agentic-review-access-control</code></td><td>Authz, IDOR, tenant isolation</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>pr-security-review</code> is vendored but opt-in, because it overlaps <code>claude-security-review</code>. Any review skill works as a reviewer: vendored, installed with <code>npx skills add</code>, or your own. Finding contract: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/skills/review/agentic-review/references/finding.md">finding.md</a>.</p>
+
+        <h3 id="routing">Model routing</h3>
+        <p>Every step resolves its own model and effort. Built-in defaults are capability classes, not model ids, so the thinking lands on the strongest model and the volume work on cheaper ones.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Step key</th><th scope="col">Runs</th><th scope="col">Built-in default</th></tr></thead>
+            <tbody>
+              <tr><td><code>grill</code></td><td>your session</td><td><span class="tag tag-frontier">frontier</span> high</td></tr>
+              <tr><td class="wrap-code"><code>review.claude-security-review</code>, <code>review.super-review</code>, <code>review.agentic-review-access-control</code></td><td>subagent</td><td><span class="tag tag-frontier">frontier</span> high</td></tr>
+              <tr><td><code>review.agentic-review-secrets</code></td><td>subagent</td><td><span class="tag tag-frontier">frontier</span> medium</td></tr>
+              <tr><td><code>audit</code></td><td>every agent <code>security-audit</code> launches</td><td><span class="tag tag-frontier">frontier</span> high</td></tr>
+              <tr><td><code>implement</code></td><td>one subagent per unit, including every review and babysit fix</td><td><span class="tag tag-code">code</span> medium</td></tr>
+              <tr><td><code>review</code></td><td>parent of <code>review.&lt;reviewer&gt;</code></td><td><span class="tag tag-code">code</span> medium</td></tr>
+              <tr><td><code>tickets</code></td><td>subagent</td><td><span class="tag tag-fast">fast</span> low</td></tr>
+              <tr><td class="wrap-code"><code>context.code</code>, <code>context.docs</code>, <code>context.runtime</code></td><td>read-only subagent</td><td>as <code>explore</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <dl class="defs">
+          <dt><span class="tag tag-frontier">frontier</span></dt><dd>The strongest reasoning model available.</dd>
+          <dt><span class="tag tag-code">code</span></dt><dd>A strong, balanced coding model.</dd>
+          <dt><span class="tag tag-fast">fast</span></dt><dd>The cheapest fast model.</dd>
+        </dl>
+        <p>Two routing keys cover work outside the steps and pin cheap models per harness: <code>chore</code> (grep, read a diff, rename, one-line edit) and <code>explore</code> (every read-only exploration). <code>grill</code> runs in your own session, so its value is a recommendation; you get a warning if your session runs a different model.</p>
+        <h4>Resolution</h4>
+        <p><code>model</code> and <code>effort</code> each resolve separately. The first hit wins:</p>
+        <ol>
+          <li><code>steps.{harness}.{key}</code></li>
+          <li><code>steps.{harness}.{parent}</code>: the key up to its first dot (<code>review</code> for <code>review.ub-mode</code>)</li>
+          <li>The built-in default: the key's own row, otherwise its parent's</li>
+          <li>The harness default</li>
+        </ol>
+
+        <h3 id="config">Configuration</h3>
+        <p>Configuration is optional. Two files are read: <code>.agentic.json</code> in the project, which wins, and <code>~/.agentic/config.json</code> globally. <code>steps</code> merges per harness and key, and <code>limits</code> per key; other keys replace. A file only needs to hold what differs from the defaults.</p>
+        <div class="code"><pre><code>{
+  "reviewers": ["code-review", "claude-security-review", "agentic-review-secrets"],
+  "steps": {
+    "claude": {
+      "grill": { "model": "opus", "effort": "high" },
+      "implement": { "model": "sonnet", "effort": "medium" }
+    }
+  },
+  "limits": { "review.iterations": 3 }
+}</code></pre></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Default</th><th scope="col">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Output</td><td><code>.agentic/work</code>, not committed</td></tr>
+              <tr><td>Worktrees</td><td><code>../{repo}-worktrees</code></td></tr>
+              <tr><td>Profiles</td><td><code>typescript</code>, <code>python</code></td></tr>
+              <tr><td>Limits</td><td class="wrap-code"><code>review.iterations</code> 3, <code>babysit.rounds</code> 5, <code>implement.retries</code> 2</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Every field, profile, step key and harness note: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/configuration.md">docs/configuration.md</a>.</p>
+
+        <h3 id="decisions">Decisions and docs</h3>
+        <ul class="links">
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0001-prompt-library-rework.md">ADR-0001: prompt library rework</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0002-skill-composition.md">ADR-0002: skill composition</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0003-implement-feature-light-mode.md">ADR-0003: implement-feature light mode</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0004-security-audit-and-review.md">ADR-0004: security audit and review</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/0005-ponytail-in-grills.md">ADR-0005: ponytail in grills</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/tech/adr/README.md">ADR index</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/docs/configuration.md">Configuration reference</a></li>
+          <li><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md">Full README</a></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div>
+      <h2>Credits</h2>
+      <p>Agentic stands on other people's work: skills from Matt Pocock, Dietrich Gebert, Eric Tech, Cloudflare, Anthropic and Robert C. Martin, vendored from upstream. Full list: <a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/README.md#credits">README credits</a>.</p>
+    </div>
+    <div>
+      <h2>Licence</h2>
+      <p><a href="https://github.com/JohannWilfridCalixte/agent-skills/blob/main/LICENSE">MIT</a>, © 2026 Johann Wilfrid-Calixte. Vendored skills keep their upstream licences.</p>
+      <p class="risk">Use at your own risk. This is a personal project exploring AI-driven development, with no guarantees, support or liability.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var media = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function read(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function write(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+
+  var toggle = document.getElementById("theme-toggle");
+  function effectiveTheme() { return root.dataset.theme || (media.matches ? "dark" : "light"); }
+  function syncToggle() {
+    var next = effectiveTheme() === "dark" ? "light" : "dark";
+    toggle.setAttribute("aria-label", "Switch to " + next + " theme");
+  }
+  toggle.addEventListener("click", function () {
+    var next = effectiveTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    write("agentic-theme", next);
+    syncToggle();
+  });
+  media.addEventListener("change", syncToggle);
+  syncToggle();
+
+  var commands = document.querySelectorAll("[data-cmd]");
+  function applyPrefix(prefix) {
+    commands.forEach(function (el) { el.textContent = prefix + el.dataset.cmd; });
+  }
+  var savedPrefix = read("agentic-prefix");
+  document.querySelectorAll('input[name="prefix"]').forEach(function (input) {
+    if (input.value === savedPrefix) input.checked = true;
+    input.addEventListener("change", function () {
+      applyPrefix(input.value);
+      write("agentic-prefix", input.value);
+    });
+  });
+  var checked = document.querySelector('input[name="prefix"]:checked');
+  if (checked) applyPrefix(checked.value);
+
+  var copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  var doneIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var status = document.createElement("div");
+  status.className = "sr-only";
+  status.setAttribute("role", "status");
+  document.body.appendChild(status);
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(area);
+      ok ? resolve() : reject();
+    });
+  }
+
+  document.querySelectorAll(".code").forEach(function (block) {
+    var pre = block.querySelector("pre");
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy";
+    button.setAttribute("aria-label", "Copy code");
+    button.innerHTML = copyIcon;
+    button.addEventListener("click", function () {
+      copyText(pre.innerText.replace(/\n$/, "")).then(function () {
+        button.innerHTML = doneIcon;
+        button.setAttribute("data-copied", "");
+        status.textContent = "Copied to clipboard";
+        setTimeout(function () {
+          button.innerHTML = copyIcon;
+          button.removeAttribute("data-copied");
+          status.textContent = "";
+        }, 1600);
+      }, function () { status.textContent = "Copy failed. Select the text and copy it manually."; });
+    });
+    block.appendChild(button);
+  });
+
+  var tocLinks = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  if ("IntersectionObserver" in window && tocLinks.length) {
+    var targets = tocLinks.map(function (a) { return document.querySelector(a.getAttribute("href")); }).filter(Boolean);
+    var visible = new Map();
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { visible.set(entry.target.id, entry.boundingClientRect.top); });
+      var current = null;
+      targets.forEach(function (t) { if (visible.has(t.id) && visible.get(t.id) < window.innerHeight * 0.35) current = t.id; });
+      tocLinks.forEach(function (a) {
+        if (a.getAttribute("href") === "#" + current) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    }, { rootMargin: "0px 0px -60% 0px", threshold: [0, 1] });
+    targets.forEach(function (t) { observer.observe(t); });
+  }
+})();
+</script>
+</body>
+</html>

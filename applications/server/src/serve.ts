@@ -32,10 +32,16 @@ const HOSTNAME = '127.0.0.1';
 
 export const serveFilePath = (homeDir: string) => join(homeDir, 'serve.json');
 
+/**
+ * Bun closes a connection idle for 10 s by default, which cuts quiet run streams and slow process-backed responses
+ * (super-review-12). 0 disables it; commands keep their own per-command deadlines (D27).
+ */
+const IDLE_TIMEOUT_DISABLED = 0;
+
 /** Binds 127.0.0.1 only; a busy port is an error (D38), never an auto-picked port. */
 export function bindServer(fetch: (request: Request) => Promise<Response> | Response, port: number) {
   try {
-    return ok(Bun.serve({ fetch, hostname: HOSTNAME, port }));
+    return ok(Bun.serve({ fetch, hostname: HOSTNAME, idleTimeout: IDLE_TIMEOUT_DISABLED, port }));
   } catch (error) {
     const code = error instanceof Error && 'code' in error ? String(error.code) : '';
     return err({ cause: error, type: code === 'EADDRINUSE' ? 'port_in_use' : 'bind_failed' });

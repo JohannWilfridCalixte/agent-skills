@@ -13,7 +13,10 @@ import { problem } from '../../platform/problem.js';
  * Mounted under `/api/runs`. There is deliberately no `POST /` taking a command (D34): runs are started only by
  * install and vendoring through `RunService`.
  */
-export function registerRunsRoutes(app: Hono<AppEnv>, service: RunService) {
+/** Comment frames keep a quiet stream alive through proxies and clients; SSE parsers ignore them. */
+export const DEFAULT_SSE_HEARTBEAT_MS = 5000;
+
+export function registerRunsRoutes(app: Hono<AppEnv>, service: RunService, { heartbeatMs = DEFAULT_SSE_HEARTBEAT_MS }: { readonly heartbeatMs?: number } = {}) {
   app.get('/:id', (c) => {
     const found = service.get(c.req.param('id'));
     if (!found.ok) return runProblem(c, found.error);
@@ -25,9 +28,16 @@ export function registerRunsRoutes(app: Hono<AppEnv>, service: RunService) {
     if (!subscription.ok) return runProblem(c, subscription.error);
     // A client disconnect only ends this loop; the run is owned by the service and keeps going (D27).
     return streamSSE(c, async (stream) => {
-      for await (const event of subscription.value) {
-        if (stream.aborted) return;
-        await stream.writeSSE({ data: JSON.stringify(event satisfies RunEvent), event: event.type });
+      const heartbeat = setInterval(() => {
+        if (!stream.aborted) void stream.write(': keepalive\n\n');
+      }, heartbeatMs);
+      try {
+        for await (const event of subscription.value) {
+          if (stream.aborted) return;
+          await stream.writeSSE({ data: JSON.stringify(event satisfies RunEvent), event: event.type });
+        }
+      } finally {
+        clearInterval(heartbeat);
       }
     });
   });

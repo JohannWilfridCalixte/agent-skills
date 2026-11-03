@@ -23,6 +23,8 @@ export interface CompositionInput {
   readonly extraModules?: ((services: { readonly runs: RunService }) => readonly ServerModule[]) | readonly ServerModule[];
   readonly logSink: LogSink;
   readonly settings: Settings;
+  /** SSE keepalive interval on run streams; tests shorten it. */
+  readonly sseHeartbeatMs?: number;
   readonly token: string;
   /** Defaults to `os.homedir()`. */
   readonly userHome?: string;
@@ -31,10 +33,10 @@ export interface CompositionInput {
 }
 
 /** Wires real adapters (sqlite, logger) into the app; tests use the same path with `:memory:`. */
-export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, token, userHome = homedir(), webRoot }: CompositionInput) {
+export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, sseHeartbeatMs, token, userHome = homedir(), webRoot }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
   const logger = createLogger(logSink, { environment: settings.environment, service_name: SERVICE_NAME, service_revision: settings.serviceRevision });
-  const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), logger, userHome, ...(commandRunner === undefined ? {} : { commandRunner }) };
+  const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), logger, userHome, ...(commandRunner === undefined ? {} : { commandRunner }), ...(sseHeartbeatMs === undefined ? {} : { sseHeartbeatMs }) };
   const { historyLog, modules, projects, runs } = createModules({ db, homeDir: settings.homeDir }, adapters);
   const extra = typeof extraModules === 'function' ? extraModules({ runs }) : extraModules;
   const app = createApp({ logger, modules: [...modules, ...extra], port: settings.port, token, webRoot });

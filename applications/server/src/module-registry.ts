@@ -33,6 +33,8 @@ export interface ModuleAdapters {
   readonly commandRunner?: CommandRunner;
   /** Run lifecycle lines (`run_started`, `run_finished`, `run_failed_to_record`). */
   readonly logger: RunLogger;
+  /** SSE keepalive interval on run streams; defaults to `DEFAULT_SSE_HEARTBEAT_MS`. */
+  readonly sseHeartbeatMs?: number;
   /** The user's home, where harness config folders live. */
   readonly userHome: string;
 }
@@ -46,7 +48,7 @@ export function assertModules(modules: readonly ServerModule[]) {
   }
 }
 
-export function createModules(context: ModuleContext, { cliExec, commandRunner = createCommandRunner(cliExec), logger, userHome }: ModuleAdapters) {
+export function createModules(context: ModuleContext, { cliExec, commandRunner = createCommandRunner(cliExec), logger, sseHeartbeatMs, userHome }: ModuleAdapters) {
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
@@ -70,6 +72,6 @@ export function createModules(context: ModuleContext, { cliExec, commandRunner =
     },
   };
   const workItems = createWorkItemsModule({ outputs });
-  const modules: readonly ServerModule[] = [healthModule, projects, history, config, createRunsModule(runs), ...install.modules, workItems, createVendoringModule({ projects: projects.service, runs })];
+  const modules: readonly ServerModule[] = [healthModule, projects, history, config, createRunsModule(runs, sseHeartbeatMs === undefined ? {} : { heartbeatMs: sseHeartbeatMs }), ...install.modules, workItems, createVendoringModule({ projects: projects.service, runs })];
   return { historyLog, modules, projects: projects.service, runs };
 }

@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { createProjectsService } from '@agentic/domain-projects';
 import { InMemoryProjectRepository } from '@agentic/domain-projects/testing';
+import { FakeCommandRunner } from '@agentic/domain-shared/testing';
 
 import { fsDirectoryProbe } from './modules/projects/fs-directory-probe.js';
 import { createLogger } from './platform/log.js';
+import { createTestApp, TEST_HOST } from './platform/testing/test-app.js';
 import { bindServer, parseServeArgs, registerStartFolder, removeServeFile, serve, serveFilePath, writeServeFile } from './serve.js';
 
 let root = '';
@@ -180,5 +182,57 @@ describe('serve startup (AC1, D28)', () => {
     } finally {
       await stop();
     }
+  });
+});
+
+/** Starts a held run on the real listener, reads its SSE stream over real HTTP and lets the runner stay quiet for `quietMs`. */
+async function quietRunOverListener({ heartbeatMs, quietMs }: { readonly heartbeatMs?: number; readonly quietMs: number }) {
+  const runner = new FakeCommandRunner({ hold: true, lines: [{ line: 'first', type: 'stdout' }] });
+  const app = await createTestApp({ commandRunner: runner, ...(heartbeatMs === undefined ? {} : { sseHeartbeatMs: heartbeatMs }) });
+  const bound = bindServer(app.app.fetch, 0);
+  if (!bound.ok) throw new Error('could not bind an ephemeral port');
+  const origin = `http://127.0.0.1:${String(bound.value.port)}`;
+  const headers = { authorization: `Bearer ${app.token}`, host: TEST_HOST };
+  try {
+    const started = (await (await fetch(`${origin}/api/test-runs`, { headers, method: 'POST' })).json()) as { readonly id: string };
+    const response = await fetch(`${origin}/api/runs/${started.id}/events`, { headers });
+    const body = response.body;
+    if (body === null) throw new Error('no SSE body');
+    const finishLater = setTimeout(() => {
+      const stream = runner.streams[0];
+      stream?.emit({ line: 'after the quiet period', type: 'stdout' });
+      stream?.finish();
+    }, quietMs);
+    let text = '';
+    try {
+      for await (const chunk of body.pipeThrough(new TextDecoderStream())) text += chunk;
+    } finally {
+      clearTimeout(finishLater);
+    }
+    const detail = (await (await fetch(`${origin}/api/runs/${started.id}`, { headers })).json()) as { readonly status: string };
+    const history = await app.historyLog.list('global');
+    return { detail, history, text };
+  } finally {
+    await bound.value.stop(true);
+    await app.db.destroy();
+  }
+}
+
+describe('quiet run streams on the real listener (super-review-12, AC14, D27)', () => {
+  it('keeps a stream that is quiet for longer than the old 10 s listener default and delivers its end', async () => {
+    const { detail, history, text } = await quietRunOverListener({ quietMs: 12_000 });
+
+    expect(text).toContain('after the quiet period');
+    expect(text).toContain('event: exit');
+    expect(text).toContain('"status":"succeeded"');
+    expect(detail.status).toBe('succeeded');
+    expect(history).toHaveLength(1);
+  }, 20_000);
+
+  it('sends keepalive comments while the run is quiet', async () => {
+    const { text } = await quietRunOverListener({ heartbeatMs: 50, quietMs: 300 });
+
+    expect(text).toMatch(/^: keepalive$/m);
+    expect(text).toContain('after the quiet period');
   });
 });

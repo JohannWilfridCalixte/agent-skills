@@ -28,6 +28,7 @@ import {
   ModelsResponse,
 } from '@agentic/contract-http/install';
 import { Project, ProjectList } from '@agentic/contract-http/projects';
+import { RunDetail } from '@agentic/contract-http/runs';
 import { VendoringPreviewResponse, VendoringRunResponse, VendoringStatusResponse } from '@agentic/contract-http/vendoring';
 import { WorkItemDetail, WorkItemDoc, WorkItemList } from '@agentic/contract-http/work-items';
 
@@ -239,38 +240,24 @@ async function editedConfig(context: Context, scope: string) {
   return edited;
 }
 
-/** Streams the run's lines live (stdout lines to stdout, stderr lines to stderr) and resolves to its exit code. */
+const RESULT_POLL_INTERVAL_MS = 1000;
+/** How long the CLI waits for a run's result after its stream broke; the run's own deadlines end it well before. */
+const RESULT_POLL_LIMIT_MS = 60 * 60 * 1000;
+
+/**
+ * Streams the run's lines live (stdout lines to stdout, stderr lines to stderr) and resolves to its exit code. A
+ * broken stream (socket closed, reset) never resubmits the command: the CLI waits for the run's result instead.
+ */
 async function followRun(context: Context, runId: string) {
   const { io } = context;
   let exitCode: number | undefined;
   let status: string | undefined;
-  for await (const event of context.client.events(runId)) {
-    if (context.json) io.stdout(`${JSON.stringify(event)}\n`);
-    switch (event.type) {
-      case 'dropped': {
-        if (!context.json) io.stderr(`Earlier output was dropped (${String(event.dropped)} lines); the run history keeps the output tail.\n`);
-        break;
-      }
-      case 'exit': {
-        exitCode = event.exitCode;
-        break;
-      }
-      case 'status': {
-        ({ status } = event);
-        break;
-      }
-      case 'stderr': {
-        if (!context.json) io.stderr(`${event.line}\n`);
-        break;
-      }
-      case 'stdout': {
-        if (!context.json) io.stdout(`${event.line}\n`);
-        break;
-      }
-      default: {
-        event satisfies never;
-      }
-    }
+  try {
+    ({ exitCode, status } = await streamRun(context, runId));
+  } catch (error) {
+    if (error instanceof CliFailure) throw error;
+    io.stderr('stream interrupted, waiting for the run result\n');
+    ({ exitCode, status } = await waitForResult(context, runId));
   }
   if (status === 'succeeded') return EXIT_OK;
   if (!context.json) io.stderr(`Run ${status ?? 'ended without a status'}${exitCode === undefined ? '' : ` (exit code ${String(exitCode)})`}.\n`);
@@ -305,8 +292,6 @@ function formatItem(item: WorkItemList['items'][number]) {
   return `${item.slug}${item.archived ? ' [archived]' : ''}  ${state}`;
 }
 
-// models
-
 async function historyCommand(context: Context) {
   const { client } = context;
   const action = positional(context, 1, 'list|restore');
@@ -333,8 +318,6 @@ async function historyCommand(context: Context) {
     }
   }
 }
-
-// install
 
 async function installCommand(context: Context) {
   const { client } = context;
@@ -377,12 +360,16 @@ async function installCommand(context: Context) {
   }
 }
 
+// models
+
 function installScope(context: Context) {
   const projectId = lastOption(context.args, 'project');
   const scope = InstallScope.safeParse(lastOption(context.args, 'scope') ?? (projectId === undefined ? 'global' : 'project'));
   if (!scope.success) throw usage(`--scope must be one of ${InstallScope.options.join(', ')}.`);
   return { projectId, scope: scope.data };
 }
+
+// install
 
 function installTarget(context: Context) {
   const target = positional(context, 2, 'harness|method');
@@ -418,14 +405,60 @@ function notConfirmed(context: Context, preview: unknown, commands: readonly str
   return EXIT_NOT_CONFIRMED;
 }
 
-// history
-
 /** A `--value` that parses as JSON is used as such (`true`, `3`, `["a"]`, `"quoted"`); anything else is a plain string. */
 function parseValue(text: string) {
   try {
     return JSON.parse(text) as unknown;
   } catch {
     return text;
+  }
+}
+
+async function streamRun(context: Context, runId: string) {
+  const { io } = context;
+  let exitCode: number | undefined;
+  let status: string | undefined;
+  for await (const event of context.client.events(runId)) {
+    if (context.json) io.stdout(`${JSON.stringify(event)}\n`);
+    switch (event.type) {
+      case 'dropped': {
+        if (!context.json) io.stderr(`Earlier output was dropped (${String(event.dropped)} lines); the run history keeps the output tail.\n`);
+        break;
+      }
+      case 'exit': {
+        exitCode = event.exitCode;
+        break;
+      }
+      case 'status': {
+        ({ status } = event);
+        break;
+      }
+      case 'stderr': {
+        if (!context.json) io.stderr(`${event.line}\n`);
+        break;
+      }
+      case 'stdout': {
+        if (!context.json) io.stdout(`${event.line}\n`);
+        break;
+      }
+      default: {
+        event satisfies never;
+      }
+    }
+  }
+  return { exitCode, status };
+}
+
+// history
+
+/** Polls `GET /api/runs/:id` until the run leaves `running`, for at most `RESULT_POLL_LIMIT_MS`. */
+async function waitForResult(context: Context, runId: string) {
+  const deadline = Date.now() + RESULT_POLL_LIMIT_MS;
+  for (;;) {
+    const run = await context.client.get(`/api/runs/${segment(runId)}`, RunDetail);
+    if (run.status !== 'running') return { exitCode: run.exitCode, status: run.status };
+    if (Date.now() >= deadline) return { exitCode: undefined, status: 'still running; check it with the web UI or history' };
+    await Bun.sleep(RESULT_POLL_INTERVAL_MS);
   }
 }
 

@@ -23,6 +23,8 @@ export interface TestAppOptions {
   /** `AGENTIC_HOME` for the run (global `config.json` lives here); defaults to a path that does not exist. */
   readonly homeDir?: string;
   readonly modules?: readonly ServerModule[];
+  /** SSE keepalive interval on run streams; defaults to the production one. */
+  readonly sseHeartbeatMs?: number;
   /** Home holding harness config folders; defaults to a path that does not exist. */
   readonly userHome?: string;
   /** Built SPA directory to serve; none by default. */
@@ -40,7 +42,7 @@ const missingCliExec: CliExec = {
  * The real app over an in-memory sqlite (D30). `request()` adds a valid Host and the bearer token;
  * pass `host` or `authorization` in `init.headers` to override them (empty string removes the token).
  */
-export async function createTestApp({ cliExec = missingCliExec, commandRunner, homeDir = '/nonexistent/agentic-test-home', modules = [], userHome = '/nonexistent/agentic-test-user', webRoot }: TestAppOptions = {}) {
+export async function createTestApp({ cliExec = missingCliExec, commandRunner, homeDir = '/nonexistent/agentic-test-home', modules = [], sseHeartbeatMs, userHome = '/nonexistent/agentic-test-user', webRoot }: TestAppOptions = {}) {
   const logLines: string[] = [];
   const { app, db, historyLog } = await compose({
     cliExec,
@@ -48,6 +50,7 @@ export async function createTestApp({ cliExec = missingCliExec, commandRunner, h
     extraModules: ({ runs }) => [testRunsModule(runs), ...modules],
     logSink: (line) => logLines.push(line),
     settings: { dbPath: ':memory:', environment: 'test', homeDir, port: TEST_PORT, serviceRevision: 'test-revision' },
+    ...(sseHeartbeatMs === undefined ? {} : { sseHeartbeatMs }),
     token: TEST_TOKEN,
     userHome,
     webRoot,

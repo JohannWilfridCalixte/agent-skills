@@ -31,6 +31,7 @@ afterEach(() => {
 
 interface Harness {
   readonly app: TestApp;
+  readonly requests: string[];
   readonly run: (...argv: string[]) => Promise<{ readonly code: number; readonly stderr: string; readonly stdout: string }>;
   readonly spawned: (readonly string[])[];
 }
@@ -43,10 +44,20 @@ async function addProject({ run }: Harness, path = projectDir) {
 }
 
 /** Seam 4 (D30): the CLI's injected fetch dispatches to the real app over an in-memory db; serve.json lives in a temp AGENTIC_HOME. */
-async function setup({ commandRunner, serveFile = true }: { readonly commandRunner?: FakeCommandRunner; readonly serveFile?: boolean } = {}) {
+async function setup({
+  commandRunner,
+  eventsBody,
+  serveFile = true,
+}: {
+  readonly commandRunner?: FakeCommandRunner;
+  /** Replaces the body of `GET /api/runs/:id/events`, given the real one's text. */
+  readonly eventsBody?: (real: string) => ReadableStream<Uint8Array>;
+  readonly serveFile?: boolean;
+} = {}) {
   const app = await createTestApp({ homeDir, ...(commandRunner === undefined ? {} : { commandRunner }) });
   if (serveFile) writeFileSync(join(homeDir, 'serve.json'), JSON.stringify({ pid: 1, port: 8787, token: app.token }));
   const spawned: (readonly string[])[] = [];
+  const requests: string[] = [];
   const run = async (...argv: string[]) => {
     let stdout = '';
     let stderr = '';
@@ -57,7 +68,10 @@ async function setup({ commandRunner, serveFile = true }: { readonly commandRunn
         // A real fetch derives Host from the URL; app.request does not, and the server rejects a missing Host.
         const headers = new Headers(init?.headers);
         headers.set('host', TEST_HOST);
-        return app.app.request(input, { ...init, headers });
+        requests.push(`${init?.method ?? 'GET'} ${new URL(input).pathname}`);
+        const response = await app.app.request(input, { ...init, headers });
+        if (eventsBody === undefined || !input.endsWith('/events')) return response;
+        return new Response(eventsBody(await response.text()), { headers: response.headers, status: response.status });
       },
       readFile: async (path) => readFile(path, 'utf8'),
       runtime: '/usr/local/bin/bun',
@@ -76,7 +90,7 @@ async function setup({ commandRunner, serveFile = true }: { readonly commandRunn
     const code = await runCli(argv, io);
     return { code, stderr, stdout };
   };
-  return { app, run, spawned } satisfies Harness;
+  return { app, requests, run, spawned } satisfies Harness;
 }
 
 function writeFile(path: string, text: string) {
@@ -353,6 +367,55 @@ describe('install', () => {
 
     expect(result.code).toBe(4);
     expect(result.stderr).toContain('marketplace not found');
+  });
+});
+
+describe('run stream resilience (super-review-12)', () => {
+  const encoder = new TextEncoder();
+
+  it('ignores keepalive comment frames in the run stream', async () => {
+    const runner = new FakeCommandRunner({ lines: [{ line: 'updated', type: 'stdout' }], result: ok({ exitCode: 0 }) });
+    const { run } = await setup({
+      commandRunner: runner,
+      eventsBody: (real) =>
+        new ReadableStream({
+          start: (controller) => {
+            controller.enqueue(encoder.encode(': keepalive\n\n'));
+            controller.enqueue(encoder.encode(real));
+            controller.enqueue(encoder.encode(': keepalive\n\n'));
+            controller.close();
+          },
+        }),
+    });
+
+    const result = await run('install', 'run', 'claude', 'update', '--yes');
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('updated\nupdated\n');
+    expect(result.stdout).not.toContain('keepalive');
+  });
+
+  it("falls back to the run's status when the stream breaks, with its real exit code and no resubmission", async () => {
+    const runner = new FakeCommandRunner({ lines: [{ line: 'marketplace not found', type: 'stderr' }], result: ok({ exitCode: 4 }) });
+    const { requests, run } = await setup({
+      commandRunner: runner,
+      eventsBody: () =>
+        new ReadableStream({
+          pull: (controller) => {
+            controller.enqueue(encoder.encode(': keepalive\n\n'));
+            controller.error(new TypeError('The socket connection was closed unexpectedly.'));
+          },
+        }),
+    });
+
+    const result = await run('install', 'run', 'claude', 'update', '--yes');
+
+    expect(result.code).toBe(4);
+    expect(result.stderr).toContain('stream interrupted, waiting for the run result');
+    const afterStream = requests.slice(requests.findIndex((request) => request.endsWith('/events')));
+    expect(afterStream.filter((request) => request.startsWith('POST'))).toEqual([]);
+    expect(runner.commands).toHaveLength(1);
+    expect(requests.some((request) => /^GET \/api\/runs\/[^/]+$/.test(request))).toBe(true);
   });
 });
 

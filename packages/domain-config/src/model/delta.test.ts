@@ -61,23 +61,44 @@ describe('delta (AC5, AC6)', () => {
     expect(content).toEqual({ knowledge: { x: 1 }, steps: { claude: { explore: { y: 2 } } } });
   });
 
-  it.each([undefined, { output: 'g', profiles: [...BUILT_IN_PROFILES] }])('every reported unknown key exists in the written text (global %#)', (global) => {
-    const raw = {
+  const shifted = { profiles: [BUILT_IN_PROFILES[0], { ...BUILT_IN_PROFILES[1], future: 1 }] };
+  it.each([
+    [undefined, undefined],
+    [{ output: 'g', profiles: [...BUILT_IN_PROFILES] }, undefined],
+    [undefined, shifted],
+  ])('every reported unknown key exists in the written text (global %#)', (global, input) => {
+    const raw = input ?? {
       knowledge: { root: 'docs', u1: 1 },
       limits: { 'review.iterations': 3 },
       output: '.agentic/work',
       profiles: [{ ...BUILT_IN_PROFILES[0], u2: { deep: true } }, { name: 'c', skills: [], u3: [] }],
-      steps: { claude: { 'explore': { effort: 'medium', u4: 'a' }, 'review.x': { model: 'm', u5: null } } },
+      steps: { claude: { 'explore': { effort: 'medium', u4: 'a' }, 'review': {}, 'review.x': { model: 'm', u5: null } } },
       u7: 'top',
     };
     const result = delta(raw, global === undefined ? undefined : (parseConfigFile(global) as { value: ConfigFile }).value);
     if (!result.ok) throw new Error('invalid');
     const written: unknown = JSON.parse(result.value.text);
-    const at = (value: unknown, path: string): unknown =>
-      path.split('.').reduce<unknown>((node, key) => (typeof node === 'object' && node !== null && key in node ? (node as Record<string, unknown>)[key] : Symbol.for('missing')), value);
+    // Resolves a dotted path by segments, joining segments when a key itself holds a dot (`review.x`).
+    const at = (value: unknown, path: string): unknown => {
+      const walk = (node: unknown, segments: readonly string[]): unknown => {
+        if (segments.length === 0) return node;
+        if (typeof node !== 'object' || node === null) return Symbol.for('missing');
+        for (let size = 1; size <= segments.length; size += 1) {
+          const key = segments.slice(0, size).join('.');
+          if (key in node) {
+            const found = walk((node as Record<string, unknown>)[key], segments.slice(size));
+            if (found !== Symbol.for('missing')) return found;
+          }
+        }
+        return Symbol.for('missing');
+      };
+      return walk(value, path.split('.'));
+    };
 
-    expect(result.value.unknownKeys.length).toBeGreaterThanOrEqual(6);
-    for (const key of result.value.unknownKeys) expect({ key, value: at(written, key) }).toEqual({ key, value: at(raw, key) });
+    if (input === undefined) expect(result.value.unknownKeys.length).toBeGreaterThanOrEqual(6);
+    else expect(result.value.unknownKeys).toEqual(['profiles.0.future']);
+    expect(written).not.toHaveProperty(['steps', 'claude', 'review']);
+    for (const key of result.value.unknownKeys) expect({ key, value: at(written, key) }).not.toEqual({ key, value: Symbol.for('missing') });
   });
 
   it('writes fields in documented order, unknown keys last', () => {

@@ -1,5 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
-import { userEvent } from '@testing-library/user-event';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { json, stubFetch } from '@/test/fetch-stub';
@@ -9,11 +8,15 @@ const project = { createdAt: '2026-11-03T10:00:00.000Z', id: 'p-1', path: '/work
 
 const scoped = { config: {}, exists: true, scope: 'project:p-1', text: '{}', unknownKeys: [] };
 
-async function openConfig() {
-  const user = userEvent.setup();
-  await user.click(within(await screen.findByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Config' }));
+async function expectProjectView(calls: ReturnType<typeof server>['calls']) {
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/config');
+  });
   await waitFor(() => {
     expect(screen.getByLabelText('Scope')).toHaveValue('project:p-1');
+  });
+  await waitFor(() => {
+    expect(calls.filter((call) => call.url.startsWith('/config/project:p-1')).map((call) => call.authorization)).toContain('Bearer T');
   });
 }
 
@@ -26,30 +29,35 @@ function server() {
 }
 
 describe('startup from the URL printed by agentic serve (AC1, D28)', () => {
-  it('captures token and project before the start redirect, strips the fragment and authenticates', async () => {
+  // The printed URL is the same for a newly registered folder and an already-known one: the id comes from the URL.
+  it.each(['new registration', 'already-known folder'])('lands on the project view without any click (%s)', async () => {
     const { calls, fetch } = server();
 
     renderApp('/#token=T&project=p-1', fetch);
+
+    await expectProjectView(calls);
+    expect(sessionStorage.getItem('agentic.token')).toBe('T');
+    expect(sessionStorage.getItem('agentic.startProject')).toBe('p-1');
+    expect(window.location.href).not.toContain('token');
+  });
+
+  it('lands on the projects list when no start project was given', async () => {
+    renderApp('/#token=T', server().fetch);
 
     await waitFor(() => {
       expect(window.location.pathname).toBe('/projects');
     });
     expect(sessionStorage.getItem('agentic.token')).toBe('T');
-    expect(sessionStorage.getItem('agentic.startProject')).toBe('p-1');
-    expect(window.location.href).not.toContain('token');
-    await openConfig();
-    expect(calls.filter((call) => call.url.startsWith('/config/project:p-1')).map((call) => call.authorization)).toContain('Bearer T');
   });
 
-  it('keeps working on reload when the fragment is gone but sessionStorage holds the token', async () => {
+  it('keeps landing on the project view on reload when the fragment is gone but sessionStorage holds it', async () => {
     sessionStorage.setItem('agentic.token', 'T');
     sessionStorage.setItem('agentic.startProject', 'p-1');
     const { calls, fetch } = server();
 
     renderApp('/', fetch);
 
-    await openConfig();
-    expect(calls.at(-1)?.authorization).toBe('Bearer T');
+    await expectProjectView(calls);
   });
 
   it('captures a fragment on a deep link', async () => {

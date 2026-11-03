@@ -50,7 +50,7 @@ type Path = readonly (number | string)[];
 export function delta(edited: unknown, global?: ConfigFile): Result<ConfigDelta, readonly ConfigIssue[]> {
   const parsed = parseConfigFile(edited);
   if (!parsed.ok) return parsed;
-  const { raw, unknownKeys, values } = parsed.value;
+  const { raw, values } = parsed.value;
 
   const layerOf = (content: Json) => {
     const file = parseConfigFile(content);
@@ -62,14 +62,15 @@ export function delta(edited: unknown, global?: ConfigFile): Result<ConfigDelta,
   const targetInherited = inherited(raw);
   let content: Json = raw;
   for (const path of removablePaths(raw)) {
-    const candidate = without(content, path, unknownKeys);
+    const candidate = without(content, path);
     if (candidate !== undefined && jsonEqual(builtIn(candidate), targetBuiltIn) && jsonEqual(inherited(candidate), targetInherited)) content = candidate;
   }
 
   const ordered: Record<string, unknown> = {};
   for (const field of CONFIG_FIELDS) if (field in content) ordered[field] = content[field];
   for (const [key, value] of Object.entries(content)) if (!KNOWN.has(key)) ordered[key] = value;
-  return ok({ content: ordered, text: serialiseConfig(ordered), unknownKeys, values });
+  // Reported against the written content, so indices match after an earlier profile entry was dropped.
+  return ok({ content: ordered, text: serialiseConfig(ordered), unknownKeys: unknownKeysOf(ordered), values });
 }
 
 /** What agents would use: values without origins; a step without a harness runs on its own harness. */
@@ -123,21 +124,22 @@ function removablePaths(raw: Json): readonly Path[] {
   return paths;
 }
 
+function unknownKeysOf(content: Json) {
+  const file = parseConfigFile(content);
+  return file.ok ? file.value.unknownKeys : [];
+}
+
 /** A copy without the value at `path`; never removes an unknown key, so an object holding one stays. `undefined`: nothing to remove. */
-function without(content: Json, path: Path, unknownKeys: readonly string[]): Record<string, unknown> | undefined {
+function without(content: Json, path: Path): Record<string, unknown> | undefined {
   const parsed: unknown = JSON.parse(JSON.stringify(content));
   if (!isObject(parsed)) return undefined;
   const copy: Record<string, unknown> = { ...parsed };
   let parent: unknown = copy;
   for (const segment of path.slice(0, -1)) parent = isObject(parent) || Array.isArray(parent) ? (parent as Record<number | string, unknown>)[segment] : undefined;
   const last = path.at(-1);
-  const dotted = path.join('.');
-  if (unknownKeys.some((key) => key === dotted || key.startsWith(`${dotted}.`))) return undefined;
-  if (Array.isArray(parent) && typeof last === 'number') {
-    parent.splice(last, 1);
-    return copy;
-  }
-  if (!isObject(parent) || typeof last !== 'string' || !(last in parent)) return undefined;
-  Reflect.deleteProperty(parent, last);
-  return copy;
+  if (Array.isArray(parent) && typeof last === 'number') parent.splice(last, 1);
+  else if (isObject(parent) && typeof last === 'string' && last in parent) Reflect.deleteProperty(parent, last);
+  else return undefined;
+  // Compared by count, not by dotted prefix: a step key may itself hold a dot (`review.x`).
+  return unknownKeysOf(copy).length === unknownKeysOf(content).length ? copy : undefined;
 }

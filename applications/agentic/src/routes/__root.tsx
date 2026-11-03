@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { ClientOnly, createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { captureToken } from '@/lib/token';
+import { readToken } from '@/lib/token';
 import { AppShell } from '@/shell/app-shell';
 import appCss from '@/styles/app.css?url';
 
@@ -35,9 +35,9 @@ function RootDocument({ children }: { readonly children: ReactNode }) {
   );
 }
 
-/** Moves `#token=` into sessionStorage once, before anything renders a link or calls the API (D28). */
+/** Reads the token createAppRouter already moved from `#token=` into sessionStorage (D28). */
 function TokenGate() {
-  const [token] = useState(() => captureToken(globalThis.window));
+  const [token] = useState(() => readToken(globalThis.window));
   return (
     <AppShell hasToken={token !== undefined}>
       <Outlet />

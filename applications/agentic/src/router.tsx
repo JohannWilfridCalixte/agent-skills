@@ -1,5 +1,3 @@
-import type { RouterHistory } from '@tanstack/react-router';
-
 import type { ApiClient } from './lib/api-client';
 
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -13,18 +11,16 @@ import { routeTree } from './routeTree.gen';
 
 interface AppRouterOptions {
   readonly api: ApiClient;
-  readonly history?: RouterHistory;
   readonly queryClient?: ReturnType<typeof createQueryClient>;
 }
 
-export function createAppRouter({ api, history, queryClient = createQueryClient() }: AppRouterOptions) {
+export function createAppRouter({ api, queryClient = createQueryClient() }: AppRouterOptions) {
   // Capture the `#token=…&project=…` fragment before the router reads the URL: the `/` redirect would drop it (D28).
   if (typeof window !== 'undefined') captureToken(window);
   return createRouter({
     context: { queryClient },
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
-    ...(history === undefined ? {} : { history }),
     routeTree,
     scrollRestoration: true,
     Wrap: ({ children }) => (

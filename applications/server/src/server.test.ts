@@ -142,6 +142,26 @@ describe('errors', () => {
     expect(await response.clone().text()).not.toContain('secret internals');
     await expectProblem(response, 500, 'internal_error');
   });
+
+  it('logs the error name, redacted message and a bounded single-line stack (code-review-6)', async () => {
+    const boom: ServerModule = {
+      name: 'boom',
+      registerRoutes(app) {
+        app.get('/', () => {
+          throw new TypeError('failed with Bearer test-token-0123456789abcdef');
+        });
+      },
+    };
+    const { logLines, request, token } = await createTestApp({ modules: [boom] });
+
+    await request('/api/boom');
+    const line = logLines.map((text) => JSON.parse(text) as Record<string, unknown>).find((entry) => entry['message'] === 'http_unhandled_error');
+
+    expect(line).toMatchObject({ error_message: 'failed with Bearer [REDACTED]', error_name: 'TypeError', level: 'error', service_name: 'agentic-server' });
+    expect(String(line?.['stack'])).toContain('TypeError');
+    expect(String(line?.['stack']).length).toBeLessThanOrEqual(2000);
+    expect(logLines.join('')).not.toContain(token);
+  });
 });
 
 describe('request log (D33)', () => {
@@ -154,11 +174,17 @@ describe('request log (D33)', () => {
     expect(logLines).toHaveLength(1);
     expect(JSON.parse(logLines[0] ?? '')).toMatchObject({
       correlation_id: 'corr-123',
+      environment: 'test',
       http_method: 'GET',
       http_status: 200,
-      msg: 'http_request',
+      level: 'info',
+      message: 'http_request',
+      service_name: 'agentic-server',
+      service_revision: 'test-revision',
+      timestamp: expect.any(String) as unknown,
       url_path: '/api/health',
     });
+    expect(JSON.parse(logLines[0] ?? '')).not.toHaveProperty('msg');
     expect(logLines.join('')).not.toContain(token);
   });
 

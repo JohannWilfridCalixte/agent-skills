@@ -2,10 +2,10 @@ import type { CliEvent } from './types.js';
 
 import { describe, expect, it } from 'vitest';
 
+import { redactArgs } from '@agentic/domain-shared';
 import { err, ok } from '@agentic/kernel-result';
 
 import { createCommandRunner } from './command-runner.js';
-import { redactArgs } from './redact.js';
 import { createFakeCliExec, fakeCliError, fakeOutput } from './testing.js';
 
 describe('createFakeCliExec', () => {

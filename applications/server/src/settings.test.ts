@@ -7,7 +7,16 @@ import { loadSettings } from './settings.js';
 
 describe('loadSettings', () => {
   it('defaults to port 8787 and ~/.agentic/agentic.db', () => {
-    expect(loadSettings({})).toEqual({ dbPath: join(homedir(), '.agentic', 'agentic.db'), homeDir: join(homedir(), '.agentic'), port: 8787 });
+    expect(loadSettings({})).toMatchObject({ dbPath: join(homedir(), '.agentic', 'agentic.db'), homeDir: join(homedir(), '.agentic'), port: 8787 });
+  });
+
+  it('resolves the log service fields once: environment local and the package version by default (ub-mode-3)', () => {
+    expect(loadSettings({})).toMatchObject({ environment: 'local', serviceRevision: expect.stringMatching(/^\d+\.\d+\.\d+/) as unknown });
+  });
+
+  it('takes the environment from AGENTIC_ENV, then NODE_ENV, and the revision from GIT_SHA', () => {
+    expect(loadSettings({ AGENTIC_ENV: 'staging', GIT_SHA: 'a1b2c3d', NODE_ENV: 'production' })).toMatchObject({ environment: 'staging', serviceRevision: 'a1b2c3d' });
+    expect(loadSettings({ NODE_ENV: 'production' })).toMatchObject({ environment: 'production' });
   });
 
   it('reads AGENTIC_PORT and AGENTIC_DB_PATH', () => {

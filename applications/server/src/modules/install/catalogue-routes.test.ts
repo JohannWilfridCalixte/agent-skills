@@ -249,7 +249,7 @@ describe('POST /api/install/runs (AC13, AC14, AC15)', () => {
     const run = InstallRunResponse.parse(await (await request('/api/install/runs', post({ action: 'install', confirm: true, method: 'skills', projectId: project.id, scope: 'project' }))).json());
     await waitForFinished(request, run.id);
 
-    expect(runner.commands).toEqual([{ args: ['skills', 'add', 'JohannWilfridCalixte/agent-skills', '-y'], cli: 'npx', cwd: projectFolder }]);
+    expect(runner.commands).toEqual([{ args: ['skills', 'add', 'JohannWilfridCalixte/agent-skills', '-y'], cli: 'npx', correlationId: expect.any(String) as string, cwd: projectFolder, timeoutMs: 600_000 }]);
     expect(await historyLog.list(`project:${project.id}`)).toHaveLength(1);
   });
 

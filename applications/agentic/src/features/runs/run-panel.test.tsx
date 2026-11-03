@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '@/lib/api-client';
 import { ApiProvider } from '@/lib/api-context';
 import { json, stubFetch } from '@/test/fetch-stub';
-import { droppingSseResponse, runSummary } from '@/test/install-fixtures';
+import { droppingSseResponse, runSummary, sseResponse } from '@/test/install-fixtures';
 
 import { RunPanel } from './run-panel';
 
@@ -68,5 +68,28 @@ describe('run panel: live stream drops and the run never finishes', () => {
     unmount();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(readsOf(stub)).toBe(reads);
+  });
+});
+
+describe('run panel: replay dropped earlier output (super-review-10)', () => {
+  it('says earlier output was dropped when the replay starts with a dropped event', async () => {
+    const stub = stubFetch({
+      'GET /runs/run-1/events': () =>
+        sseResponse([{ dropped: 12, type: 'dropped' }, { line: 'line 13', type: 'stdout' }, { exitCode: 0, type: 'exit' }, { status: 'succeeded', type: 'status' }]),
+    });
+    renderPanel(stub);
+
+    expect(await screen.findByText(/earlier output was dropped/iu)).toBeInTheDocument();
+    expect(within(screen.getByRole('log', { name: 'Run output' })).getAllByRole('listitem').map((line) => line.textContent)).toEqual(['line 13']);
+  });
+
+  it('says earlier output was dropped when the saved run is truncated', async () => {
+    const stub = stubFetch({
+      'GET /runs/run-1': () => json({ ...runSummary('succeeded', 0), output: ['tail'], truncated: true }),
+      'GET /runs/run-1/events': () => droppingSseResponse([]),
+    });
+    renderPanel(stub);
+
+    expect(await screen.findByText(/earlier output was dropped/iu)).toBeInTheDocument();
   });
 });

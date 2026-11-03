@@ -247,6 +247,10 @@ async function followRun(context: Context, runId: string) {
   for await (const event of context.client.events(runId)) {
     if (context.json) io.stdout(`${JSON.stringify(event)}\n`);
     switch (event.type) {
+      case 'dropped': {
+        if (!context.json) io.stderr(`Earlier output was dropped (${String(event.dropped)} lines); the run history keeps the output tail.\n`);
+        break;
+      }
       case 'exit': {
         exitCode = event.exitCode;
         break;

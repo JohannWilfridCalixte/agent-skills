@@ -56,7 +56,7 @@ export class InMemoryHistoryLog implements HistoryLog, HistoryReader {
     const base = { createdAt: FIXED_NOW, id: `history-${String(this.entries.length + 1)}`, kind: entry.kind, scope: entry.scope, summary: entry.summary };
     const recorded: HistoryEntry =
       entry.kind === 'run'
-        ? { ...base, content: null, exitCode: entry.exitCode, outputTail: entry.output, truncated: false }
+        ? { ...base, content: null, exitCode: entry.exitCode, outputTail: entry.output, truncated: entry.outputTruncated ?? false }
         : { ...base, content: entry.content, exitCode: null, outputTail: null, truncated: false };
     this.entries.push(recorded);
     return Promise.resolve(recorded);

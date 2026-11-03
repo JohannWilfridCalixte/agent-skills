@@ -6,7 +6,11 @@ export const COMMAND_CLIS = ['agent', 'claude', 'codex', 'git', 'npx', 'node', '
 export interface Command {
   readonly args: readonly string[];
   readonly cli: CommandCli;
+  /** Request correlation id, forwarded to the process log lines. */
+  readonly correlationId?: string;
   readonly cwd?: string;
+  /** The process tree is killed after this long; chosen where the command is built (catalogue, vendoring). */
+  readonly timeoutMs?: number;
 }
 
 export type CommandCli = (typeof COMMAND_CLIS)[number];

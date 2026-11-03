@@ -90,7 +90,7 @@ export function createCatalogueService({ environment, projects, runs, userHome }
       return planned.ok ? ok(planned.value.commands) : planned;
     },
 
-    async start(request: InstallRequest) {
+    async start(request: InstallRequest, { correlationId }: { readonly correlationId?: string } = {}) {
       const planned = await plan(request);
       if (!planned.ok) return planned;
       const [first, ...next] = planned.value.commands;
@@ -98,6 +98,7 @@ export function createCatalogueService({ environment, projects, runs, userHome }
       const project = planned.value.project;
       const started = runs.start({
         ...first,
+        ...(correlationId === undefined ? {} : { correlationId }),
         ...(next.length === 0 ? {} : { next }),
         scope: project === undefined ? 'global' : `project:${project.id}`,
         summary: `${ACTION_LABEL[request.action]} ${targetLabel(request, project?.path)}`,

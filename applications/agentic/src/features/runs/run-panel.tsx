@@ -9,6 +9,8 @@ import { RunDetail, RunSummary } from '@agentic/contract-http/runs';
 import { Badge, Button, Callout } from '@agentic/design-system';
 
 interface RunView {
+  /** Set when the server no longer holds the earliest output lines (replay cap). */
+  readonly dropped?: boolean;
   readonly exitCode?: number;
   readonly lines: readonly string[];
   /** Set when the bounded re-reads gave up while the run still looked active. */
@@ -119,6 +121,11 @@ export function RunPanel({ onFinished, onRunAgain, runId, title }: RunPanelProps
           )}
         </Callout>
       )}
+      {view.dropped === true && (
+        <Callout title="Earlier output was dropped" tone="warning">
+          <p>Only the most recent output lines are kept while a run is shown. The run history keeps the output tail.</p>
+        </Callout>
+      )}
       {cancelError !== undefined && (
         <Callout title="Could not cancel the run" tone="error">
           {cancelError}
@@ -160,6 +167,10 @@ async function followRun(api: ApiClient, runId: string, signal: AbortSignal, upd
     if (!event.ok) break;
     const value = event.value;
     switch (value.type) {
+      case 'dropped': {
+        update((view) => ({ ...view, dropped: true }));
+        break;
+      }
       case 'exit': {
         update((view) => ({ ...view, exitCode: value.exitCode }));
         break;
@@ -201,9 +212,9 @@ async function followSavedRun(api: ApiClient, runId: string, signal: AbortSignal
 async function readSavedRun(api: ApiClient, runId: string, signal: AbortSignal, update: Update) {
   const detail = await api.get(`/runs/${encodeURIComponent(runId)}`, RunDetail, { signal });
   if (signal.aborted || !detail.ok) return false;
-  const { exitCode, output, status } = detail.value;
+  const { exitCode, output, status, truncated } = detail.value;
   const finished = status !== 'running';
-  update((view) => ({ ...view, lines: output, notice: finished ? INTERRUPTED : RECONNECTING, status, ...(exitCode === undefined ? {} : { exitCode }) }));
+  update((view) => ({ ...view, ...(truncated === true ? { dropped: true } : {}), lines: output, notice: finished ? INTERRUPTED : RECONNECTING, status, ...(exitCode === undefined ? {} : { exitCode }) }));
   return finished;
 }
 

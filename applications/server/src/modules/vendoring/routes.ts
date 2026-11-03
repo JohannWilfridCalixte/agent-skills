@@ -28,7 +28,7 @@ export function registerVendoringRoutes(app: Hono<AppEnv>, service: VendoringSer
   });
 
   app.post('/:projectId/runs', validate('json', VendoringRunRequest), async (c) => {
-    const started = await service.start(c.req.param('projectId'), toRequest(c.req.valid('json')));
+    const started = await service.start(c.req.param('projectId'), toRequest(c.req.valid('json')), { correlationId: c.get('correlationId') });
     if (!started.ok) return vendoringProblem(c, started.error);
     return c.json({ ...started.value } satisfies VendoringRunResponse, 201);
   });

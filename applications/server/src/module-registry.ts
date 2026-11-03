@@ -1,4 +1,5 @@
 import type { CliExec } from '@agentic/adapter-cli-exec';
+import type { RunLogger } from '@agentic/domain-runs';
 import type { CommandRunner, HistoryLog, HistoryReader, ModelSource, ProjectOutputResolver, RunService } from '@agentic/domain-shared';
 
 import type { ModuleContext, ServerModule } from './platform/module.js';
@@ -30,6 +31,8 @@ export interface ModuleAdapters {
   readonly cliExec: CliExec;
   /** Defaults to `createCommandRunner(cliExec)`; tests pass a fake to drive runs step by step. */
   readonly commandRunner?: CommandRunner;
+  /** Run lifecycle lines (`run_started`, `run_finished`, `run_failed_to_record`). */
+  readonly logger: RunLogger;
   /** The user's home, where harness config folders live. */
   readonly userHome: string;
 }
@@ -43,7 +46,7 @@ export function assertModules(modules: readonly ServerModule[]) {
   }
 }
 
-export function createModules(context: ModuleContext, { cliExec, commandRunner = createCommandRunner(cliExec), userHome }: ModuleAdapters) {
+export function createModules(context: ModuleContext, { cliExec, commandRunner = createCommandRunner(cliExec), logger, userHome }: ModuleAdapters) {
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
@@ -53,7 +56,7 @@ export function createModules(context: ModuleContext, { cliExec, commandRunner =
       return found.ok ? found.value : undefined;
     },
   };
-  const runs: RunService = createRunService({ history: historyLog, newId: randomUUID, runner: commandRunner });
+  const runs: RunService = createRunService({ history: historyLog, logger, newId: randomUUID, runner: commandRunner });
   const install = createInstallModule({ cliExec, projects: projects.service, runs, userHome });
   const models: ModelSource = install.service;
   const config = createConfigModule(context, { history: historyLog, historyReader, models, projects: projects.service });

@@ -25,7 +25,7 @@ export function createHistoryService({ newId, now, repository }: HistoryServiceD
       }
       case 'run': {
         const { tail, truncated } = outputTail(entry.output);
-        return { ...base, content: null, exitCode: entry.exitCode, outputTail: tail, truncated };
+        return { ...base, content: null, exitCode: entry.exitCode, outputTail: tail, truncated: truncated || entry.outputTruncated === true };
       }
       default: {
         return entry satisfies never;

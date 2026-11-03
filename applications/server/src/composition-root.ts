@@ -11,7 +11,7 @@ import { createCliExec } from '@agentic/adapter-cli-exec';
 
 import { createModules } from './module-registry.js';
 import { openDatabase } from './platform/db/db.js';
-import { createLogger } from './platform/log.js';
+import { createLogger, SERVICE_NAME } from './platform/log.js';
 import { createApp } from './server.js';
 
 export interface CompositionInput {
@@ -33,8 +33,8 @@ export interface CompositionInput {
 /** Wires real adapters (sqlite, logger) into the app; tests use the same path with `:memory:`. */
 export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, token, userHome = homedir(), webRoot }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
-  const logger = createLogger(logSink);
-  const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), userHome, ...(commandRunner === undefined ? {} : { commandRunner }) };
+  const logger = createLogger(logSink, { environment: settings.environment, service_name: SERVICE_NAME, service_revision: settings.serviceRevision });
+  const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), logger, userHome, ...(commandRunner === undefined ? {} : { commandRunner }) };
   const { historyLog, modules, projects, runs } = createModules({ db, homeDir: settings.homeDir }, adapters);
   const extra = typeof extraModules === 'function' ? extraModules({ runs }) : extraModules;
   const app = createApp({ logger, modules: [...modules, ...extra], port: settings.port, token, webRoot });

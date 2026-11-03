@@ -1,11 +1,11 @@
-import type { RunEvent, RunService, RunSpec } from '@agentic/domain-shared';
+import type { HistoryLog, RunEvent, RunService, RunSpec } from '@agentic/domain-shared';
 
 import { describe, expect, it } from 'vitest';
 
 import { FakeCommandRunner, InMemoryHistoryLog } from '@agentic/domain-shared/testing';
 import { err, ok } from '@agentic/kernel-result';
 
-import { createRunService, parseRunSpec } from './index.js';
+import { createRunService, MAX_BUFFERED_LINES, parseRunSpec } from './index.js';
 
 const SPEC: RunSpec = { args: ['plugin', 'install', 'agentic'], cli: 'claude', scope: 'global', summary: 'Install claude plugin' };
 
@@ -17,17 +17,18 @@ async function collect(service: RunService, id: string) {
   return events;
 }
 
-function setup(runner = new FakeCommandRunner(), { maxFinishedRuns = 100 } = {}) {
+function setup(runner = new FakeCommandRunner(), { history = new InMemoryHistoryLog() as HistoryLog, maxFinishedRuns = 100 } = {}) {
   let sequence = 0;
-  const history = new InMemoryHistoryLog();
+  const logLines: { readonly fields: Readonly<Record<string, unknown>>; readonly message: string }[] = [];
   const service = createRunService({
     history,
+    logger: { info: (message, fields) => logLines.push({ fields, message }), warn: (message, fields) => logLines.push({ fields, message }) },
     maxFinishedRuns,
     newId: () => `run-${String(++sequence)}`,
     now: () => '2026-11-03T10:00:00.000Z',
     runner,
   });
-  return { history, runner, service };
+  return { history: history as InMemoryHistoryLog, logLines, runner, service };
 }
 
 const started = (service: RunService, spec: RunSpec = SPEC) => {
@@ -104,7 +105,7 @@ describe('run lifecycle (AC14)', () => {
     const run = started(service);
     await collect(service, run.id);
 
-    expect(service.get(run.id)).toEqual(ok({ exitCode: 0, finishedAt: '2026-11-03T10:00:00.000Z', id: run.id, output: ['done'], startedAt: '2026-11-03T10:00:00.000Z', status: 'succeeded' }));
+    expect(service.get(run.id)).toEqual(ok({ exitCode: 0, finishedAt: '2026-11-03T10:00:00.000Z', id: run.id, output: ['done'], startedAt: '2026-11-03T10:00:00.000Z', status: 'succeeded', truncated: false }));
   });
 
   it('answers run_not_found for an unknown id', () => {
@@ -220,6 +221,93 @@ describe('ordered command sequence (`next`)', () => {
     const result = parseRunSpec({ ...SEQUENCE, next: [{ args: [], cli: 'sh' }] });
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('per-command timeouts and correlation id (ub-mode-1, code-review-5)', () => {
+  it('forwards each command timeout and the request correlation id to the runner', async () => {
+    const { runner, service } = setup();
+
+    started(service, { ...SPEC, correlationId: 'corr-1', next: [{ args: ['plugin', 'update', 'agentic'], cli: 'claude', timeoutMs: 2000 }], timeoutMs: 1000 });
+    await waitFor(() => runner.commands.length === 2);
+
+    expect(runner.commands).toEqual([
+      { args: ['plugin', 'install', 'agentic'], cli: 'claude', correlationId: 'corr-1', timeoutMs: 1000 },
+      { args: ['plugin', 'update', 'agentic'], cli: 'claude', correlationId: 'corr-1', timeoutMs: 2000 },
+    ]);
+  });
+
+  it('rejects a non-positive timeout', () => {
+    expect(parseRunSpec({ ...SPEC, timeoutMs: 0 }).ok).toBe(false);
+  });
+
+  it('ends failed with the timeout message when the command times out', async () => {
+    const { history, service } = setup(new FakeCommandRunner({ result: err({ exitCode: null, message: 'npx timed out after 600000 ms.', type: 'timeout' }) }));
+
+    const run = started(service);
+    const events = await collect(service, run.id);
+
+    expect(events).toEqual([{ line: 'npx timed out after 600000 ms.', type: 'stderr' }, { status: 'failed', type: 'status' }]);
+    expect(history.entries).toMatchObject([{ exitCode: -1, outputTail: 'npx timed out after 600000 ms.' }]);
+  });
+});
+
+describe('run log lines (code-review-5)', () => {
+  it('logs run_started then exactly one run_finished, carrying the correlation id', async () => {
+    const { logLines, service } = setup(new FakeCommandRunner({ result: ok({ exitCode: 3 }) }));
+
+    const run = started(service, { ...SPEC, args: ['--token', 'abc123'], correlationId: 'corr-9', cwd: '/Users/me/work/app' });
+    await collect(service, run.id);
+
+    expect(logLines.map((line) => line.message)).toEqual(['run_started', 'run_finished']);
+    expect(logLines[0]?.fields).toEqual({ args: '["--token","[REDACTED]"]', cli: 'claude', correlation_id: 'corr-9', cwd: 'app', run_id: run.id, scope: 'global' });
+    expect(logLines[1]?.fields).toMatchObject({ correlation_id: 'corr-9', duration_ms: expect.any(Number) as unknown, exit_code: 3, run_id: run.id, scope: 'global', status: 'failed' });
+  });
+
+  it('logs run_failed_to_record when history cannot be written', async () => {
+    const failing: HistoryLog = { list: () => Promise.resolve([]), record: () => Promise.reject(new Error('disk full')) };
+    const { logLines, service } = setup(new FakeCommandRunner(), { history: failing });
+
+    const run = started(service, { ...SPEC, correlationId: 'corr-2' });
+    await collect(service, run.id);
+
+    expect(logLines.find((line) => line.message === 'run_failed_to_record')?.fields).toMatchObject({ correlation_id: 'corr-2', error_message: 'disk full', run_id: run.id });
+  });
+});
+
+describe('replay cap truncation (super-review-10)', () => {
+  const manyLines = (count: number) => Array.from({ length: count }, (_, index) => ({ line: `line-${String(index)}`, type: 'stdout' as const }));
+
+  it('flags the run truncated and tells the replay how many lines were dropped, while history keeps every line', async () => {
+    const { history, service } = setup(new FakeCommandRunner({ lines: manyLines(MAX_BUFFERED_LINES + 1) }));
+
+    const run = started(service);
+    await waitFor(() => history.entries.length === 1);
+    const events = await collect(service, run.id);
+
+    expect(events[0]).toEqual({ dropped: 1, type: 'dropped' });
+    expect(service.get(run.id)).toMatchObject({ ok: true, value: { truncated: true } });
+    expect(history.entries[0]?.outputTail?.split('\n')).toHaveLength(MAX_BUFFERED_LINES + 1);
+    expect(history.entries[0]?.truncated).toBe(false);
+  });
+
+  it('flags history truncated when the output exceeded what the run keeps for history', async () => {
+    const { history, service } = setup(new FakeCommandRunner({ lines: manyLines(3).map((line) => ({ ...line, line: 'x'.repeat(200 * 1024) })) }));
+
+    const run = started(service);
+    await collect(service, run.id);
+    await waitFor(() => history.entries.length === 1);
+
+    expect(history.entries[0]?.truncated).toBe(true);
+  });
+
+  it('is not truncated for a short run', async () => {
+    const { service } = setup();
+
+    const run = started(service);
+    await collect(service, run.id);
+
+    expect(service.get(run.id)).toMatchObject({ ok: true, value: { truncated: false } });
   });
 });
 

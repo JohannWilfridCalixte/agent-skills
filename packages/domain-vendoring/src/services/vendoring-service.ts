@@ -68,10 +68,10 @@ export function createVendoringService({ projects, runs, source }: VendoringServ
       return ok({ results: parseResults(run.value.output, loaded.value.skills), runId, status: run.value.status });
     },
 
-    async start(projectId: string, request: VendorRequest) {
+    async start(projectId: string, request: VendorRequest, { correlationId }: { readonly correlationId?: string } = {}) {
       const planned = await plan(projectId, request);
       if (!planned.ok) return planned;
-      const started = runs.start({ ...planned.value.command, scope: `project:${planned.value.project.id}`, summary: runSummary(request) });
+      const started = runs.start({ ...planned.value.command, ...(correlationId === undefined ? {} : { correlationId }), scope: `project:${planned.value.project.id}`, summary: runSummary(request) });
       return started.ok ? started : err({ issues: started.error.issues, type: 'invalid_run' } satisfies VendoringError);
     },
 

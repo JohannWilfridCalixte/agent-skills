@@ -47,7 +47,7 @@ export async function createTestApp({ cliExec = missingCliExec, commandRunner, h
     ...(commandRunner === undefined ? {} : { commandRunner }),
     extraModules: ({ runs }) => [testRunsModule(runs), ...modules],
     logSink: (line) => logLines.push(line),
-    settings: { dbPath: ':memory:', homeDir, port: TEST_PORT },
+    settings: { dbPath: ':memory:', environment: 'test', homeDir, port: TEST_PORT, serviceRevision: 'test-revision' },
     token: TEST_TOKEN,
     userHome,
     webRoot,
@@ -72,7 +72,7 @@ function testRunsModule(runs: RunService) {
     name: 'test-runs',
     registerRoutes: (app) => {
       app.post('/', async (c) => {
-        const body: unknown = c.req.header('content-type') === 'application/json' ? await c.req.json() : TEST_RUN_SPEC;
+        const body: unknown = c.req.header('content-type') === 'application/json' ? await c.req.json() : { ...TEST_RUN_SPEC, correlationId: c.get('correlationId') };
         // @ts-expect-error -- deliberately passes an unchecked value to prove the service validates at runtime.
         const started = runs.start(body);
         if (!started.ok) return problem(c, { detail: started.error.issues.join('; '), status: 422, title: 'Invalid run spec', type: started.error.type });

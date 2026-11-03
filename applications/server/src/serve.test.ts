@@ -29,7 +29,7 @@ function projectsWithLog() {
     now: () => new Date('2026-11-03T10:00:00.000Z'),
     repository: new InMemoryProjectRepository(),
   });
-  return { lines, logger: createLogger((line) => lines.push(line)), projects };
+  return { lines, logger: createLogger((line) => lines.push(line), { environment: 'test', service_name: 'agentic-server', service_revision: 'test-revision' }), projects };
 }
 
 describe('serve.json lifecycle (AC1)', () => {

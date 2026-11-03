@@ -44,7 +44,9 @@ export interface CatalogueRequest {
 export const cursorCloneDirectory = (userHome: string) => `${userHome.replace(/\/+$/, '')}/${CURSOR_CLONE_FOLDER}`;
 
 const unsupported = (reason: string) => err({ reason, type: 'unsupported' } satisfies CatalogueRejection);
-const commands = (...list: readonly Command[]) => ok(list);
+/** Install and update runs (plugin installs, git clone, `npx skills add` on a cold cache) can take minutes. */
+export const INSTALL_RUN_TIMEOUT_MS = 10 * 60 * 1000;
+const commands = (...list: readonly Command[]) => ok(list.map((command): Command => ({ ...command, timeoutMs: INSTALL_RUN_TIMEOUT_MS })));
 
 /** The closed catalogue (D34): the ordered commands for one action, or why the combination is not offered. */
 export function catalogueCommands(request: CatalogueRequest, context: CatalogueContext) {

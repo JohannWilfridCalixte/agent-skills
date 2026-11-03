@@ -1,10 +1,10 @@
 import type { CliCommand, CliEvent, CliExec, CliExecError, CliExecErrorType, CliOutput, CliStream } from './types.js';
 
+import { redactArgs } from '@agentic/domain-shared';
 import { err, ok } from '@agentic/kernel-result';
 
 import { sanitiseEnvironment } from './environment.js';
 import { EventQueue, LineSplitter } from './lines.js';
-import { redactArgs } from './redact.js';
 import { DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_TIMEOUT_MS, isCliName } from './types.js';
 
 const STDERR_TAIL_CHARS = 4000;
@@ -29,12 +29,12 @@ export function createCliExec({ baseEnvironment = process.env, logger }: CliExec
     if (typeof executable !== 'string') return failedStream(executable);
 
     const maxOutputBytes = command.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
-    logger?.info('cli.start', {
+    logger?.info('cli_start', {
       args: redactArgs(command.args),
       cli: command.cli,
-      correlationId: command.correlationId,
+      correlation_id: command.correlationId,
       cwd: command.cwd,
-      envKeys: Object.keys(command.env ?? {}),
+      env_keys: Object.keys(command.env ?? {}),
     });
 
     const startedAt = performance.now();
@@ -84,7 +84,7 @@ export function createCliExec({ baseEnvironment = process.env, logger }: CliExec
       const durationMs = Math.round(performance.now() - startedAt);
       events.push({ durationMs, exitCode, type: 'exit' });
       events.close();
-      logger?.info('cli.exit', { cli: command.cli, correlationId: command.correlationId, durationMs, exitCode, stop });
+      logger?.info('cli_exit', { cli: command.cli, correlation_id: command.correlationId, duration_ms: durationMs, exit_code: exitCode, stop });
 
       const stderrTail = tail(output.stderr, STDERR_TAIL_CHARS);
       if (stop === 'timeout') return err(failure(command, 'timeout', `${command.cli} timed out after ${String(command.timeoutMs ?? DEFAULT_TIMEOUT_MS)} ms.`, { stderrTail }));

@@ -85,6 +85,14 @@ describe('record', () => {
     expect(entry).toMatchObject({ content: null, exitCode: 2, kind: 'run', truncated: true });
     expect(entry.outputTail).toBe('z'.repeat(OUTPUT_TAIL_LIMIT_BYTES));
   });
+
+  it('flags a short run output as truncated when the run already dropped its head (super-review-10)', async () => {
+    const { service } = setup();
+
+    const entry = await service.record({ exitCode: 0, kind: 'run', output: 'last lines', outputTruncated: true, scope: 'global', summary: 'vendor update' });
+
+    expect(entry).toMatchObject({ outputTail: 'last lines', truncated: true });
+  });
 });
 
 describe('list and get', () => {

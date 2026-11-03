@@ -35,6 +35,8 @@ export interface NewRunEntry {
   readonly kind: 'run';
   /** Full output; the history log keeps only its tail. */
   readonly output: string;
+  /** `true` when `output` already lacks its head (the run dropped lines before recording). */
+  readonly outputTruncated?: boolean;
   readonly scope: HistoryScope;
   readonly summary: string;
 }

@@ -4,6 +4,12 @@ import type { Result } from '@agentic/kernel-result';
 /** Lines kept per run for replay and `get`; the history tail cap (256 KiB) is applied by `domain-history`. */
 export const MAX_BUFFERED_LINES = 10_000;
 
+/**
+ * Output characters kept for history, independent of the replay buffer. At least as many as the history byte tail
+ * (256 KiB, one byte per character at minimum), so the stored tail is complete unless this overflows.
+ */
+export const MAX_HISTORY_OUTPUT_CHARS = 256 * 1024;
+
 /** Exit code recorded in history when the process never exited (spawn failure, timeout, cancel). */
 export const NO_EXIT_CODE = -1;
 
@@ -20,9 +26,14 @@ export class Run {
     return this.status !== 'running';
   }
 
-  /** Full output for history, from the lines still buffered. */
+  /** Output for history: its own bounded tail of lines, kept even after the replay buffer dropped them. */
   get output() {
-    return this.lines().join('\n');
+    return this.historyLines.join('\n');
+  }
+
+  /** `true` when `output` lacks lines the run produced. */
+  get outputTruncated() {
+    return this.historyDropped;
   }
 
   get recordedExitCode() {
@@ -33,8 +44,11 @@ export class Run {
   private dropped = 0;
   private readonly events: RunEvent[] = [];
   private exitCode: number | undefined;
-
   private finishedAt: string | undefined;
+  private historyChars = 0;
+  private historyDropped = false;
+
+  private readonly historyLines: string[] = [];
 
   private status: RunStatus = 'running';
 
@@ -47,6 +61,7 @@ export class Run {
   }
 
   append(line: Extract<RunEvent, { line: string }>) {
+    this.keepForHistory(line.line);
     this.push(line);
     if (this.events.length > MAX_BUFFERED_LINES) {
       this.events.shift();
@@ -58,10 +73,14 @@ export class Run {
     this.push({ status: this.status, type: 'status' });
   }
 
+  /** Yields a `dropped` event wherever lines were lost before this subscriber read them (at the start for a late one). */
   async* replay() {
-    let cursor = this.dropped;
+    let cursor = 0;
     for (;;) {
-      cursor = Math.max(cursor, this.dropped);
+      if (cursor < this.dropped) {
+        yield { dropped: this.dropped - cursor, type: 'dropped' } satisfies RunEvent;
+        cursor = this.dropped;
+      }
       const event = this.events[cursor - this.dropped];
       if (event !== undefined) {
         cursor += 1;
@@ -98,6 +117,7 @@ export class Run {
       id: this.id,
       startedAt: this.startedAt,
       status: this.status,
+      truncated: this.dropped > 0,
       ...(this.exitCode === undefined ? {} : { exitCode: this.exitCode }),
       ...(this.finishedAt === undefined ? {} : { finishedAt: this.finishedAt }),
     } satisfies RunSummary;
@@ -105,6 +125,15 @@ export class Run {
 
   view() {
     return { ...this.summary(), output: this.lines() } satisfies RunView;
+  }
+
+  private keepForHistory(line: string) {
+    this.historyLines.push(line);
+    this.historyChars += line.length + 1;
+    while (this.historyChars > MAX_HISTORY_OUTPUT_CHARS && this.historyLines.length > 1) {
+      this.historyChars -= (this.historyLines.shift() ?? '').length + 1;
+      this.historyDropped = true;
+    }
   }
 
   private lines() {

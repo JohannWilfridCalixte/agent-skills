@@ -9,6 +9,7 @@ export {
   displayCommand,
   INSTALL_ACTIONS,
   INSTALL_METHODS,
+  INSTALL_RUN_TIMEOUT_MS,
   INSTALL_SCOPES,
 } from './model/catalogue.js';
 export type { Harness, HarnessPresence } from './model/harness.js';

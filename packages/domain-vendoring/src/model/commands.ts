@@ -11,6 +11,9 @@ export type VendorAction = (typeof VENDOR_ACTIONS)[number];
 
 export const VENDOR_SCRIPT = 'scripts/vendor-skills.mjs';
 
+/** `update` runs `npx skills add` and git once per vendored source, so it gets the longest budget. */
+export const VENDOR_TIMEOUTS_MS = { check: 5 * 60_000, update: 30 * 60_000, verify: 60_000 } as const satisfies Record<VendorAction, number>;
+
 export type VendorCommandError =
   | { readonly names: readonly string[]; readonly type: 'unknown_skill' }
   | { readonly reason: string; readonly type: 'invalid_selection' };
@@ -26,7 +29,7 @@ const invalid = (reason: string) => err({ reason, type: 'invalid_selection' } sa
 
 /** The one command for a request (D34): fixed script, closed action, names only from `vendor.json`. */
 export function vendorCommand({ action, all = false, skills = [] }: VendorRequest, known: readonly VendoredSkill[], projectPath: string) {
-  const command = (args: readonly string[]): Command => ({ args: [VENDOR_SCRIPT, action, ...args], cli: 'node', cwd: projectPath });
+  const command = (args: readonly string[]): Command => ({ args: [VENDOR_SCRIPT, action, ...args], cli: 'node', cwd: projectPath, timeoutMs: VENDOR_TIMEOUTS_MS[action] });
   if (action !== 'update') return skills.length > 0 || all ? invalid(`${action} takes no skill selection`) : ok(command([]));
   if (all === (skills.length > 0)) return invalid('update needs either a non-empty skills list or all: true');
   const unknown = skills.filter((name) => !SKILL_NAME.test(name) || !known.some((skill) => skill.name === name));

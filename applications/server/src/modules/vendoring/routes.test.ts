@@ -138,7 +138,7 @@ describe('with vendor.json (AC21)', () => {
     await waitForFinished(request, runId);
     const results = VendoringResultsResponse.parse(await (await request(`/api/vendoring/${projectId}/runs/${runId}/results`)).json());
 
-    expect(runner.commands).toEqual([{ args: ['scripts/vendor-skills.mjs', 'verify'], cli: 'node', cwd: projectFolder }]);
+    expect(runner.commands).toEqual([{ args: ['scripts/vendor-skills.mjs', 'verify'], cli: 'node', correlationId: expect.any(String) as string, cwd: projectFolder, timeoutMs: 60_000 }]);
     expect(results).toEqual({ results: [{ detail: '', name: 'grilling', status: 'ok' }, { detail: 'hash mismatch', name: 'tdd', status: 'drift' }], runId, status: 'failed' });
     expect(await historyLog.list(`project:${projectId}`)).toMatchObject([{ exitCode: 1, kind: 'run', summary: 'Vendor verify' }]);
   });
@@ -173,7 +173,7 @@ describe('update (AC22)', () => {
     const runId = await startRun(request, projectId, { action: 'update', confirm: true, skills: ['tdd'] });
     const detail = await waitForFinished(request, runId);
 
-    expect(runner.commands).toEqual([{ args: ['scripts/vendor-skills.mjs', 'update', 'tdd'], cli: 'node', cwd: projectFolder }]);
+    expect(runner.commands).toEqual([{ args: ['scripts/vendor-skills.mjs', 'update', 'tdd'], cli: 'node', correlationId: expect.any(String) as string, cwd: projectFolder, timeoutMs: 1_800_000 }]);
     expect(detail).toMatchObject({ exitCode: 0, output: ['vendored mattpocock/skills/tdd@1234567 -> skills/flow/tdd'], status: 'succeeded' });
     expect(await historyLog.list(`project:${projectId}`)).toMatchObject([{ exitCode: 0, summary: 'Vendor update tdd' }]);
   });

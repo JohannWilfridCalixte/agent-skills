@@ -110,6 +110,16 @@ describe('createCliExec', () => {
 
     expect(JSON.stringify(logged)).not.toContain('abc123');
     expect(JSON.stringify(logged)).not.toContain('hidden-value');
-    expect(logged[0]).toMatchObject({ envKeys: ['API_KEY'] });
+    expect(logged[0]).toMatchObject({ env_keys: ['API_KEY'] });
+  });
+
+  it('logs snake_case fields and event names (code-review-6)', async () => {
+    const logged: { fields: Readonly<Record<string, unknown>>; message: string }[] = [];
+    const logging = createCliExec({ logger: { info: (message, fields) => logged.push({ fields, message }) } });
+    await logging.run(bun('1', { correlationId: 'corr-1' }));
+
+    expect(logged.map((line) => line.message)).toEqual(['cli_start', 'cli_exit']);
+    expect(logged[1]?.fields).toMatchObject({ correlation_id: 'corr-1', duration_ms: expect.any(Number) as unknown, exit_code: 0 });
+    expect(JSON.stringify(logged)).not.toMatch(/"[a-z]+[A-Z]\w*":/);
   });
 });

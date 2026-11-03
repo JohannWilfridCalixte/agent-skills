@@ -15,10 +15,10 @@ function recordingRuns(output: readonly string[] = []) {
   const started: RunSpec[] = [];
   const runs: RunService = {
     cancel: (id) => err({ id, type: 'run_not_found' }),
-    get: (id) => (id === 'run-1' ? ok({ id, output, startedAt: 'now', status: 'failed' }) : err({ id, type: 'run_not_found' })),
+    get: (id) => (id === 'run-1' ? ok({ id, output, startedAt: 'now', status: 'failed', truncated: false }) : err({ id, type: 'run_not_found' })),
     start: (spec) => {
       started.push(spec);
-      return ok({ id: 'run-1', startedAt: 'now', status: 'running' });
+      return ok({ id: 'run-1', startedAt: 'now', status: 'running', truncated: false });
     },
     subscribe: (id) => err({ id, type: 'run_not_found' }),
   };
@@ -57,9 +57,9 @@ describe('vendoring service', () => {
   it('starts a run in the project, scoped to it, naming the action', async () => {
     const { service, started } = setup();
 
-    await service.start('project-1', { action: 'update', skills: ['tdd'] });
+    await service.start('project-1', { action: 'update', skills: ['tdd'] }, { correlationId: 'corr-1' });
 
-    expect(started).toEqual([{ args: ['scripts/vendor-skills.mjs', 'update', 'tdd'], cli: 'node', cwd: '/p', scope: 'project:project-1', summary: 'Vendor update tdd' }]);
+    expect(started).toEqual([{ args: ['scripts/vendor-skills.mjs', 'update', 'tdd'], cli: 'node', correlationId: 'corr-1', cwd: '/p', scope: 'project:project-1', summary: 'Vendor update tdd', timeoutMs: 30 * 60_000 }]);
   });
 
   it('derives per-skill results from the run output', async () => {

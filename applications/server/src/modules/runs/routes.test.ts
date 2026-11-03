@@ -179,3 +179,37 @@ describe('POST /api/runs/:id/cancel', () => {
     expect(ProblemDetails.parse(await response.json()).type).toBe('run_not_running');
   });
 });
+
+describe('run log lines (code-review-5)', () => {
+  it('logs run_started and one run_finished with the correlation id of the request that started it', async () => {
+    const { logLines, request } = await createTestApp({ commandRunner: new FakeCommandRunner({ result: ok({ exitCode: 0 }) }) });
+    const response = await request('/api/test-runs', { headers: { 'x-correlation-id': 'corr-run-1' }, method: 'POST' });
+    const run = RunSummary.parse(await response.json());
+    await waitForStatus(request, run.id, 'succeeded');
+
+    const runLines = logLines.map((text) => JSON.parse(text) as Record<string, unknown>).filter((line) => String(line['message']).startsWith('run_'));
+    expect(runLines).toMatchObject([
+      { correlation_id: 'corr-run-1', message: 'run_started', run_id: run.id, service_name: 'agentic-server' },
+      { correlation_id: 'corr-run-1', exit_code: 0, message: 'run_finished', run_id: run.id, status: 'succeeded' },
+    ]);
+  });
+});
+
+describe('replay cap (super-review-10)', () => {
+  it('keeps every line of a long run in history and flags the run detail and replay as truncated', async () => {
+    const lines = Array.from({ length: 10_001 }, (_, index) => ({ line: `line-${String(index)}`, type: 'stdout' as const }));
+    const { request } = await createTestApp({ commandRunner: new FakeCommandRunner({ lines, result: ok({ exitCode: 0 }) }) });
+    const { run } = await startRun(request);
+    const id = String(run?.id);
+    const detail = await waitForStatus(request, id, 'succeeded');
+
+    const events = await readEvents(await request(`/api/runs/${id}/events`));
+    const history = (await (await request('/api/history?scope=global')).json()) as { entries: { id: string }[] };
+    const entry = (await (await request(`/api/history/${String(history.entries[0]?.id)}`)).json()) as { outputTail: string; truncated: boolean };
+
+    expect(detail.truncated).toBe(true);
+    expect(events[0]).toEqual({ data: { dropped: 1, type: 'dropped' }, event: 'dropped' });
+    expect(entry.outputTail.split('\n')).toHaveLength(10_001);
+    expect(entry.truncated).toBe(false);
+  });
+});

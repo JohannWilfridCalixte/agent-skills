@@ -2,6 +2,7 @@ export type { Command, CommandCli, CommandError, CommandLine, CommandOutcome, Co
 export { COMMAND_CLIS, isCommandCli } from './model/command.js';
 export type { HistoryEntry, HistoryKind, HistoryScope, NewConfigEntry, NewHistoryEntry, NewRunEntry } from './model/history.js';
 export type { Project } from './model/project.js';
+export { redactArgs } from './model/redact.js';
 export type { CancelRunError, InvalidRunSpec, RunEvent, RunNotFound, RunNotRunning, RunSpec, RunStatus, RunSummary, RunView } from './model/run.js';
 export type { CommandRunner } from './ports/command-runner.js';
 export type { HistoryLog } from './ports/history-log.js';

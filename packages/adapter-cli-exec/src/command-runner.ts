@@ -22,7 +22,14 @@ const ERROR_TYPES = {
 export function createCommandRunner(exec: CliExec) {
   return {
     stream(command) {
-      const stream = exec.stream({ args: command.args, cli: command.cli, ...(command.cwd === undefined ? {} : { cwd: command.cwd }) });
+      const { args, cli, correlationId, cwd, timeoutMs } = command;
+      const stream = exec.stream({
+        args,
+        cli,
+        ...(correlationId === undefined ? {} : { correlationId }),
+        ...(cwd === undefined ? {} : { cwd }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      });
       return { cancel: () => {
         stream.cancel();
       }, lines: onlyLines(stream.events), result: stream.result.then(toOutcome) };

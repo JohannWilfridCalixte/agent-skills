@@ -34,7 +34,7 @@ export function registerInstallRoutes(app: Hono<AppEnv>, service: InstallService
 
   app.post('/runs', validate('json', InstallRunRequest), async (c) => {
     const { confirm: _confirm, ...request } = c.req.valid('json');
-    const started = await catalogue.start(withoutUndefined(request));
+    const started = await catalogue.start(withoutUndefined(request), { correlationId: c.get('correlationId') });
     if (!started.ok) return installProblem(c, started.error);
     return c.json({ ...started.value } satisfies InstallRunResponse, 201);
   });

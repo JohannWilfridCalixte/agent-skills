@@ -24,7 +24,7 @@ class RecordingRunService implements RunService {
 
   start(spec: RunSpec) {
     this.specs.push(spec);
-    return ok({ id: `run-${String(this.specs.length)}`, startedAt: '2026-11-03T10:00:00.000Z', status: 'running' } as const);
+    return ok({ id: `run-${String(this.specs.length)}`, startedAt: '2026-11-03T10:00:00.000Z', status: 'running', truncated: false } as const);
   }
 
   subscribe(id: string) {
@@ -44,7 +44,7 @@ describe('preview (AC13)', () => {
 
     const preview = await service.preview({ action: 'update', harness: 'claude', method: 'plugin', scope: 'global' });
 
-    expect(preview).toEqual({ ok: true, value: [{ args: ['plugin', 'marketplace', 'update', 'agentic'], cli: 'claude' }, { args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude' }] });
+    expect(preview).toEqual({ ok: true, value: [{ args: ['plugin', 'marketplace', 'update', 'agentic'], cli: 'claude', timeoutMs: 600_000 }, { args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude', timeoutMs: 600_000 }] });
     expect(runs.specs).toEqual([]);
     expect(environment.executed).toEqual([]);
   });
@@ -74,11 +74,19 @@ describe('start', () => {
   it('starts one run for the whole ordered sequence under the global scope', async () => {
     const { runs, service } = setup();
 
-    const started = await service.start({ action: 'update', harness: 'claude', method: 'plugin', scope: 'global' });
+    const started = await service.start({ action: 'update', harness: 'claude', method: 'plugin', scope: 'global' }, { correlationId: 'corr-1' });
 
     expect(started).toMatchObject({ ok: true, value: { id: 'run-1' } });
     expect(runs.specs).toEqual([
-      { args: ['plugin', 'marketplace', 'update', 'agentic'], cli: 'claude', next: [{ args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude' }], scope: 'global', summary: 'Update claude plugin' },
+      {
+        args: ['plugin', 'marketplace', 'update', 'agentic'],
+        cli: 'claude',
+        correlationId: 'corr-1',
+        next: [{ args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude', timeoutMs: 600_000 }],
+        scope: 'global',
+        summary: 'Update claude plugin',
+        timeoutMs: 600_000,
+      },
     ]);
   });
 

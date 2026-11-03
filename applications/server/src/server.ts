@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 
 import { assertModules } from './module-registry.js';
 import { correlationId } from './platform/correlation.js';
+import { errorFields } from './platform/log.js';
 import { problem } from './platform/problem.js';
 import { requestLog } from './platform/request-log.js';
 import { bearerToken, hostAllowlist, originAllowlist } from './platform/security.js';
@@ -40,7 +41,7 @@ export function createApp({ logger, modules, port, token, webRoot }: AppDependen
 
   app.notFound((c) => problem(c, { status: 404, title: 'Not found', type: 'not_found' }));
   app.onError((error, c) => {
-    logger.error('http_unhandled_error', { correlation_id: c.get('correlationId'), error_name: error.name, url_path: c.req.path });
+    logger.error('http_unhandled_error', { correlation_id: c.get('correlationId'), ...errorFields(error), url_path: c.req.path });
     return problem(c, { status: 500, title: 'Internal server error', type: 'internal_error' });
   });
 

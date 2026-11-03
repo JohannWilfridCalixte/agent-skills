@@ -21,6 +21,7 @@
     "@agentic/domain-projects": "workspace:*",
     "@agentic/domain-runs": "workspace:*",
     "@agentic/domain-shared": "workspace:*",
+    "@agentic/domain-vendoring": "workspace:*",
     "@agentic/domain-work-items": "workspace:*",
     "@agentic/kernel-result": "workspace:*",
     "@hono/zod-validator": "0.9.1",

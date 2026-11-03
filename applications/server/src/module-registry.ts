@@ -14,6 +14,7 @@ import { createHistoryModule } from './modules/history/module.js';
 import { createInstallModule } from './modules/install/module.js';
 import { createProjectsModule } from './modules/projects/module.js';
 import { createRunsModule } from './modules/runs/module.js';
+import { createVendoringModule } from './modules/vendoring/module.js';
 import { createWorkItemsModule } from './modules/work-items/module.js';
 import { healthModule } from './platform/health.js';
 
@@ -65,6 +66,6 @@ export function createModules(context: ModuleContext, { cliExec, commandRunner =
     },
   };
   const workItems = createWorkItemsModule({ outputs });
-  const modules: readonly ServerModule[] = [healthModule, projects, history, config, createRunsModule(runs), ...install.modules, workItems];
+  const modules: readonly ServerModule[] = [healthModule, projects, history, config, createRunsModule(runs), ...install.modules, workItems, createVendoringModule({ projects: projects.service, runs })];
   return { historyLog, modules, projects: projects.service, runs };
 }

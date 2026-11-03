@@ -39,6 +39,11 @@
       "development": "./src/work-items/index.ts",
       "types": "./dist/work-items/index.d.ts",
       "default": "./dist/work-items/index.js"
+    },
+    "./vendoring": {
+      "development": "./src/vendoring/index.ts",
+      "types": "./dist/vendoring/index.d.ts",
+      "default": "./dist/vendoring/index.js"
     }
   },
   "files": [

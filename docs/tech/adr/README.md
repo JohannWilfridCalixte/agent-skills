@@ -12,3 +12,6 @@
 | [0008-config-files-source-of-truth-and-history](0008-config-files-source-of-truth-and-history.md) | Config JSON files stay the source of truth; sqlite holds projects and append-only history; diff-and-save, last write wins, restore as a new entry |
 | [0009-local-api-command-execution](0009-local-api-command-execution.md) | API binds 127.0.0.1, validated-enum commands, Origin/Host check and token, confirm-and-stream install/update, best-effort status, on-demand vendoring |
 | [0010-work-item-browse-read-only](0010-work-item-browse-read-only.md) | Read-only browse of active and archived work items per project from the effective `{output}` |
+| [0011-webapp-runtime-storage-toolchain](0011-webapp-runtime-storage-toolchain.md) | Bun + bun:sqlite + Kysely Migrator, port and db defaults, clone-only distribution, monorepo root mechanics, TypeScript 6/7 split |
+| [0012-webapp-modules-apps-and-tests](0012-webapp-modules-apps-and-tests.md) | `@agentic/*` packages, six module slices, three apps, design-system package, fs ports, four test seams |
+| [0013-runs-token-and-path-safety](0013-runs-token-and-path-safety.md) | Streamed runs over SSE, token handoff, install command catalogue, path safety, work-item read limits, logging |

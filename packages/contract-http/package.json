@@ -1,0 +1,71 @@
+{
+  "name": "@agentic/contract-http",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP wire contract between server and web: zod schemas and inferred types, one subpath per module (declarative only).",
+  "type": "module",
+  "exports": {
+    "./config": {
+      "development": "./src/config/index.ts",
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./history": {
+      "development": "./src/history/index.ts",
+      "types": "./dist/history/index.d.ts",
+      "default": "./dist/history/index.js"
+    },
+    "./install": {
+      "development": "./src/install/index.ts",
+      "types": "./dist/install/index.d.ts",
+      "default": "./dist/install/index.js"
+    },
+    "./problem": {
+      "development": "./src/problem/index.ts",
+      "types": "./dist/problem/index.d.ts",
+      "default": "./dist/problem/index.js"
+    },
+    "./projects": {
+      "development": "./src/projects/index.ts",
+      "types": "./dist/projects/index.d.ts",
+      "default": "./dist/projects/index.js"
+    },
+    "./runs": {
+      "development": "./src/runs/index.ts",
+      "types": "./dist/runs/index.d.ts",
+      "default": "./dist/runs/index.js"
+    },
+    "./work-items": {
+      "development": "./src/work-items/index.ts",
+      "types": "./dist/work-items/index.d.ts",
+      "default": "./dist/work-items/index.js"
+    },
+    "./vendoring": {
+      "development": "./src/vendoring/index.ts",
+      "types": "./dist/vendoring/index.d.ts",
+      "default": "./dist/vendoring/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@agentic/tooling-eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "5.0.3",
+    "eslint": "10.12.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

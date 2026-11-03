@@ -1,0 +1,39 @@
+{
+  "name": "@agentic/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Hono API on Bun: safety middleware, sqlite via Kysely, module registry.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --conditions development --watch src/main.ts",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix",
+    "start": "bun --conditions development src/main.ts",
+    "test": "bun test --conditions development src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentic/adapter-cli-exec": "workspace:*",
+    "@agentic/contract-http": "workspace:*",
+    "@agentic/domain-config": "workspace:*",
+    "@agentic/domain-history": "workspace:*",
+    "@agentic/domain-install": "workspace:*",
+    "@agentic/domain-projects": "workspace:*",
+    "@agentic/domain-runs": "workspace:*",
+    "@agentic/domain-shared": "workspace:*",
+    "@agentic/domain-vendoring": "workspace:*",
+    "@agentic/domain-work-items": "workspace:*",
+    "@agentic/kernel-result": "workspace:*",
+    "@hono/zod-validator": "0.9.1",
+    "hono": "4.13.16",
+    "kysely": "0.28.19",
+    "kysely-bun-sqlite": "0.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@agentic/tooling-eslint-config": "workspace:*",
+    "@types/bun": "1.3.14",
+    "eslint": "10.12.0",
+    "typescript": "7.0.2"
+  }
+}

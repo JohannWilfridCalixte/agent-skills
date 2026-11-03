@@ -1,0 +1,43 @@
+{
+  "name": "@agentic/adapter-cli-exec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runs allowlisted CLIs via Bun.spawn: no shell, sanitised env, process-tree kill, output cap, line streaming; fake in ./testing.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "development": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix",
+    "test": "bun --bun vitest run",
+    "test:watch": "bun --bun vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentic/domain-shared": "workspace:*",
+    "@agentic/kernel-result": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentic/tooling-eslint-config": "workspace:*",
+    "@types/bun": "1.3.14",
+    "eslint": "10.12.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

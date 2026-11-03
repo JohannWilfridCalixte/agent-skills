@@ -1,0 +1,39 @@
+{
+  "name": "@agentic/domain-runs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Background runs: validate a RunSpec, stream it through CommandRunner, buffer events for SSE replay, record the outcome in history once, bounded retention.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentic/domain-shared": "workspace:*",
+    "@agentic/kernel-result": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentic/tooling-eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "5.0.3",
+    "eslint": "10.12.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

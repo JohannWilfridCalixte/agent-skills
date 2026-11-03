@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Scan this package's components for utility classes. */
+@source './';
+
+/* `.dark` forces dark mode; otherwise the system preference applies (see the media query below). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Theme tokens. Hex values only: `tokens.test.ts` parses this file and checks WCAG AA contrast for every
+ * text/background pair. Keep the light block, the dark media block and the `.dark` block in sync.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --panel-raised: #f1f5f9;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --subtle-foreground: #475569;
+  --accent: #e2e8f0;
+  --accent-foreground: #0f172a;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --border: #cbd5e1;
+  --input: #94a3b8;
+  --ring: #2563eb;
+
+  --success: #15803d;
+  --warning: #a16207;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+  --purple: #7e22ce;
+  --teal: #0f766e;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0d1117;
+    --foreground: #e6edf3;
+    --card: #161b22;
+    --card-foreground: #e6edf3;
+    --popover: #161b22;
+    --popover-foreground: #e6edf3;
+    --panel-raised: #1c232d;
+    --primary: #58a6ff;
+    --primary-foreground: #0d1117;
+    --secondary: #1c232d;
+    --secondary-foreground: #e6edf3;
+    --muted: #1c232d;
+    --muted-foreground: #9da7b3;
+    --subtle-foreground: #9da7b3;
+    --accent: #262e3a;
+    --accent-foreground: #e6edf3;
+    --destructive: #f85149;
+    --destructive-foreground: #0d1117;
+    --border: #30363d;
+    --input: #57606a;
+    --ring: #58a6ff;
+
+    --success: #3fb950;
+    --warning: #e3b341;
+    --danger: #f85149;
+    --info: #58a6ff;
+    --purple: #bc8cff;
+    --teal: #39c5cf;
+
+    color-scheme: dark;
+  }
+}
+
+.dark {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --card: #161b22;
+  --card-foreground: #e6edf3;
+  --popover: #161b22;
+  --popover-foreground: #e6edf3;
+  --panel-raised: #1c232d;
+  --primary: #58a6ff;
+  --primary-foreground: #0d1117;
+  --secondary: #1c232d;
+  --secondary-foreground: #e6edf3;
+  --muted: #1c232d;
+  --muted-foreground: #9da7b3;
+  --subtle-foreground: #9da7b3;
+  --accent: #262e3a;
+  --accent-foreground: #e6edf3;
+  --destructive: #f85149;
+  --destructive-foreground: #0d1117;
+  --border: #30363d;
+  --input: #57606a;
+  --ring: #58a6ff;
+
+  --success: #3fb950;
+  --warning: #e3b341;
+  --danger: #f85149;
+  --info: #58a6ff;
+  --purple: #bc8cff;
+  --teal: #39c5cf;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-panel-raised: var(--panel-raised);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-purple: var(--purple);
+  --color-teal: var(--teal);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

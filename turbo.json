@@ -1,0 +1,94 @@
+{
+  "$schema": "https://v2-11-10.turborepo.dev/schema.json",
+  "agentGuidance": false,
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "tsconfig.build.base.json",
+    "tsconfig.bundler.base.json"
+  ],
+  "tasks": {
+    "transit": {
+      "dependsOn": [
+        "^transit"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "typecheck": {
+      "dependsOn": [
+        "transit"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "lint": {
+      "dependsOn": [
+        "transit"
+      ],
+      "outputs": [
+        ".eslintcache"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "lint:fix": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": [
+        "transit"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "test:coverage": {
+      "dependsOn": [
+        "transit"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "test:integration": {
+      "cache": false
+    },
+    "e2e": {
+      "cache": false
+    },
+    "//#lint:root": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!packages/**",
+        "!applications/**"
+      ],
+      "outputs": [
+        ".eslintcache"
+      ]
+    },
+    "//#lint:manifests": {
+      "inputs": [
+        "package.json",
+        "applications/*/package.json",
+        "packages/*/package.json",
+        "scripts/check-workspace-manifests.ts"
+      ]
+    },
+    "//#test:root": {
+      "inputs": [
+        "scripts/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "//#check:plugin": {
+      "cache": false
+    }
+  }
+}

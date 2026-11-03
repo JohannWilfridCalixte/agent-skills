@@ -15,10 +15,12 @@ export type { ConfigDelta } from './model/delta.js';
 export { delta, serialiseConfig } from './model/delta.js';
 export type { DiffLine } from './model/diff.js';
 export { lineDiff } from './model/diff.js';
-export type { EffectiveConfig, EffectiveStep, Origin, Sourced, UnknownKey } from './model/effective.js';
+export type { EffectiveConfig, EffectiveStep, Origin, Sourced, StepLeaf, UnknownKey } from './model/effective.js';
 export { effective } from './model/effective.js';
 export type {
   ConfigInvalid,
+  ConfigIoFailed,
+  ConfigLocationMissing,
   ConfigProjectNotFound,
   ConfigUnreadable,
   EntryNotRestorable,
@@ -30,7 +32,7 @@ export type {
 } from './model/errors.js';
 export type { ConfigScope } from './model/scope.js';
 export { formatScope, parseScope } from './model/scope.js';
-export type { ConfigFileRead, ConfigLocation, ConfigStore } from './ports/config-store.js';
+export type { ConfigFileRead, ConfigLocation, ConfigStore, ConfigStoreError } from './ports/config-store.js';
 export type { ModelCatalog, ModelList } from './ports/model-catalog.js';
 export type { ConfigPreview, ConfigRestored, ConfigRestorePreview, ConfigSaved, ConfigService, ConfigServiceDependencies, RawConfig } from './services/config-service.js';
 export { createConfigService } from './services/config-service.js';

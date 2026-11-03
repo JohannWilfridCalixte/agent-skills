@@ -69,6 +69,22 @@ function configProblem(c: Context<AppEnv>, error: ReadConfigError | RestoreConfi
     case 'config_invalid': {
       return problem(c, { detail: `The edited ${error.scope} config is invalid; nothing was written.`, issues: error.issues, status: 422, title: 'Invalid config', type: error.type });
     }
+    case 'config_io_failed': {
+      return problem(c, {
+        detail: `Could not ${error.operation} the ${error.scope} config file (${error.detail}). Check the file and folder permissions, then retry.`,
+        status: 422,
+        title: 'Config file not accessible',
+        type: error.type,
+      });
+    }
+    case 'config_location_missing': {
+      return problem(c, {
+        detail: `The ${error.scope} folder no longer exists; nothing was written. Restore the folder or remove the project on the Projects page.`,
+        status: 409,
+        title: 'Project folder missing',
+        type: error.type,
+      });
+    }
     case 'config_unreadable': {
       return problem(c, {
         detail: `${error.scope} config is unreadable (${error.reason}): ${error.detail}`,

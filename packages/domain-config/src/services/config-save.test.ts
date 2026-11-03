@@ -118,7 +118,7 @@ describe('config save', () => {
     store.set(PROJECT, '{"output":"before"}');
     store.failWrites = true;
 
-    await expect(service.save('project:project-1', { output: 'after' })).rejects.toThrow('write failed');
+    expect(await service.save('project:project-1', { output: 'after' })).toEqual({ error: { detail: 'write failed', operation: 'write', scope: 'project:project-1', type: 'config_io_failed' }, ok: false });
     expect(history.entries.map((entry) => entry.content)).toEqual(['{"output":"before"}']);
   });
 
@@ -129,5 +129,46 @@ describe('config save', () => {
     await service.save('project:project-1', { output: 'fixed' });
 
     expect(store.get(PROJECT)).toBe('{\n  "output": "fixed"\n}\n');
+  });
+});
+
+describe('save against concurrent disk edits (AC16, D12)', () => {
+  it('snapshots a disk edit made while models were being looked up', async () => {
+    let release = () => {};
+    let lookupStarted = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      lookupStarted = resolve;
+    });
+    const slowModels = {
+      models: async () => {
+        lookupStarted();
+        await gate;
+        return { available: false } as const;
+      },
+    };
+    const store = new InMemoryConfigStore();
+    const history = new InMemoryHistoryLog();
+    const service = createConfigService({ history, historyReader: history, models: slowModels, projects: new InMemoryProjectRegistry([PROJECT_PATH]), store });
+    store.set(PROJECT, '{"output":"old"}');
+
+    const saving = service.save('project:project-1', { steps: { claude: { grill: { model: 'opus' } } } });
+    await started;
+    store.set(PROJECT, '{"output":"external"}');
+    release();
+    await saving;
+
+    expect(history.entries.map((entry) => entry.content)[0]).toBe('{"output":"external"}');
+  });
+
+  it('serialises overlapping saves to one file, each snapshotting the previous write', async () => {
+    const { history, service, store } = setup();
+    store.set(PROJECT, '{"output":"start"}');
+
+    await Promise.all([service.save('project:project-1', { output: 'a' }), service.save('project:project-1', { output: 'b' })]);
+
+    expect(history.entries.map((entry) => entry.content)).toEqual(['{"output":"start"}', '{\n  "output": "a"\n}\n', '{\n  "output": "a"\n}\n', '{\n  "output": "b"\n}\n']);
   });
 });

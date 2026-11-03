@@ -21,9 +21,9 @@ export interface EffectiveConfig {
 }
 
 export interface EffectiveStep {
-  readonly effort?: Sourced<string>;
-  readonly harness?: Sourced<Harness>;
-  readonly model?: Sourced<string>;
+  readonly effort?: StepLeaf<string>;
+  readonly harness?: StepLeaf<Harness>;
+  readonly model?: StepLeaf<string>;
 }
 
 export type Origin = 'default' | 'global' | 'project';
@@ -31,6 +31,11 @@ export type Origin = 'default' | 'global' | 'project';
 export interface Sourced<T> {
   readonly origin: Origin;
   readonly value: T;
+}
+
+/** A step leaf; `from` is the parent step key that supplied it, absent when the key itself (or a built-in) did. */
+export interface StepLeaf<T> extends Sourced<T> {
+  readonly from?: string;
 }
 
 export interface UnknownKey {
@@ -81,6 +86,13 @@ export function effective(global: ConfigFile, project?: ConfigFile): EffectiveCo
   };
 }
 
+/** `review` for `review.x`, `explore` for `context.*`; a top-level key has no parent. */
+export function parentKey(key: string) {
+  if (key.startsWith('context.')) return 'explore';
+  const dot = key.indexOf('.');
+  return dot === -1 ? undefined : key.slice(0, dot);
+}
+
 function knowledgeRoot(layers: readonly Layer[]): Sourced<string> {
   const found = pick(layers, 'knowledge');
   if (found?.value.root === undefined) return { origin: 'default', value: FIELD_DEFAULTS['knowledge.root'] };
@@ -105,21 +117,32 @@ function mergeProfiles(configured: readonly Profile[]) {
   return [...byName.values()];
 }
 
+/**
+ * Resolves each leaf separately (config.md Resolution): `steps.{harness}.{key}`, then the configured parent key,
+ * project before global at each level; then the built-in default of the key, else of its parent, mapped to the
+ * resolved harness. `harness` itself only comes from levels 1-2. `from` names the parent key when it supplied the leaf.
+ */
 function mergeStep(harness: Harness, key: string, layers: readonly Layer[]): EffectiveStep {
-  const base = defaultStep(harness, key);
-  const leaf = <F extends keyof StepEntry>(field: F) => {
-    for (const layer of layers) {
-      const value = layer.values.steps?.[harness]?.[key]?.[field];
-      if (value !== undefined) {
-        const sourced: Sourced<NonNullable<StepEntry[F]>> = { origin: layer.origin, value };
-        return sourced;
+  const parent = parentKey(key);
+  const candidates = parent === undefined ? [key] : [key, parent];
+  const configured = <F extends keyof StepEntry>(field: F) => {
+    for (const candidate of candidates) {
+      for (const layer of layers) {
+        const value = layer.values.steps?.[harness]?.[candidate]?.[field];
+        if (value !== undefined) {
+          const sourced: StepLeaf<NonNullable<StepEntry[F]>> = { origin: layer.origin, value, ...(candidate === key ? {} : { from: candidate }) };
+          return sourced;
+        }
       }
     }
-    return base[field];
+    return undefined;
   };
-  const harnessLeaf = leaf('harness');
-  const model = leaf('model');
-  const effort = leaf('effort');
+  const harnessLeaf = configured('harness');
+  const target = harnessLeaf?.value ?? harness;
+  const own = defaultStep(target, key);
+  const builtIn = own.model === undefined && parent !== undefined ? defaultStep(target, parent) : own;
+  const model = configured('model') ?? builtIn.model;
+  const effort = configured('effort') ?? builtIn.effort;
   return {
     ...(effort === undefined ? {} : { effort }),
     ...(harnessLeaf === undefined ? {} : { harness: harnessLeaf }),

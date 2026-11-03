@@ -19,10 +19,13 @@ export const ConfigProfile = z.object({
 
 export type ConfigProfile = z.infer<typeof ConfigProfile>;
 
+/** `from`: the parent step key (`review`, `explore`) that supplied the leaf, when not the key itself. */
+const StepLeafString = SourcedString.extend({ from: z.string().optional() });
+
 export const EffectiveStep = z.object({
-  effort: SourcedString.optional(),
-  harness: z.object({ origin: ConfigOrigin, value: Harness }).optional(),
-  model: SourcedString.optional(),
+  effort: StepLeafString.optional(),
+  harness: z.object({ from: z.string().optional(), origin: ConfigOrigin, value: Harness }).optional(),
+  model: StepLeafString.optional(),
 });
 
 export type EffectiveStep = z.infer<typeof EffectiveStep>;

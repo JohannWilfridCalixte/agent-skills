@@ -7,6 +7,20 @@ export interface ConfigInvalid {
   readonly type: 'config_invalid';
 }
 
+/** Reading or writing the file failed for a reason other than a missing folder (permissions, disk). */
+export interface ConfigIoFailed {
+  readonly detail: string;
+  readonly operation: 'read' | 'write';
+  readonly scope: string;
+  readonly type: 'config_io_failed';
+}
+
+/** The project folder no longer exists; a project file is never created with its folder. */
+export interface ConfigLocationMissing {
+  readonly scope: string;
+  readonly type: 'config_location_missing';
+}
+
 export interface ConfigProjectNotFound {
   readonly projectId: string;
   readonly type: 'project_not_found';
@@ -41,10 +55,10 @@ export interface InvalidScope {
   readonly type: 'invalid_scope';
 }
 
-export type ReadConfigError = ConfigProjectNotFound | ConfigUnreadable | InvalidScope;
+export type ReadConfigError = ConfigIoFailed | ConfigProjectNotFound | ConfigUnreadable | InvalidScope;
 
 /** Errors of restore preview and restore; `config_invalid` when the stored content no longer parses as a config file. */
-export type RestoreConfigError = ConfigInvalid | ConfigProjectNotFound | EntryNotRestorable | HistoryEntryNotFound | InvalidScope;
+export type RestoreConfigError = ConfigInvalid | ConfigIoFailed | ConfigLocationMissing | ConfigProjectNotFound | EntryNotRestorable | HistoryEntryNotFound | InvalidScope;
 
 /** Errors of preview and save: the scope must resolve; save also needs a valid config. */
-export type SaveConfigError = ConfigInvalid | ConfigProjectNotFound | InvalidScope;
+export type SaveConfigError = ConfigInvalid | ConfigIoFailed | ConfigLocationMissing | ConfigProjectNotFound | InvalidScope;

@@ -50,7 +50,7 @@ describe('effective (AC3)', () => {
 
     expect(steps.claude['implement']).toEqual({ effort: { origin: 'global', value: 'high' }, model: { origin: 'project', value: 'sonnet' } });
     expect(steps.claude['tickets']).toEqual({ effort: { origin: 'default', value: 'low' }, model: { origin: 'global', value: 'haiku' } });
-    expect(steps.claude['review.ub-mode']).toEqual({ harness: { origin: 'project', value: 'codex' } });
+    expect(steps.claude['review.ub-mode']).toEqual({ effort: { origin: 'default', value: 'medium' }, harness: { origin: 'project', value: 'codex' }, model: { origin: 'default', value: 'code' } });
     expect(steps.cursor['implement']).toEqual({ effort: { origin: 'default', value: 'medium' }, model: { origin: 'default', value: 'code' } });
   });
 
@@ -81,5 +81,33 @@ describe('effective (AC3)', () => {
       { path: 'x', scope: 'global' },
       { path: 'review', scope: 'project' },
     ]);
+  });
+});
+
+describe('effective step resolution (config.md Resolution)', () => {
+  it('falls back to the configured parent key: review for review.x, explore for context.*', () => {
+    const { steps } = effective(file({ steps: { claude: { explore: { model: 'my-explore' }, review: { effort: 'low', model: 'my-review' } } } }));
+
+    expect(steps.claude['review.super-review']).toEqual({ effort: { from: 'review', origin: 'global', value: 'low' }, model: { from: 'review', origin: 'global', value: 'my-review' } });
+    expect(steps.claude['context.code']).toEqual({ effort: { origin: 'default', value: 'medium' }, model: { from: 'explore', origin: 'global', value: 'my-explore' } });
+  });
+
+  it('prefers an explicit key over its parent, project over global, per leaf', () => {
+    const { steps } = effective(file({ steps: { cursor: { review: { model: 'composer-2.5' } } } }), file({ steps: { cursor: { 'review.claude-security-review': { effort: 'high', model: 'claude-opus-5-5' } } } }));
+
+    expect(steps.cursor['review.super-review']).toEqual({ effort: { origin: 'default', value: 'high' }, model: { from: 'review', origin: 'global', value: 'composer-2.5' } });
+    expect(steps.cursor['review.claude-security-review']).toEqual({ effort: { origin: 'project', value: 'high' }, model: { origin: 'project', value: 'claude-opus-5-5' } });
+  });
+
+  it('gives an unknown child its parent built-in default', () => {
+    const { steps } = effective(file({ steps: { claude: { 'review.custom': { harness: 'claude' } } } }));
+
+    expect(steps.claude['review.custom']).toEqual({ effort: { origin: 'default', value: 'medium' }, harness: { origin: 'global', value: 'claude' }, model: { origin: 'default', value: 'code' } });
+  });
+
+  it('maps a routing default to the target harness when a parent routes elsewhere', () => {
+    const { steps } = effective(file({ steps: { claude: { explore: { harness: 'codex' } } } }));
+
+    expect(steps.claude['context.docs']).toEqual({ effort: { origin: 'default', value: 'medium' }, harness: { from: 'explore', origin: 'global', value: 'codex' }, model: { origin: 'default', value: 'gpt-6.1-sol' } });
   });
 });

@@ -1,8 +1,10 @@
-import type { ConfigLocation, ConfigStore } from '@agentic/domain-config';
+import type { ConfigLocation, ConfigStore, ConfigStoreError } from '@agentic/domain-config';
 
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+
+import { err, ok } from '@agentic/kernel-result';
 
 const GLOBAL_FILE = 'config.json';
 const PROJECT_FILE = '.agentic.json';
@@ -20,26 +22,27 @@ export function createFsConfigStore(homeDir: string): ConfigStore {
   return {
     read: async (location) => {
       try {
-        return { exists: true, text: await readFile(configPath(homeDir, location), 'utf8') };
+        return ok({ exists: true, text: await readFile(configPath(homeDir, location), 'utf8') } as const);
       } catch (cause) {
-        if (isMissing(cause)) return { exists: false };
-        throw cause;
+        if (isMissing(cause)) return ok({ exists: false } as const);
+        return err(ioFailed(cause));
       }
     },
 
     /** Temp file in the same directory, then rename: readers never see a half-written file (D31). */
     write: async (location, text) => {
       const path = configPath(homeDir, location);
-      if (location.kind === 'global') await mkdir(dirname(path), { recursive: true });
-      const mode = await currentMode(path);
       const temporary = join(dirname(path), `.${randomUUID()}.agentic-tmp`);
       try {
+        if (location.kind === 'global') await mkdir(dirname(path), { recursive: true });
+        const mode = await currentMode(path);
         await writeFile(temporary, text, { flag: 'wx', mode });
         await chmod(temporary, mode);
         await rename(temporary, path);
+        return ok(undefined);
       } catch (cause) {
         await rm(temporary, { force: true });
-        throw cause;
+        return err(isMissing(cause) ? ({ type: 'location_missing' } as const) : ioFailed(cause));
       }
     },
   };
@@ -52,4 +55,8 @@ async function currentMode(path: string) {
     if (isMissing(cause)) return NEW_FILE_MODE;
     throw cause;
   }
+}
+
+function ioFailed(cause: unknown): ConfigStoreError {
+  return { detail: cause instanceof Error ? cause.message : String(cause), type: 'io_failed' };
 }

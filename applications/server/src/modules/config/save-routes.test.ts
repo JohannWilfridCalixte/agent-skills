@@ -107,8 +107,21 @@ describe('PUT /api/config/:scope', () => {
     const { scope, send } = await setup();
     rmSync(projectDir, { recursive: true });
 
-    expect((await send('PUT', `/api/config/${scope}`, { output: 'x' })).status).toBe(500);
+    const response = await send('PUT', `/api/config/${scope}`, { output: 'x' });
+
+    expect(response.status).toBe(409);
+    expect(ProblemDetails.parse(await response.json())).toMatchObject({ detail: expect.stringContaining('remove the project'), type: 'config_location_missing' });
     expect(existsSync(projectDir)).toBe(false);
+  });
+
+  it('answers a problem with a next step when the project file cannot be read', async () => {
+    const { request, scope } = await setup('{}');
+    chmodSync(projectFile(), 0o000);
+
+    const response = await request(`/api/config/${scope}`);
+
+    expect(response.status).toBe(422);
+    expect(ProblemDetails.parse(await response.json())).toMatchObject({ detail: expect.stringContaining('permissions'), type: 'config_io_failed' });
   });
 
   it('keeps unknown keys untouched and reports them (AC6)', async () => {

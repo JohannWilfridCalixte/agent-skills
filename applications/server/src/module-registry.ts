@@ -3,6 +3,7 @@ import type { CommandRunner, HistoryLog, HistoryReader, ModelSource, ProjectOutp
 
 import type { ModuleContext, ServerModule } from './platform/module.js';
 
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import { createCommandRunner } from '@agentic/adapter-cli-exec';
@@ -52,7 +53,7 @@ export function createModules(context: ModuleContext, { cliExec, commandRunner =
       return found.ok ? found.value : undefined;
     },
   };
-  const runs: RunService = createRunService({ history: historyLog, runner: commandRunner });
+  const runs: RunService = createRunService({ history: historyLog, newId: randomUUID, runner: commandRunner });
   const install = createInstallModule({ cliExec, projects: projects.service, runs, userHome });
   const models: ModelSource = install.service;
   const config = createConfigModule(context, { history: historyLog, historyReader, models, projects: projects.service });

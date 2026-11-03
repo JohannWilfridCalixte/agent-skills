@@ -9,6 +9,7 @@ import { correlationId } from './platform/correlation.js';
 import { problem } from './platform/problem.js';
 import { requestLog } from './platform/request-log.js';
 import { bearerTokenOnWrites, hostAllowlist, originAllowlist } from './platform/security.js';
+import { registerWebUi } from './platform/web-ui.js';
 
 export interface AppDependencies {
   readonly logger: Logger;
@@ -16,10 +17,12 @@ export interface AppDependencies {
   readonly port: number;
   /** Per-run write token (D28); never logged. */
   readonly token: string;
+  /** Built SPA directory served at `/` (non-`/api` paths); omitted when the web UI is not built. */
+  readonly webRoot?: string | undefined;
 }
 
 /** Middleware order: correlation id and log first, so rejected requests are logged and carry the id too. */
-export function createApp({ logger, modules, port, token }: AppDependencies) {
+export function createApp({ logger, modules, port, token, webRoot }: AppDependencies) {
   assertModules(modules);
   const app = new Hono<AppEnv>();
 
@@ -30,6 +33,8 @@ export function createApp({ logger, modules, port, token }: AppDependencies) {
     module.registerRoutes(router);
     app.route(module.mountPath ?? `/api/${module.name}`, router);
   }
+
+  if (webRoot !== undefined) registerWebUi(app, webRoot);
 
   app.notFound((c) => problem(c, { status: 404, title: 'Not found', type: 'not_found' }));
   app.onError((error, c) => {

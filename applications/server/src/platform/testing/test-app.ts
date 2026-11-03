@@ -25,6 +25,8 @@ export interface TestAppOptions {
   readonly modules?: readonly ServerModule[];
   /** Home holding harness config folders; defaults to a path that does not exist. */
   readonly userHome?: string;
+  /** Built SPA directory to serve; none by default. */
+  readonly webRoot?: string;
 }
 
 const missingCliExec: CliExec = {
@@ -38,7 +40,7 @@ const missingCliExec: CliExec = {
  * The real app over an in-memory sqlite (D30). `request()` adds a valid Host and the bearer token;
  * pass `host` or `authorization` in `init.headers` to override them (empty string removes the token).
  */
-export async function createTestApp({ cliExec = missingCliExec, commandRunner, homeDir = '/nonexistent/agentic-test-home', modules = [], userHome = '/nonexistent/agentic-test-user' }: TestAppOptions = {}) {
+export async function createTestApp({ cliExec = missingCliExec, commandRunner, homeDir = '/nonexistent/agentic-test-home', modules = [], userHome = '/nonexistent/agentic-test-user', webRoot }: TestAppOptions = {}) {
   const logLines: string[] = [];
   const { app, db, historyLog } = await compose({
     cliExec,
@@ -48,6 +50,7 @@ export async function createTestApp({ cliExec = missingCliExec, commandRunner, h
     settings: { dbPath: ':memory:', homeDir, port: TEST_PORT },
     token: TEST_TOKEN,
     userHome,
+    webRoot,
   });
 
   const request = (path: string, init: RequestInit = {}) => {

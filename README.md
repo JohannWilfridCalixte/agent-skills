@@ -604,3 +604,20 @@ Agentic stands on other people's work.
 ## License
 
 MIT, see [LICENSE](LICENSE). Vendored skills keep their upstream licences (see [Credits](#credits)).
+
+## Webapp (agentic serve)
+
+A local web UI and CLI to manage agentic from a clone of this repository (needs [Bun](https://bun.sh)):
+
+```bash
+bun install
+bun run serve          # builds the web UI, then starts the server
+```
+
+It manages registered projects, global and project configuration (with history), harness installs and their status, live command runs, run and config history, browsing work items, and vendored skills.
+
+The server prints `http://127.0.0.1:<port>/#token=<token>` (default port 8787; `--port` or `AGENTIC_PORT` to change it): open that URL, the token authorises changes. It listens on 127.0.0.1 only and rejects other hosts and origins. Port and token are also written to `~/.agentic/serve.json` (`AGENTIC_HOME` to move it) while the server runs.
+
+The same API is scriptable from the CLI: `bun run agentic -- <command>` (`bun run agentic -- help` for the list).
+
+Design and rationale: [ADR-0007](docs/tech/adr/0007-agentic-webapp-and-monorepo.md) to [ADR-0013](docs/tech/adr/0013-runs-token-and-path-safety.md).

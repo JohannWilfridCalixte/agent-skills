@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
 import { err, ok } from '@agentic/kernel-result';
 
 import { compose } from './composition-root.js';
+import { DEFAULT_WEB_ROOT, hasWebUi } from './platform/web-ui.js';
 import { loadSettings } from './settings.js';
 
 export interface ServeFile {
@@ -91,11 +92,11 @@ export async function serve(io: ServeIo) {
   }
   const port = args.value.port ?? settings.port;
   const token = randomBytes(32).toString('base64url');
-  const { app, db, logger, projects } = await compose({ logSink: io.logSink, settings: { ...settings, port }, token });
 
-  const bound = bindServer(app.fetch, port);
+  /** Bind before opening the database, so a busy port leaves nothing behind (D38). */
+  let handle: (request: Request) => Promise<Response> | Response = () => new Response('Starting', { status: 503 });
+  const bound = bindServer((request) => handle(request), port);
   if (!bound.ok) {
-    await db.destroy();
     io.stderr(
       bound.error.type === 'port_in_use'
         ? `Port ${String(port)} on ${HOSTNAME} is already in use. Stop the other process or choose another port with --port or AGENTIC_PORT.\n`
@@ -104,6 +105,11 @@ export async function serve(io: ServeIo) {
     return 1;
   }
   const server = bound.value;
+
+  const webRoot = hasWebUi(DEFAULT_WEB_ROOT) ? DEFAULT_WEB_ROOT : undefined;
+  if (webRoot === undefined) io.stderr('Web UI not built; run `bun run build`\n');
+  const { app, db, logger, projects } = await compose({ logSink: io.logSink, settings: { ...settings, port }, token, webRoot });
+  handle = app.fetch;
 
   await registerStartFolder(projects, args.value.projectDir, logger);
 

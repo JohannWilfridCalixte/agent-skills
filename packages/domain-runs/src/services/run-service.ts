@@ -12,7 +12,8 @@ export interface RunServiceDependencies {
   readonly history: HistoryLog;
   /** Finished runs kept for `get`/replay; the oldest finished is evicted beyond it. */
   readonly maxFinishedRuns?: number;
-  readonly newId?: () => string;
+  /** Unique run id; injected so the domain stays free of platform APIs. */
+  readonly newId: () => string;
   /** ISO-8601 timestamp. */
   readonly now?: () => string;
   readonly runner: CommandRunner;
@@ -22,7 +23,7 @@ export interface RunServiceDependencies {
 export function createRunService({
   history,
   maxFinishedRuns = DEFAULT_MAX_FINISHED_RUNS,
-  newId = () => crypto.randomUUID(),
+  newId,
   now = () => new Date().toISOString(),
   runner,
 }: RunServiceDependencies) {

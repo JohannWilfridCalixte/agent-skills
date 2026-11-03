@@ -86,6 +86,9 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "//#check:plugin": {
+      "cache": false
     }
   }
 }

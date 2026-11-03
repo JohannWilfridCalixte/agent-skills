@@ -9,15 +9,17 @@
   "scripts": {
     "agentic": "bun --conditions development applications/cli/src/main.ts",
     "build": "turbo run build",
+    "check:plugin": "node scripts/check-plugin-integrity.mjs",
     "dev": "turbo run dev --concurrency 100",
     "fix": "turbo run lint:fix && eslint . --fix",
     "lint": "turbo run lint lint:root lint:manifests",
     "lint:manifests": "bun scripts/check-workspace-manifests.ts",
     "lint:root": "eslint . --cache",
+    "serve": "bun run --cwd applications/agentic build && bun run agentic serve",
     "test": "turbo run test test:root",
     "test:root": "bun test scripts",
     "typecheck": "turbo run typecheck",
-    "verify": "turbo run lint lint:root lint:manifests typecheck test test:root"
+    "verify": "turbo run lint lint:root lint:manifests typecheck test test:root build check:plugin"
   },
   "devDependencies": {
     "@agentic/tooling-eslint-config": "workspace:*",

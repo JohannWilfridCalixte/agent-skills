@@ -26,16 +26,18 @@ export interface CompositionInput {
   readonly token: string;
   /** Defaults to `os.homedir()`. */
   readonly userHome?: string;
+  /** Built SPA to serve at `/`; none by default. */
+  readonly webRoot?: string | undefined;
 }
 
 /** Wires real adapters (sqlite, logger) into the app; tests use the same path with `:memory:`. */
-export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, token, userHome = homedir() }: CompositionInput) {
+export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, token, userHome = homedir(), webRoot }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
   const logger = createLogger(logSink);
   const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), userHome, ...(commandRunner === undefined ? {} : { commandRunner }) };
   const { historyLog, modules, projects, runs } = createModules({ db, homeDir: settings.homeDir }, adapters);
   const extra = typeof extraModules === 'function' ? extraModules({ runs }) : extraModules;
-  const app = createApp({ logger, modules: [...modules, ...extra], port: settings.port, token });
+  const app = createApp({ logger, modules: [...modules, ...extra], port: settings.port, token, webRoot });
   return { app, db, historyLog, logger, projects, runs };
 }
 

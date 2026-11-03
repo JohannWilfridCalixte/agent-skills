@@ -9,7 +9,7 @@ import { InMemoryProjectRepository } from '@agentic/domain-projects/testing';
 
 import { fsDirectoryProbe } from './modules/projects/fs-directory-probe.js';
 import { createLogger } from './platform/log.js';
-import { bindServer, parseServeArgs, registerStartFolder, removeServeFile, serveFilePath, writeServeFile } from './serve.js';
+import { bindServer, parseServeArgs, registerStartFolder, removeServeFile, serve, serveFilePath, writeServeFile } from './serve.js';
 
 let root = '';
 
@@ -103,5 +103,30 @@ describe('bindServer (AC1)', () => {
 
     expect(second.ok ? undefined : second.error.type).toBe('port_in_use');
     await first.value.stop(true);
+  });
+});
+
+describe('serve startup on a busy port (D38)', () => {
+  it('fails with exit code 1 and creates neither the database nor serve.json', async () => {
+    const blocker = Bun.serve({ fetch: () => new Response('busy'), hostname: '127.0.0.1', port: 0 });
+    const homeDir = join(root, 'home');
+    const errors: string[] = [];
+    try {
+      const exitCode = await serve({
+        argv: ['--port', String(blocker.port), '--project', root],
+        cwd: root,
+        env: { AGENTIC_HOME: homeDir },
+        logSink: () => undefined,
+        stderr: (text) => errors.push(text),
+        stdout: () => undefined,
+      });
+
+      expect(exitCode).toBe(1);
+      expect(errors.join('')).toContain('already in use');
+      expect(existsSync(join(homeDir, 'agentic.db'))).toBe(false);
+      expect(existsSync(serveFilePath(homeDir))).toBe(false);
+    } finally {
+      await blocker.stop(true);
+    }
   });
 });

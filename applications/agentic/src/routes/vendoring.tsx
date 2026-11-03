@@ -1,9 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { PlaceholderPage } from '@/shell/placeholder-page';
-
-function VendoringPage() {
-  return <PlaceholderPage description="Vendored skills: check, verify and update." title="Vendoring" />;
-}
+import { VendoringPage } from '@/features/vendoring/vendoring-page';
 
 export const Route = createFileRoute('/vendoring')({ component: VendoringPage });

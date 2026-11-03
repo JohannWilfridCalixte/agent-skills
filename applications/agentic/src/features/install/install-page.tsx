@@ -1,18 +1,19 @@
+import type { ApiClient } from '@/lib/api-client';
 import type { InstallStatusEntry } from '@agentic/contract-http/install';
 
 import type { PlannedAction, SkillsScope } from './install-actions';
 
 import { useId, useState } from 'react';
 
+import { ConfirmRunDialog } from '@/features/runs/confirm-run-dialog';
+import { RunPanel } from '@/features/runs/run-panel';
 import { useApi } from '@/lib/api-context';
 import { useListQuery } from '@/lib/use-list-query';
-import { HarnessesResponse, InstallStatusResponse } from '@agentic/contract-http/install';
+import { HarnessesResponse, InstallPreviewResponse, InstallRunResponse, InstallStatusResponse } from '@agentic/contract-http/install';
 import { ProjectList } from '@agentic/contract-http/projects';
 import { Badge, Button, ListState, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@agentic/design-system';
 
-import { ConfirmRunDialog } from './confirm-run-dialog';
-import { actionsFor, methodLabel } from './install-actions';
-import { RunPanel } from './run-panel';
+import { actionsFor, describeInstallError, methodLabel } from './install-actions';
 
 /** Status is computed on request only: load once, refresh on demand, never poll (AC11). */
 const NO_POLLING = { refetchInterval: false, refetchOnReconnect: false, refetchOnWindowFocus: false, staleTime: Number.POSITIVE_INFINITY } as const;
@@ -35,6 +36,7 @@ interface StatusTableProps {
 }
 
 export function InstallPage() {
+  const api = useApi();
   const [scope, setScope] = useState<SkillsScope>({ kind: 'global' });
   const [planned, setPlanned] = useState<PlannedAction>();
   const [run, setRun] = useState<ActiveRun>();
@@ -64,7 +66,7 @@ export function InstallPage() {
           if (planned !== undefined) setRun({ planned, runId });
           setPlanned(undefined);
         }}
-        planned={planned}
+        plan={planned === undefined ? undefined : installPlan(api, planned)}
       />
       {run !== undefined && (
         <RunPanel
@@ -108,6 +110,19 @@ function HarnessSection() {
       )}
     </section>
   );
+}
+
+function installPlan(api: ApiClient, planned: PlannedAction) {
+  return {
+    describeError: describeInstallError,
+    label: planned.label,
+    preview: async (signal: AbortSignal) => {
+      const preview = await api.post('/install/preview', planned.request, InstallPreviewResponse, { signal });
+      return preview.ok ? { ...preview, value: preview.value.commands } : preview;
+    },
+    previewKey: ['install', planned.request],
+    start: async () => api.post('/install/runs', { ...planned.request, confirm: true }, InstallRunResponse),
+  };
 }
 
 function ScopeSelect({ onChange, scope }: { readonly onChange: (scope: SkillsScope) => void; readonly scope: SkillsScope }) {

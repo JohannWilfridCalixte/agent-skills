@@ -43,6 +43,15 @@ interface Layer {
   readonly values: ConfigValues;
 }
 
+/** The built-in leaves of one step key on one harness (capability class or routing model). */
+export function defaultStep(harness: Harness, key: string): EffectiveStep {
+  const step = STEP_DEFAULTS[key] ?? (key in ROUTING_DEFAULTS ? { as: key as RoutingKey, kind: 'routing' as const } : undefined);
+  if (step === undefined) return {};
+  if (step.kind === 'class') return { effort: { origin: 'default', value: step.effort }, model: { origin: 'default', value: step.model } };
+  const routing = ROUTING_DEFAULTS[step.as];
+  return { effort: { origin: 'default', value: routing.effort }, model: { origin: 'default', value: routing.models[harness] } };
+}
+
 /**
  * Merges the global and project files (D3, AC3): project wins; `steps` merge per harness and step key,
  * `limits` per key; any other top-level key present in the project file replaces the global value whole;
@@ -70,14 +79,6 @@ export function effective(global: ConfigFile, project?: ConfigFile): EffectiveCo
     ],
     worktrees: whole(layers, 'worktrees', FIELD_DEFAULTS.worktrees),
   };
-}
-
-function defaultStep(harness: Harness, key: string): EffectiveStep {
-  const step = STEP_DEFAULTS[key] ?? (key in ROUTING_DEFAULTS ? { as: key as RoutingKey, kind: 'routing' as const } : undefined);
-  if (step === undefined) return {};
-  if (step.kind === 'class') return { effort: { origin: 'default', value: step.effort }, model: { origin: 'default', value: step.model } };
-  const routing = ROUTING_DEFAULTS[step.as];
-  return { effort: { origin: 'default', value: routing.effort }, model: { origin: 'default', value: routing.models[harness] } };
 }
 
 function knowledgeRoot(layers: readonly Layer[]): Sourced<string> {

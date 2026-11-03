@@ -1,5 +1,12 @@
 import type { ConfigIssue } from './config-file.js';
 
+/** The edited config breaks the schema; save is blocked (D14). */
+export interface ConfigInvalid {
+  readonly issues: readonly ConfigIssue[];
+  readonly scope: string;
+  readonly type: 'config_invalid';
+}
+
 export interface ConfigProjectNotFound {
   readonly projectId: string;
   readonly type: 'project_not_found';
@@ -22,3 +29,6 @@ export interface InvalidScope {
 }
 
 export type ReadConfigError = ConfigProjectNotFound | ConfigUnreadable | InvalidScope;
+
+/** Errors of preview and save: the scope must resolve; save also needs a valid config. */
+export type SaveConfigError = ConfigInvalid | ConfigProjectNotFound | InvalidScope;

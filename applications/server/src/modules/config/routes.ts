@@ -1,13 +1,16 @@
 import type { Context, Hono } from 'hono';
 
-import type { EffectiveConfigResponse, RawConfigResponse } from '@agentic/contract-http/config';
-import type { ConfigService, ReadConfigError } from '@agentic/domain-config';
+import type { ConfigPreviewResponse, ConfigSaveResponse, EffectiveConfigResponse, RawConfigResponse } from '@agentic/contract-http/config';
+import type { ConfigService, ReadConfigError, SaveConfigError } from '@agentic/domain-config';
 
 import type { AppEnv } from '../../platform/app-env.js';
 
-import { problem } from '../../platform/problem.js';
+import { EditedConfig } from '@agentic/contract-http/config';
 
-/** Mounted under `/api/config`; `:scope` is `global` or `project:<id>`, never a path (D31). Read-only until T7. */
+import { problem } from '../../platform/problem.js';
+import { validate } from '../../platform/validation.js';
+
+/** Mounted under `/api/config`; `:scope` is `global` or `project:<id>`, never a path (D31). Saves go through preview (diff) then PUT. */
 export function registerConfigRoutes(app: Hono<AppEnv>, service: ConfigService) {
   app.get('/:scope/effective', async (c) => {
     const scope = c.req.param('scope');
@@ -23,6 +26,20 @@ export function registerConfigRoutes(app: Hono<AppEnv>, service: ConfigService) 
     return c.json({ config, scope, unknownKeys: [...unknownKeys] } satisfies EffectiveConfigResponse);
   });
 
+  app.post('/:scope/preview', validate('json', EditedConfig), async (c) => {
+    const preview = await service.preview(c.req.param('scope'), c.req.valid('json'));
+    if (!preview.ok) return configProblem(c, preview.error);
+    const { diff, issues, proposedText, scope, unknownKeys, warnings } = preview.value;
+    return c.json({ diff: [...diff], issues: [...issues], proposedText, scope, unknownKeys: [...unknownKeys], warnings: [...warnings] } satisfies ConfigPreviewResponse);
+  });
+
+  app.put('/:scope', validate('json', EditedConfig), async (c) => {
+    const saved = await service.save(c.req.param('scope'), c.req.valid('json'));
+    if (!saved.ok) return configProblem(c, saved.error);
+    const { changed, scope, text, unknownKeys, warnings } = saved.value;
+    return c.json({ changed, scope, text, unknownKeys: [...unknownKeys], warnings: [...warnings] } satisfies ConfigSaveResponse);
+  });
+
   app.get('/:scope', async (c) => {
     const read = await service.raw(c.req.param('scope'));
     if (!read.ok) return configProblem(c, read.error);
@@ -31,8 +48,11 @@ export function registerConfigRoutes(app: Hono<AppEnv>, service: ConfigService) 
   });
 }
 
-function configProblem(c: Context<AppEnv>, error: ReadConfigError) {
+function configProblem(c: Context<AppEnv>, error: ReadConfigError | SaveConfigError) {
   switch (error.type) {
+    case 'config_invalid': {
+      return problem(c, { detail: `The edited ${error.scope} config is invalid; nothing was written.`, issues: error.issues, status: 422, title: 'Invalid config', type: error.type });
+    }
     case 'config_unreadable': {
       return problem(c, {
         detail: `${error.scope} config is unreadable (${error.reason}): ${error.detail}`,

@@ -26,7 +26,7 @@ export function createModules(context: ModuleContext) {
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
-  const config = createConfigModule(context, { projects: projects.service });
+  const config = createConfigModule(context, { history: historyLog, projects: projects.service });
   const modules: readonly ServerModule[] = [healthModule, projects, history, config];
   return { historyLog, modules, projects: projects.service };
 }

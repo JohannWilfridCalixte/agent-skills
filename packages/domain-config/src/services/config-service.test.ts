@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { InMemoryProjectRegistry } from '@agentic/domain-shared/testing';
+import { InMemoryHistoryLog, InMemoryProjectRegistry } from '@agentic/domain-shared/testing';
 
 import { InMemoryConfigStore } from '../testing.js';
 import { createConfigService } from './config-service.js';
@@ -9,7 +9,7 @@ const PROJECT_PATH = '/work/app';
 
 function setup() {
   const store = new InMemoryConfigStore();
-  const service = createConfigService({ projects: new InMemoryProjectRegistry([PROJECT_PATH]), store });
+  const service = createConfigService({ history: new InMemoryHistoryLog(), projects: new InMemoryProjectRegistry([PROJECT_PATH]), store });
   return { service, store };
 }
 

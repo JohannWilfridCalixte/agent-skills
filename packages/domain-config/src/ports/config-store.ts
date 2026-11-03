@@ -6,11 +6,13 @@ export type ConfigFileRead = { readonly exists: false } | { readonly exists: tru
  */
 export type ConfigLocation = { readonly kind: 'global' } | { readonly kind: 'project'; readonly projectPath: string };
 
-/**
- * Raw config file access (D39). Read-only for now; T7 adds `write(location, text)` with atomic
- * temp-and-rename semantics and kept file mode, so callers only ever hand over a `ConfigLocation`.
- */
+/** Raw config file access (D39); callers only ever hand over a `ConfigLocation`, never a path. */
 export interface ConfigStore {
   /** A missing file is `{ exists: false }`; other I/O failures reject. */
   read(location: ConfigLocation): Promise<ConfigFileRead>;
+  /**
+   * Replaces the file atomically (temp file in the same directory, then rename), keeping its mode.
+   * May create the global directory, never a project directory. Failures reject and leave the file as it was.
+   */
+  write(location: ConfigLocation, text: string): Promise<void>;
 }

@@ -68,3 +68,40 @@ export const RawConfigResponse = z.object({
 });
 
 export type RawConfigResponse = z.infer<typeof RawConfigResponse>;
+
+/** Body of `POST /api/config/:scope/preview` and `PUT /api/config/:scope`: the edited file object (full or partial); the server validates it. */
+export const EditedConfig = z.record(z.string(), z.unknown());
+
+export type EditedConfig = z.infer<typeof EditedConfig>;
+
+export const ConfigDiffLine = z.object({ kind: z.enum(['added', 'context', 'removed']), text: z.string() });
+
+export type ConfigDiffLine = z.infer<typeof ConfigDiffLine>;
+
+const ConfigIssue = z.object({ message: z.string(), path: z.string() });
+
+/** `POST /api/config/:scope/preview`: what a save would write; nothing is written. Non-empty `issues` blocks the save. */
+export const ConfigPreviewResponse = z.object({
+  /** Line diff of the file on disk against `proposedText`; empty when `issues` is non-empty. */
+  diff: z.array(ConfigDiffLine),
+  issues: z.array(ConfigIssue),
+  proposedText: z.string().nullable(),
+  scope: z.string(),
+  unknownKeys: z.array(z.string()),
+  /** Unknown model ids: shown, never blocking. */
+  warnings: z.array(ConfigIssue),
+});
+
+export type ConfigPreviewResponse = z.infer<typeof ConfigPreviewResponse>;
+
+/** `PUT /api/config/:scope`: the file was written (last write wins; the overwritten content is in history). */
+export const ConfigSaveResponse = z.object({
+  /** `false` when the file already held this text: nothing written or recorded. */
+  changed: z.boolean(),
+  scope: z.string(),
+  text: z.string(),
+  unknownKeys: z.array(z.string()),
+  warnings: z.array(ConfigIssue),
+});
+
+export type ConfigSaveResponse = z.infer<typeof ConfigSaveResponse>;

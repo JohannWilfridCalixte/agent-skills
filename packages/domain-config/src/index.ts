@@ -11,11 +11,16 @@ export {
   ROUTING_DEFAULTS,
   STEP_DEFAULTS,
 } from './model/defaults.js';
+export type { ConfigDelta } from './model/delta.js';
+export { delta, serialiseConfig } from './model/delta.js';
+export type { DiffLine } from './model/diff.js';
+export { lineDiff } from './model/diff.js';
 export type { EffectiveConfig, EffectiveStep, Origin, Sourced, UnknownKey } from './model/effective.js';
 export { effective } from './model/effective.js';
-export type { ConfigProjectNotFound, ConfigUnreadable, InvalidScope, ReadConfigError } from './model/errors.js';
+export type { ConfigInvalid, ConfigProjectNotFound, ConfigUnreadable, InvalidScope, ReadConfigError, SaveConfigError } from './model/errors.js';
 export type { ConfigScope } from './model/scope.js';
 export { formatScope, parseScope } from './model/scope.js';
 export type { ConfigFileRead, ConfigLocation, ConfigStore } from './ports/config-store.js';
-export type { ConfigService, ConfigServiceDependencies, RawConfig } from './services/config-service.js';
+export type { ModelCatalog, ModelList } from './ports/model-catalog.js';
+export type { ConfigPreview, ConfigSaved, ConfigService, ConfigServiceDependencies, RawConfig } from './services/config-service.js';
 export { createConfigService } from './services/config-service.js';

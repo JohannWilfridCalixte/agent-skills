@@ -1,0 +1,22 @@
+{
+  "name": "agentic",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "applications/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --concurrency 100",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "verify": "turbo run lint typecheck test"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10",
+    "typescript": "6.0.3"
+  },
+  "packageManager": "bun@1.4.2"
+}

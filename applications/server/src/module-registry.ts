@@ -1,13 +1,26 @@
-import type { HistoryLog } from '@agentic/domain-shared';
+import type { CliExec } from '@agentic/adapter-cli-exec';
+import type { HistoryLog, ModelSource } from '@agentic/domain-shared';
 
 import type { ModuleContext, ServerModule } from './platform/module.js';
 
 import { createConfigModule } from './modules/config/module.js';
 import { createHistoryModule } from './modules/history/module.js';
+import { createInstallModule } from './modules/install/module.js';
 import { createProjectsModule } from './modules/projects/module.js';
 import { healthModule } from './platform/health.js';
 
 const MODULE_NAME = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * Feature modules in mount order, plus the shared ports and services other parts of the server use
+ * (`serve` adds projects; config, install and vendoring record through `historyLog`; config warns
+ * on unknown model ids through install's `ModelSource`).
+ */
+export interface ModuleAdapters {
+  readonly cliExec: CliExec;
+  /** The user's home, where harness config folders live. */
+  readonly userHome: string;
+}
 
 export function assertModules(modules: readonly ServerModule[]) {
   const seen = new Set<string>();
@@ -18,15 +31,13 @@ export function assertModules(modules: readonly ServerModule[]) {
   }
 }
 
-/**
- * Feature modules in mount order, plus the shared ports and services other parts of the server use
- * (`serve` adds projects; config, install and vendoring record through `historyLog`).
- */
-export function createModules(context: ModuleContext) {
+export function createModules(context: ModuleContext, { cliExec, userHome }: ModuleAdapters) {
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
-  const config = createConfigModule(context, { history: historyLog, projects: projects.service });
-  const modules: readonly ServerModule[] = [healthModule, projects, history, config];
+  const install = createInstallModule({ cliExec, userHome });
+  const models: ModelSource = install.service;
+  const config = createConfigModule(context, { history: historyLog, models, projects: projects.service });
+  const modules: readonly ServerModule[] = [healthModule, projects, history, config, ...install.modules];
   return { historyLog, modules, projects: projects.service };
 }

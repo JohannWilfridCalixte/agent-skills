@@ -13,9 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agentic/adapter-cli-exec": "workspace:*",
     "@agentic/contract-http": "workspace:*",
     "@agentic/domain-config": "workspace:*",
     "@agentic/domain-history": "workspace:*",
+    "@agentic/domain-install": "workspace:*",
     "@agentic/domain-projects": "workspace:*",
     "@agentic/domain-shared": "workspace:*",
     "@agentic/kernel-result": "workspace:*",

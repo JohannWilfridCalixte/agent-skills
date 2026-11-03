@@ -3,4 +3,5 @@ export type { HistoryEntry, HistoryKind, HistoryScope, NewConfigEntry, NewHistor
 export type { Project } from './model/project.js';
 export type { CommandRunner } from './ports/command-runner.js';
 export type { HistoryLog } from './ports/history-log.js';
+export type { HarnessName, ModelListing, ModelSource } from './ports/model-source.js';
 export type { ProjectRegistry } from './ports/project-registry.js';

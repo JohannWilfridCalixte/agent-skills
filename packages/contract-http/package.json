@@ -15,6 +15,11 @@
       "types": "./dist/history/index.d.ts",
       "default": "./dist/history/index.js"
     },
+    "./install": {
+      "development": "./src/install/index.ts",
+      "types": "./dist/install/index.d.ts",
+      "default": "./dist/install/index.js"
+    },
     "./problem": {
       "development": "./src/problem/index.ts",
       "types": "./dist/problem/index.d.ts",

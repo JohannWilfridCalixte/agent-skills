@@ -43,7 +43,7 @@ export interface CliExecError {
   readonly type: CliExecErrorType;
 }
 
-export type CliExecErrorType = 'cancelled' | 'failed' | 'invalid_output' | 'not_found' | 'not_installed' | 'output_too_large' | 'timeout';
+export type CliExecErrorType = 'cancelled' | 'cwd_missing' | 'failed' | 'invalid_output' | 'not_found' | 'not_installed' | 'output_too_large' | 'spawn_failed' | 'timeout';
 
 export interface CliOutput {
   readonly durationMs: number;

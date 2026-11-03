@@ -1,5 +1,10 @@
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'bun:test';
 
+import { createCliExec } from '@agentic/adapter-cli-exec';
 import { ProblemDetails } from '@agentic/contract-http/problem';
 import { RunDetail, RunEvent, RunSummary } from '@agentic/contract-http/runs';
 import { FakeCommandRunner } from '@agentic/domain-shared/testing';
@@ -211,5 +216,38 @@ describe('replay cap (super-review-10)', () => {
     expect(events[0]).toEqual({ data: { dropped: 1, type: 'dropped' }, event: 'dropped' });
     expect(entry.outputTail.split('\n')).toHaveLength(10_001);
     expect(entry.truncated).toBe(false);
+  });
+});
+
+describe('spawn failures with the real adapter (super-review-13)', () => {
+  it('answers a run for a deleted project folder with the run, then fails it with the folder in the output and one history entry', async () => {
+    const { historyLog, logLines, request } = await createTestApp({ cliExec: createCliExec() });
+
+    const { response, run } = await startRun(request, { ...TEST_RUN_SPEC, args: ['--version'], cli: 'bun', cwd: '/nonexistent/agentic-deleted-project' });
+
+    expect(response.status).toBe(201);
+    const detail = await waitForStatus(request, String(run?.id), 'failed');
+    expect(detail.output.join('\n')).toContain('/nonexistent/agentic-deleted-project');
+    expect(detail.output.join('\n')).toContain('The working folder no longer exists');
+    expect(await historyLog.list(TEST_RUN_SPEC.scope)).toMatchObject([{ exitCode: -1, kind: 'run' }]);
+    expect(logLines.filter((line) => line.includes('run_finished'))).toHaveLength(1);
+  });
+
+  it('fails a run whose executable cannot be launched, records it once, and the next run still works', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'agentic-cli-'));
+    writeFileSync(join(folder, 'claude'), '\u0000\u0001not a program');
+    chmodSync(join(folder, 'claude'), 0o755);
+    const { historyLog, request } = await createTestApp({ cliExec: createCliExec({ baseEnvironment: { PATH: `${folder}:${process.env['PATH'] ?? ''}` } }) });
+
+    const { response, run } = await startRun(request);
+
+    expect(response.status).toBe(201);
+    const detail = await waitForStatus(request, String(run?.id), 'failed');
+    expect(detail.output.join('\n')).toContain('could not be started');
+    expect(await historyLog.list(TEST_RUN_SPEC.scope)).toHaveLength(1);
+
+    const second = await startRun(request, { ...TEST_RUN_SPEC, args: ['-e', '1'], cli: 'bun' });
+    await waitForStatus(request, String(second.run?.id), 'succeeded');
+    expect(await historyLog.list(TEST_RUN_SPEC.scope)).toHaveLength(2);
   });
 });

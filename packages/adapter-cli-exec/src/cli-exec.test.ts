@@ -1,5 +1,9 @@
 import type { CliCommand, CliEvent } from './types.js';
 
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { createCliExec } from './cli-exec.js';
@@ -121,5 +125,29 @@ describe('createCliExec', () => {
     expect(logged.map((line) => line.message)).toEqual(['cli_start', 'cli_exit']);
     expect(logged[1]?.fields).toMatchObject({ correlation_id: 'corr-1', duration_ms: expect.any(Number) as unknown, exit_code: 0 });
     expect(JSON.stringify(logged)).not.toMatch(/"[a-z]+[A-Z]\w*":/);
+  });
+
+  describe('spawn failures become typed errors, never throws (super-review-13)', () => {
+    it('reports a missing working folder as cwd_missing with a hint, and closes the events', async () => {
+      const handle = exec.stream(bun('1', { cwd: '/nonexistent/agentic-deleted-project' }));
+
+      expect(await collect(handle.events)).toEqual([]);
+      expect(await handle.result).toMatchObject({
+        error: { exitCode: null, hint: expect.stringContaining('The working folder no longer exists') as string, message: expect.stringContaining('/nonexistent/agentic-deleted-project') as string, type: 'cwd_missing' },
+        ok: false,
+      });
+    });
+
+    it('reports an executable the OS cannot launch as spawn_failed with the system code', async () => {
+      const folder = mkdtempSync(join(tmpdir(), 'agentic-cli-'));
+      writeFileSync(join(folder, 'claude'), '\u0000\u0001not a program');
+      chmodSync(join(folder, 'claude'), 0o755);
+      const broken = createCliExec({ baseEnvironment: { PATH: folder } });
+
+      const handle = broken.stream({ args: ['--version'], cli: 'claude' });
+
+      expect(await collect(handle.events)).toEqual([]);
+      expect(await handle.result).toMatchObject({ error: { exitCode: null, message: expect.stringContaining('ENOEXEC') as string, type: 'spawn_failed' }, ok: false });
+    });
   });
 });

@@ -314,3 +314,83 @@ describe('replay cap truncation (super-review-10)', () => {
 async function waitFor(condition: () => boolean) {
   for (let attempt = 0; attempt < 200 && !condition(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 1));
 }
+
+describe('unexpected runner throws (super-review-13)', () => {
+  const SEQUENCE: RunSpec = { ...SPEC, next: [{ args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude' }] };
+
+  /** Runner whose `stream()` call number `throwOn` (1-based) throws synchronously, like a real spawn ENOENT. */
+  class ThrowingRunner extends FakeCommandRunner {
+    calls = 0;
+    private readonly throwOn: number;
+    constructor(throwOn: number) {
+      super({ lines: [{ line: 'step ok', type: 'stdout' }], result: ok({ exitCode: 0 }) });
+      this.throwOn = throwOn;
+    }
+
+    override stream(command: Parameters<FakeCommandRunner['stream']>[0]) {
+      this.calls += 1;
+      if (this.calls === this.throwOn) throw new Error('posix_spawn failed: ENOENT /deleted/folder');
+      return super.stream(command);
+    }
+  }
+
+  async function withoutUnhandledRejections(body: () => Promise<void>) {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on('unhandledRejection', onRejection);
+    try {
+      await body();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    } finally {
+      process.off('unhandledRejection', onRejection);
+    }
+    expect(rejections).toEqual([]);
+  }
+
+  it('fails the run once with the message when a later command throws, and a following run still works', async () => {
+    await withoutUnhandledRejections(async () => {
+      const { history, service } = setup(new ThrowingRunner(2));
+
+      const run = started(service, SEQUENCE);
+      const events = await collect(service, run.id);
+
+      expect(events.at(-1)).toEqual({ status: 'failed', type: 'status' });
+      expect(events).toContainEqual({ line: expect.stringContaining('/deleted/folder') as string, type: 'stderr' });
+      expect(service.get(run.id)).toMatchObject(ok({ status: 'failed' }));
+      expect(history.entries).toHaveLength(1);
+      expect(history.entries[0]).toMatchObject({ exitCode: -1 });
+
+      const next = started(service);
+      expect((await collect(service, next.id)).at(-1)).toEqual({ status: 'succeeded', type: 'status' });
+      expect(history.entries).toHaveLength(2);
+    });
+  });
+
+  it('fails the run once when the first command throws, still answering start with the run', async () => {
+    await withoutUnhandledRejections(async () => {
+      const { history, logLines, service } = setup(new ThrowingRunner(1));
+
+      const result = service.start(SPEC);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const events = await collect(service, result.value.id);
+      expect(events.at(-1)).toEqual({ status: 'failed', type: 'status' });
+      expect(history.entries).toMatchObject([{ exitCode: -1, outputTail: expect.stringContaining('ENOENT') as string }]);
+      expect(logLines.map((line) => line.message)).toContain('run_finished');
+    });
+  });
+
+  it('still settles and closes when recording history throws after an unexpected failure', async () => {
+    await withoutUnhandledRejections(async () => {
+      const history = { record: () => Promise.reject(new Error('disk full')) } as unknown as HistoryLog;
+      const { logLines, service } = setup(new ThrowingRunner(2), { history });
+
+      const run = started(service, SEQUENCE);
+      const events = await collect(service, run.id);
+
+      expect(events.at(-1)).toEqual({ status: 'failed', type: 'status' });
+      expect(logLines.map((line) => line.message)).toContain('run_failed_to_record');
+    });
+  });
+});

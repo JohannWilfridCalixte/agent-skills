@@ -1,5 +1,7 @@
 import type { CliCommand, CliEvent, CliExec, CliExecError, CliExecErrorType, CliOutput, CliStream } from './types.js';
 
+import { statSync } from 'node:fs';
+
 import { redactArgs } from '@agentic/domain-shared';
 import { err, ok } from '@agentic/kernel-result';
 
@@ -38,14 +40,12 @@ export function createCliExec({ baseEnvironment = process.env, logger }: CliExec
     });
 
     const startedAt = performance.now();
-    const child = Bun.spawn([executable, ...command.args], {
-      ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
-      detached: true,
-      env,
-      stderr: 'pipe',
-      stdin: command.stdin === undefined ? 'ignore' : new TextEncoder().encode(command.stdin),
-      stdout: 'pipe',
-    });
+    const spawned = spawn(command, executable, env);
+    if (!spawned.ok) {
+      logger?.info('cli_spawn_failed', { cli: command.cli, correlation_id: command.correlationId, error_type: spawned.error.type });
+      return failedStream(spawned.error);
+    }
+    const child = spawned.value;
 
     const events = new EventQueue<CliEvent>();
     const output = { stderr: '', stdout: '' };
@@ -131,12 +131,43 @@ function failure(command: CliCommand, type: CliExecErrorType, message: string, e
   return { cli: command.cli, exitCode: null, message, stderrTail: '', type, ...extra };
 }
 
+function isDirectory(path: string) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 /** Signals the whole process group (the child leads its own group), so grandchildren die too. */
 function killTree(pid: number) {
   try {
     process.kill(-pid, 'SIGKILL');
   } catch {
     // Group already gone.
+  }
+}
+
+/** `Bun.spawn` throws synchronously (ENOENT cwd, ENOEXEC, EACCES, E2BIG); every throw becomes a typed error. */
+function spawn(command: CliCommand, executable: string, env: Record<string, string>) {
+  if (command.cwd !== undefined && !isDirectory(command.cwd)) {
+    return err(failure(command, 'cwd_missing', `Cannot run ${command.cli} in ${command.cwd}.`, { hint: 'The working folder no longer exists; restore it or remove the project.' }));
+  }
+  try {
+    return ok(
+      Bun.spawn([executable, ...command.args], {
+        ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
+        detached: true,
+        env,
+        stderr: 'pipe',
+        stdin: command.stdin === undefined ? 'ignore' : new TextEncoder().encode(command.stdin),
+        stdout: 'pipe',
+      }),
+    );
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    const detail = error instanceof Error ? error.message : String(error);
+    return err(failure(command, 'spawn_failed', `${command.cli} could not be started${typeof code === 'string' ? ` (${code})` : ''}: ${detail}`, { hint: `Check the ${command.cli} installation.` }));
   }
 }
 

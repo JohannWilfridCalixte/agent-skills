@@ -8,10 +8,12 @@ import { err, ok } from '@agentic/kernel-result';
 /** CliExec errors other than a nonzero exit, as the port's error types. */
 const ERROR_TYPES = {
   cancelled: 'cancelled',
+  cwd_missing: 'cwd_missing',
   invalid_output: 'unexpected',
   not_found: 'not_found',
   not_installed: 'not_installed',
   output_too_large: 'output_too_large',
+  spawn_failed: 'spawn_failed',
   timeout: 'timeout',
 } as const satisfies Record<Exclude<CliExecError['type'], 'failed'>, CommandError['type']>;
 
@@ -45,7 +47,7 @@ async function* onlyLines(events: AsyncIterable<CliEvent>) {
 
 function toOutcome(result: Result<CliOutput, CliExecError>) {
   if (result.ok) return ok({ exitCode: result.value.exitCode });
-  const { exitCode, message, type } = result.error;
+  const { exitCode, hint, message, type } = result.error;
   if (type === 'failed' && exitCode !== null) return ok({ exitCode });
-  return err({ exitCode, message, type: type === 'failed' ? 'unexpected' : ERROR_TYPES[type] } satisfies CommandError);
+  return err({ exitCode, message: hint === undefined ? message : `${message} ${hint}`, type: type === 'failed' ? 'unexpected' : ERROR_TYPES[type] } satisfies CommandError);
 }

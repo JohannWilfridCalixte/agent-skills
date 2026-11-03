@@ -22,7 +22,7 @@ export type CommandCli = (typeof COMMAND_CLIS)[number];
 export interface CommandError {
   readonly exitCode: null | number;
   readonly message: string;
-  readonly type: 'cancelled' | 'not_found' | 'not_installed' | 'output_too_large' | 'timeout' | 'unexpected';
+  readonly type: 'cancelled' | 'cwd_missing' | 'not_found' | 'not_installed' | 'output_too_large' | 'spawn_failed' | 'timeout' | 'unexpected';
 }
 
 export interface CommandLine {

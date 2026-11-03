@@ -7,6 +7,8 @@ import { parseRunSpec } from '../model/run-spec.js';
 import { Run } from '../model/run.js';
 import { sequenceStream } from '../model/sequence-stream.js';
 
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 export const DEFAULT_MAX_FINISHED_RUNS = 100;
 
 /** Structured log port: `message` is a snake_case event name, fields are snake_case and never secret. */
@@ -44,12 +46,7 @@ export function createRunService({
     for (const { run } of finished.slice(0, Math.max(0, finished.length - maxFinishedRuns))) runs.delete(run.id);
   };
 
-  const drive = async (run: Run, stream: CommandStream) => {
-    const ids = { correlation_id: run.spec.correlationId ?? run.id, run_id: run.id, scope: run.spec.scope };
-    for await (const line of stream.lines) run.append(line);
-    run.settle(await stream.result, now());
-    const { exitCode = null, finishedAt = run.startedAt, startedAt, status } = run.summary();
-    logger?.info('run_finished', { ...ids, duration_ms: Date.parse(finishedAt) - Date.parse(startedAt), exit_code: exitCode, status });
+  const record = async (run: Run, ids: Readonly<Record<string, string>>) => {
     try {
       await history.record({
         exitCode: run.recordedExitCode,
@@ -60,10 +57,26 @@ export function createRunService({
         summary: run.spec.summary,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       logger?.warn('run_failed_to_record', { ...ids, error_message: message });
       run.append({ line: `History not recorded: ${message}`, type: 'stderr' });
     }
+  };
+
+  /** Never rejects: any unexpected throw fails the run, which is still recorded once and closed (super-review-13). */
+  const drive = async (run: Run, stream: CommandStream) => {
+    const ids = { correlation_id: run.spec.correlationId ?? run.id, run_id: run.id, scope: run.spec.scope };
+    try {
+      for await (const line of stream.lines) run.append(line);
+      run.settle(await stream.result, now());
+    } catch (error) {
+      const message = redactArgs(errorMessage(error).split(' ')).join(' ');
+      logger?.warn('run_unexpected_error', { ...ids, error_message: message });
+      run.settle(err({ exitCode: null, message: `Run failed unexpectedly: ${message}`, type: 'unexpected' }), now());
+    }
+    const { exitCode = null, finishedAt = run.startedAt, startedAt, status } = run.summary();
+    logger?.info('run_finished', { ...ids, duration_ms: Date.parse(finishedAt) - Date.parse(startedAt), exit_code: exitCode, status });
+    await record(run, ids);
     run.close();
     evictFinished();
   };

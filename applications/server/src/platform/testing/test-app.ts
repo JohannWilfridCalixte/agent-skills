@@ -16,7 +16,7 @@ export interface TestAppOptions {
  */
 export async function createTestApp({ modules = [] }: TestAppOptions = {}) {
   const logLines: string[] = [];
-  const { app, db } = await compose({
+  const { app, db, historyLog } = await compose({
     extraModules: modules,
     logSink: (line) => logLines.push(line),
     settings: { dbPath: ':memory:', homeDir: '/nonexistent/agentic-test-home', port: TEST_PORT },
@@ -30,5 +30,5 @@ export async function createTestApp({ modules = [] }: TestAppOptions = {}) {
     return app.request(`http://${TEST_HOST}${path}`, { ...init, headers });
   };
 
-  return { app, db, logLines, request, token: TEST_TOKEN };
+  return { app, db, historyLog, logLines, request, token: TEST_TOKEN };
 }

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@agentic/contract-http": "workspace:*",
+    "@agentic/domain-history": "workspace:*",
     "@agentic/domain-projects": "workspace:*",
     "@agentic/domain-shared": "workspace:*",
     "@agentic/kernel-result": "workspace:*",

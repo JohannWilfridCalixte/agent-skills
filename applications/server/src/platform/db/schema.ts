@@ -8,7 +8,7 @@ export interface HistoryTable {
   created_at: string;
   exit_code: null | number;
   id: string;
-  kind: 'config' | 'run';
+  kind: 'config_restore' | 'config_write' | 'run';
   output_tail: null | string;
   scope: string;
   summary: string;

@@ -22,15 +22,21 @@ export class FakeCommandRunner implements CommandRunner {
   }
 }
 
+/** Keeps run output whole (no tail cap: that rule lives in `domain-history`); lists newest first. */
 export class InMemoryHistoryLog implements HistoryLog {
-  private readonly entries: HistoryEntry[] = [];
+  readonly entries: HistoryEntry[] = [];
 
-  list(scope: HistoryScope) {
-    return Promise.resolve(this.entries.filter((entry) => entry.scope === scope));
+  list(scope: HistoryScope, { limit }: { readonly limit?: number } = {}) {
+    const matching = this.entries.filter((entry) => entry.scope === scope).toReversed();
+    return Promise.resolve(limit === undefined ? matching : matching.slice(0, limit));
   }
 
   record(entry: NewHistoryEntry) {
-    const recorded = { ...entry, createdAt: FIXED_NOW, id: `history-${String(this.entries.length + 1)}` };
+    const base = { createdAt: FIXED_NOW, id: `history-${String(this.entries.length + 1)}`, kind: entry.kind, scope: entry.scope, summary: entry.summary };
+    const recorded: HistoryEntry =
+      entry.kind === 'run'
+        ? { ...base, content: null, exitCode: entry.exitCode, outputTail: entry.output, truncated: false }
+        : { ...base, content: entry.content, exitCode: null, outputTail: null, truncated: false };
     this.entries.push(recorded);
     return Promise.resolve(recorded);
   }

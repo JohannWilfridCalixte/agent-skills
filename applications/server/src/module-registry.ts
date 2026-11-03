@@ -1,5 +1,8 @@
+import type { HistoryLog } from '@agentic/domain-shared';
+
 import type { ModuleContext, ServerModule } from './platform/module.js';
 
+import { createHistoryModule } from './modules/history/module.js';
 import { createProjectsModule } from './modules/projects/module.js';
 import { healthModule } from './platform/health.js';
 
@@ -14,9 +17,14 @@ export function assertModules(modules: readonly ServerModule[]) {
   }
 }
 
-/** Feature modules in mount order, plus the services other parts of the server (e.g. `serve`) use. */
+/**
+ * Feature modules in mount order, plus the shared ports and services other parts of the server use
+ * (`serve` adds projects; config, install and vendoring record through `historyLog`).
+ */
 export function createModules(context: ModuleContext) {
   const projects = createProjectsModule(context);
-  const modules: readonly ServerModule[] = [healthModule, projects];
-  return { modules, projects: projects.service };
+  const history = createHistoryModule(context);
+  const historyLog: HistoryLog = history.service;
+  const modules: readonly ServerModule[] = [healthModule, projects, history];
+  return { historyLog, modules, projects: projects.service };
 }

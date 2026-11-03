@@ -14,13 +14,15 @@ describe('InMemoryProjectRegistry', () => {
 });
 
 describe('InMemoryHistoryLog', () => {
-  it('lists entries of the requested scope only', async () => {
+  it('lists entries of the requested scope only, newest first', async () => {
     const log = new InMemoryHistoryLog();
-    const base = { content: '{}', exitCode: null, kind: 'config', outputTail: null, summary: 'saved', truncated: false } as const;
-    const global = await log.record({ ...base, scope: 'global' });
-    await log.record({ ...base, scope: 'project:1' });
+    const first = await log.record({ content: '{}', kind: 'config_write', scope: 'global', summary: 'saved' });
+    await log.record({ content: '{}', kind: 'config_write', scope: 'project:1', summary: 'saved' });
+    const run = await log.record({ exitCode: 1, kind: 'run', output: 'boom', scope: 'global', summary: 'install' });
 
-    expect(await log.list('global')).toEqual([global]);
+    expect(await log.list('global')).toEqual([run, first]);
+    expect(await log.list('global', { limit: 1 })).toEqual([run]);
+    expect(run).toMatchObject({ content: null, exitCode: 1, outputTail: 'boom', truncated: false });
   });
 });
 

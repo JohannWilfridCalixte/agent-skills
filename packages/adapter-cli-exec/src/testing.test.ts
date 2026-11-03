@@ -2,6 +2,8 @@ import type { CliEvent } from './types.js';
 
 import { describe, expect, it } from 'vitest';
 
+import { err, ok } from '@agentic/kernel-result';
+
 import { createCommandRunner } from './command-runner.js';
 import { redactArgs } from './redact.js';
 import { createFakeCliExec, fakeCliError, fakeOutput } from './testing.js';
@@ -24,17 +26,31 @@ describe('createFakeCliExec', () => {
 });
 
 describe('createCommandRunner', () => {
-  it('maps outcomes and typed errors onto the CommandRunner port', async () => {
-    const runner = createCommandRunner(
-      createFakeCliExec([
-        { args: ['ok'], cli: 'git', result: fakeOutput('done') },
-        { args: ['bad'], cli: 'git', result: fakeCliError('git', 'failed', { exitCode: 2, stderrTail: 'nope' }) },
-      ]),
-    );
+  const runner = createCommandRunner(
+    createFakeCliExec([
+      { args: ['ok'], cli: 'git', result: fakeOutput('done\n') },
+      { args: ['bad'], cli: 'git', lines: [{ line: 'nope', type: 'stderr' }], result: fakeCliError('git', 'failed', { exitCode: 2, stderrTail: 'nope' }) },
+      { args: ['slow'], cli: 'git', result: fakeCliError('git', 'timeout') },
+    ]),
+  );
 
-    expect(await runner.run({ args: ['ok'], executable: 'git' })).toEqual({ exitCode: 0, output: 'done' });
-    expect(await runner.run({ args: ['bad'], executable: 'git' })).toEqual({ exitCode: 2, output: 'nope\ngit failed' });
-    expect(await runner.run({ args: [], executable: 'rm' })).toMatchObject({ exitCode: -1 });
+  const drain = async (args: readonly string[]) => {
+    const stream = runner.stream({ args, cli: 'git' });
+    const lines = [];
+    for await (const line of stream.lines) lines.push(line);
+    return { lines, result: await stream.result };
+  };
+
+  it('streams lines without the exit event and maps exit 0 to an outcome', async () => {
+    expect(await drain(['ok'])).toEqual({ lines: [{ line: 'done', type: 'stdout' }], result: ok({ exitCode: 0 }) });
+  });
+
+  it('maps a nonzero exit to an outcome carrying the code, not an error', async () => {
+    expect((await drain(['bad'])).result).toEqual(ok({ exitCode: 2 }));
+  });
+
+  it('maps other typed errors onto CommandError', async () => {
+    expect((await drain(['slow'])).result).toEqual(err({ exitCode: null, message: 'git timeout', type: 'timeout' }));
   });
 });
 

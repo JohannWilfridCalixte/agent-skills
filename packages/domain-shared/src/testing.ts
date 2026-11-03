@@ -1,24 +1,40 @@
-import type { Command, CommandOutcome } from './model/command.js';
+import type { Result } from '@agentic/kernel-result';
+
+import type { Command, CommandError, CommandLine, CommandOutcome, CommandStream } from './model/command.js';
 import type { HistoryEntry, HistoryScope, NewHistoryEntry } from './model/history.js';
 import type { Project } from './model/project.js';
 import type { CommandRunner } from './ports/command-runner.js';
 import type { HistoryLog } from './ports/history-log.js';
 import type { ProjectRegistry } from './ports/project-registry.js';
 
+import { err, ok } from '@agentic/kernel-result';
+
 const FIXED_NOW = '2026-01-01T00:00:00.000Z';
 
-/** Records every command and answers with the scripted outcome (default: exit 0, no output). */
+/** Lines then a result; a command scripted with `hold: true` stays running until the test calls `finish`. */
+export interface FakeCommandScript {
+  readonly hold?: boolean;
+  readonly lines?: readonly CommandLine[];
+  readonly result?: Result<CommandOutcome, CommandError>;
+}
+
+/** Records every command; each stream plays `script` (default: exit 0, no output). */
 export class FakeCommandRunner implements CommandRunner {
   readonly commands: Command[] = [];
-  private readonly outcome: CommandOutcome;
+  readonly streams: ManualCommandStream[] = [];
+  private readonly script: FakeCommandScript;
 
-  constructor(outcome: CommandOutcome = { exitCode: 0, output: '' }) {
-    this.outcome = outcome;
+  constructor(script: FakeCommandScript = {}) {
+    this.script = script;
   }
 
-  run(command: Command) {
+  stream(command: Command) {
     this.commands.push(command);
-    return Promise.resolve(this.outcome);
+    const stream = new ManualCommandStream();
+    this.streams.push(stream);
+    for (const line of this.script.lines ?? []) stream.emit(line);
+    if (this.script.hold !== true) stream.finish(this.script.result);
+    return stream;
   }
 }
 
@@ -56,5 +72,63 @@ export class InMemoryProjectRegistry implements ProjectRegistry {
 
   list() {
     return Promise.resolve(this.projects);
+  }
+}
+
+/** A command stream the test drives: `emit` lines, then `finish`; `cancel` finishes it as cancelled. */
+export class ManualCommandStream implements CommandStream {
+  cancelled = false;
+  readonly result: Promise<Result<CommandOutcome, CommandError>>;
+  get lines() {
+    return { [Symbol.asyncIterator]: () => this.iterate() };
+  }
+
+  private closed = false;
+  private readonly pending: CommandLine[] = [];
+  private waiter: (() => void) | undefined;
+
+  constructor() {
+    this.result = new Promise((resolve) => {
+      this.resolveResult = resolve;
+    });
+  }
+
+  cancel() {
+    this.cancelled = true;
+    this.finish(err({ exitCode: null, message: 'cancelled', type: 'cancelled' }));
+  }
+
+  emit(line: CommandLine) {
+    this.pending.push(line);
+    this.wake();
+  }
+
+  finish(result: Result<CommandOutcome, CommandError> = ok({ exitCode: 0 })) {
+    if (this.closed) return;
+    this.closed = true;
+    this.wake();
+    this.resolveResult(result);
+  }
+
+  private async* iterate() {
+    for (;;) {
+      const line = this.pending.shift();
+      if (line !== undefined) {
+        yield line;
+        continue;
+      }
+      if (this.closed) return;
+      await new Promise<void>((resolve) => {
+        this.waiter = resolve;
+      });
+    }
+  }
+
+  private resolveResult: (result: Result<CommandOutcome, CommandError>) => void = () => undefined;
+
+  private wake() {
+    const waiter = this.waiter;
+    this.waiter = undefined;
+    waiter?.();
   }
 }

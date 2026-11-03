@@ -29,6 +29,11 @@
       "development": "./src/projects/index.ts",
       "types": "./dist/projects/index.d.ts",
       "default": "./dist/projects/index.js"
+    },
+    "./runs": {
+      "development": "./src/runs/index.ts",
+      "types": "./dist/runs/index.d.ts",
+      "default": "./dist/runs/index.js"
     }
   },
   "files": [

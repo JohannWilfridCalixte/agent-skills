@@ -2,7 +2,7 @@
   "name": "@agentic/domain-shared",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared domain model and ports (ProjectRegistry, HistoryLog, CommandRunner) with in-memory fakes in ./testing.",
+  "description": "Shared domain model and ports (ProjectRegistry, HistoryLog, CommandRunner, RunService) with in-memory fakes in ./testing.",
   "type": "module",
   "exports": {
     ".": {
@@ -30,7 +30,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@agentic/kernel-result": "workspace:*"
+  },
   "devDependencies": {
     "@agentic/tooling-eslint-config": "workspace:*",
     "@vitest/coverage-v8": "5.0.3",

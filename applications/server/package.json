@@ -19,6 +19,7 @@
     "@agentic/domain-history": "workspace:*",
     "@agentic/domain-install": "workspace:*",
     "@agentic/domain-projects": "workspace:*",
+    "@agentic/domain-runs": "workspace:*",
     "@agentic/domain-shared": "workspace:*",
     "@agentic/kernel-result": "workspace:*",
     "@hono/zod-validator": "0.9.1",

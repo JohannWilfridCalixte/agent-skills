@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { ok } from '@agentic/kernel-result';
+
 import { FakeCommandRunner, InMemoryHistoryLog, InMemoryProjectRegistry } from './testing.js';
 
 describe('InMemoryProjectRegistry', () => {
@@ -27,10 +29,27 @@ describe('InMemoryHistoryLog', () => {
 });
 
 describe('FakeCommandRunner', () => {
-  it('records the command and returns the scripted outcome', async () => {
-    const runner = new FakeCommandRunner({ exitCode: 2, output: 'boom' });
+  it('records the command and plays the scripted lines and result', async () => {
+    const runner = new FakeCommandRunner({ lines: [{ line: 'boom', type: 'stderr' }], result: ok({ exitCode: 2 }) });
 
-    expect(await runner.run({ args: ['--version'], executable: 'claude' })).toEqual({ exitCode: 2, output: 'boom' });
-    expect(runner.commands).toEqual([{ args: ['--version'], executable: 'claude' }]);
+    const stream = runner.stream({ args: ['--version'], cli: 'claude' });
+    const lines = [];
+    for await (const line of stream.lines) lines.push(line);
+
+    expect(lines).toEqual([{ line: 'boom', type: 'stderr' }]);
+    expect(await stream.result).toEqual(ok({ exitCode: 2 }));
+    expect(runner.commands).toEqual([{ args: ['--version'], cli: 'claude' }]);
+  });
+
+  it('keeps a held stream running until finished', async () => {
+    const runner = new FakeCommandRunner({ hold: true });
+    const stream = runner.stream({ args: [], cli: 'git' });
+
+    runner.streams[0]?.emit({ line: 'late', type: 'stdout' });
+    runner.streams[0]?.finish(ok({ exitCode: 0 }));
+    const lines = [];
+    for await (const line of stream.lines) lines.push(line.line);
+
+    expect(lines).toEqual(['late']);
   });
 });

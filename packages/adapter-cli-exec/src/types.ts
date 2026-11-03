@@ -1,8 +1,11 @@
+import type { CommandCli } from '@agentic/domain-shared';
 import type { Result } from '@agentic/kernel-result';
 
-/** Closed list of executables this app may launch. `node`/`bun` run repository scripts (vendor-skills.mjs). */
-export const CLI_NAMES = ['agent', 'claude', 'codex', 'git', 'npx', 'node', 'bun'] as const;
-export type CliName = (typeof CLI_NAMES)[number];
+import { COMMAND_CLIS } from '@agentic/domain-shared';
+
+/** Closed list of executables this app may launch, owned by the domain (`COMMAND_CLIS`). `node`/`bun` run repository scripts. */
+export const CLI_NAMES = COMMAND_CLIS;
+export type CliName = CommandCli;
 
 export const DEFAULT_TIMEOUT_MS = 60_000;
 export const DEFAULT_MAX_OUTPUT_BYTES = 20 * 1024 * 1024;

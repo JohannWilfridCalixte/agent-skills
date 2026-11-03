@@ -1,4 +1,5 @@
 import type { CliExec } from '@agentic/adapter-cli-exec';
+import type { CommandRunner, RunService } from '@agentic/domain-shared';
 
 import type { LogFields, Logger, LogSink } from './platform/log.js';
 import type { ServerModule } from './platform/module.js';
@@ -16,7 +17,10 @@ import { createApp } from './server.js';
 export interface CompositionInput {
   /** Defaults to the real `createCliExec`; tests pass a fake. */
   readonly cliExec?: CliExec;
-  readonly extraModules?: readonly ServerModule[];
+  /** Defaults to one over `cliExec`; tests pass a fake to drive runs step by step. */
+  readonly commandRunner?: CommandRunner;
+  /** Mounted after the feature modules; the factory form gets the shared services (tests start runs this way). */
+  readonly extraModules?: ((services: { readonly runs: RunService }) => readonly ServerModule[]) | readonly ServerModule[];
   readonly logSink: LogSink;
   readonly settings: Settings;
   readonly token: string;
@@ -25,12 +29,14 @@ export interface CompositionInput {
 }
 
 /** Wires real adapters (sqlite, logger) into the app; tests use the same path with `:memory:`. */
-export async function compose({ cliExec, extraModules = [], logSink, settings, token, userHome = homedir() }: CompositionInput) {
+export async function compose({ cliExec, commandRunner, extraModules = [], logSink, settings, token, userHome = homedir() }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
   const logger = createLogger(logSink);
-  const { historyLog, modules, projects } = createModules({ db, homeDir: settings.homeDir }, { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), userHome });
-  const app = createApp({ logger, modules: [...modules, ...extraModules], port: settings.port, token });
-  return { app, db, historyLog, logger, projects };
+  const adapters = { cliExec: cliExec ?? createCliExec({ logger: cliLogger(logger) }), userHome, ...(commandRunner === undefined ? {} : { commandRunner }) };
+  const { historyLog, modules, projects, runs } = createModules({ db, homeDir: settings.homeDir }, adapters);
+  const extra = typeof extraModules === 'function' ? extraModules({ runs }) : extraModules;
+  const app = createApp({ logger, modules: [...modules, ...extra], port: settings.port, token });
+  return { app, db, historyLog, logger, projects, runs };
 }
 
 /** Keeps the primitive fields cli-exec logs (cli, redacted args, exit code, duration). */

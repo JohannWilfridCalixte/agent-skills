@@ -1,9 +1,8 @@
 import type { Project } from '../model/project.js';
 
-/** Known projects. Refined in T4. */
+/** Read side of the known projects, for domains that resolve a project by id. Adding and removing belong to `domain-projects`. */
 export interface ProjectRegistry {
-  add(path: string): Promise<Project>;
+  /** `undefined` when the id is unknown. */
+  get(id: string): Promise<Project | undefined>;
   list(): Promise<readonly Project[]>;
-  /** Deletes the row only; returns false when the id is unknown. */
-  remove(id: string): Promise<boolean>;
 }

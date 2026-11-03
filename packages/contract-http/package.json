@@ -9,6 +9,11 @@
       "development": "./src/problem/index.ts",
       "types": "./dist/problem/index.d.ts",
       "default": "./dist/problem/index.js"
+    },
+    "./projects": {
+      "development": "./src/projects/index.ts",
+      "types": "./dist/projects/index.d.ts",
+      "default": "./dist/projects/index.js"
     }
   },
   "files": [

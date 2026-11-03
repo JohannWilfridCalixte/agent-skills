@@ -19,7 +19,7 @@ export async function createTestApp({ modules = [] }: TestAppOptions = {}) {
   const { app, db } = await compose({
     extraModules: modules,
     logSink: (line) => logLines.push(line),
-    settings: { dbPath: ':memory:', port: TEST_PORT },
+    settings: { dbPath: ':memory:', homeDir: '/nonexistent/agentic-test-home', port: TEST_PORT },
     token: TEST_TOKEN,
   });
 

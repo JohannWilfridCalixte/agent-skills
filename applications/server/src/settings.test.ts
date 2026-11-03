@@ -7,11 +7,15 @@ import { loadSettings } from './settings.js';
 
 describe('loadSettings', () => {
   it('defaults to port 8787 and ~/.agentic/agentic.db', () => {
-    expect(loadSettings({})).toEqual({ dbPath: join(homedir(), '.agentic', 'agentic.db'), port: 8787 });
+    expect(loadSettings({})).toEqual({ dbPath: join(homedir(), '.agentic', 'agentic.db'), homeDir: join(homedir(), '.agentic'), port: 8787 });
   });
 
   it('reads AGENTIC_PORT and AGENTIC_DB_PATH', () => {
-    expect(loadSettings({ AGENTIC_DB_PATH: ':memory:', AGENTIC_PORT: '9000' })).toEqual({ dbPath: ':memory:', port: 9000 });
+    expect(loadSettings({ AGENTIC_DB_PATH: ':memory:', AGENTIC_PORT: '9000' })).toMatchObject({ dbPath: ':memory:', port: 9000 });
+  });
+
+  it('puts the database under AGENTIC_HOME', () => {
+    expect(loadSettings({ AGENTIC_HOME: '/tmp/agentic-home' })).toMatchObject({ dbPath: '/tmp/agentic-home/agentic.db', homeDir: '/tmp/agentic-home' });
   });
 
   it('rejects an invalid port', () => {

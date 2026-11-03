@@ -2,7 +2,7 @@ import type { LogSink } from './platform/log.js';
 import type { ServerModule } from './platform/module.js';
 import type { Settings } from './settings.js';
 
-import { MODULES } from './module-registry.js';
+import { createModules } from './module-registry.js';
 import { openDatabase } from './platform/db/db.js';
 import { createLogger } from './platform/log.js';
 import { createApp } from './server.js';
@@ -18,6 +18,7 @@ export interface CompositionInput {
 export async function compose({ extraModules = [], logSink, settings, token }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
   const logger = createLogger(logSink);
-  const app = createApp({ logger, modules: [...MODULES, ...extraModules], port: settings.port, token });
-  return { app, db, logger };
+  const { modules, projects } = createModules({ db });
+  const app = createApp({ logger, modules: [...modules, ...extraModules], port: settings.port, token });
+  return { app, db, logger, projects };
 }

@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { FakeCommandRunner, InMemoryHistoryLog, InMemoryProjectRegistry } from './testing.js';
 
 describe('InMemoryProjectRegistry', () => {
-  it('lists added projects and forgets removed ones', async () => {
-    const registry = new InMemoryProjectRegistry();
-    const project = await registry.add('/work/app');
+  it('lists the seeded projects and finds one by id', async () => {
+    const registry = new InMemoryProjectRegistry(['/work/app']);
+    const [project] = await registry.list();
 
-    expect(await registry.list()).toEqual([project]);
-    expect(await registry.remove(project.id)).toBe(true);
-    expect(await registry.list()).toEqual([]);
+    expect(project?.path).toBe('/work/app');
+    expect(await registry.get('project-1')).toEqual(project);
+    expect(await registry.get('project-9')).toBeUndefined();
   });
 });
 

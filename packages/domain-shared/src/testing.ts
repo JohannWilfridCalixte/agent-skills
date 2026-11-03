@@ -36,22 +36,19 @@ export class InMemoryHistoryLog implements HistoryLog {
   }
 }
 
+/** Seeded with fixed projects; ids `project-1`, `project-2`, ... in path order given. */
 export class InMemoryProjectRegistry implements ProjectRegistry {
-  private readonly projects = new Map<string, Project>();
-  private sequence = 0;
+  private readonly projects: readonly Project[];
 
-  add(path: string) {
-    this.sequence += 1;
-    const project = { createdAt: FIXED_NOW, id: `project-${String(this.sequence)}`, path };
-    this.projects.set(project.id, project);
-    return Promise.resolve(project);
+  constructor(paths: readonly string[] = []) {
+    this.projects = paths.map((path, index) => ({ createdAt: FIXED_NOW, id: `project-${String(index + 1)}`, path }));
+  }
+
+  get(id: string) {
+    return Promise.resolve(this.projects.find((project) => project.id === id));
   }
 
   list() {
-    return Promise.resolve([...this.projects.values()]);
-  }
-
-  remove(id: string) {
-    return Promise.resolve(this.projects.delete(id));
+    return Promise.resolve(this.projects);
   }
 }

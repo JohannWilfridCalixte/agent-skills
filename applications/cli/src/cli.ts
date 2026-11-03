@@ -431,18 +431,38 @@ function parseValue(text: string) {
 
 // work items
 
-function setPath(target: Record<string, unknown>, path: string, value: unknown) {
-  const keys = path.split('.');
-  const last = keys.pop();
-  if (last === undefined || keys.includes('') || last === '') throw usage(`Invalid --key "${path}".`);
+const SCALAR_KEYS = new Set(['commitWork', 'knowledge', 'limits', 'output', 'profiles', 'reviewers', 'selectedProfiles', 'steps', 'worktrees']);
+const STEP_FIELDS = new Set(['effort', 'harness', 'model']);
+const KEY_FORMS =
+  'Valid --key forms: output, commitWork, worktrees, profiles, selectedProfiles, reviewers, knowledge, knowledge.root, steps, limits, limits.<limitKey>, steps.<harness>.<stepKey>.<harness|model|effort>. Use --file for other edits.';
+
+/** Maps a dotted `--key` onto the config file shape: flat dotted `limits` keys, dotted step keys, nested `knowledge.root`. */
+function configPath(key: string): readonly string[] {
+  const parts = key.split('.');
+  const [top, ...rest] = parts;
+  const bad = () => usage(`Invalid --key "${key}". ${KEY_FORMS}`);
+  if (top === undefined || parts.includes('') || !SCALAR_KEYS.has(top)) throw bad();
+  if (rest.length === 0) return [top];
+  if (top === 'knowledge' && rest.length === 1 && rest[0] === 'root') return parts;
+  if (top === 'limits') return [top, rest.join('.')];
+  if (top === 'steps' && rest.length >= 3) {
+    const field = rest.at(-1) ?? '';
+    if (STEP_FIELDS.has(field)) return [top, rest[0] ?? '', rest.slice(1, -1).join('.'), field];
+  }
+  throw bad();
+}
+
+function setPath(target: Record<string, unknown>, key: string, value: unknown) {
+  const path = configPath(key);
+  if (path[0] === 'limits' && path.length === 2 && typeof value !== 'number') throw usage(`--key ${key} needs a numeric --value.`);
   let node = target;
-  for (const key of keys) {
-    const child = node[key];
+  for (const segment of path.slice(0, -1)) {
+    const child = node[segment];
     const next = typeof child === 'object' && child !== null && !Array.isArray(child) ? { ...(child as Record<string, unknown>) } : {};
-    node[key] = next;
+    node[segment] = next;
     node = next;
   }
-  node[last] = value;
+  node[path.at(-1) ?? ''] = value;
 }
 
 async function vendoringCommand(context: Context) {

@@ -215,6 +215,63 @@ describe('config', () => {
     expect(JSON.parse(readFileSync(join(homeDir, 'config.json'), 'utf8'))).toEqual({ output: 'docs/work' });
   });
 
+  it.each([
+    ['limits.review.iterations', '4', { limits: { 'review.iterations': 4 } }],
+    ['steps.claude.review.super-review.model', 'opus', { steps: { claude: { 'review.super-review': { model: 'opus' } } } }],
+    ['steps.claude.context.code.effort', 'high', { steps: { claude: { 'context.code': { effort: 'high' } } } }],
+    ['steps.codex.implement.harness', 'claude', { steps: { codex: { implement: { harness: 'claude' } } } }],
+    ['knowledge.root', 'kb', { knowledge: { root: 'kb' } }],
+    ['commitWork', 'true', { commitWork: true }],
+  ])('maps --key %s onto the config shape', async (key, value, expected) => {
+    const { run } = await setup();
+
+    const result = await run('config', 'set', '--key', key, '--value', value, '--yes');
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(readFileSync(join(homeDir, 'config.json'), 'utf8'))).toEqual(expected);
+  });
+
+  it('keeps unknown keys already in the file', async () => {
+    const { run } = await setup();
+    writeFileSync(join(homeDir, 'config.json'), JSON.stringify({ limits: { 'babysit.rounds': 7 } }));
+
+    const result = await run('config', 'set', '--key', 'limits.review.iterations', '--value', '2', '--yes');
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(readFileSync(join(homeDir, 'config.json'), 'utf8'))).toEqual({ limits: { 'babysit.rounds': 7, 'review.iterations': 2 } });
+  });
+
+  it.each([['nope.x'], ['steps.claude.review.colour'], ['steps.claude.model'], ['knowledge.other'], ['steps.claude'], ['output.x']])(
+    'rejects the key %s with the valid forms',
+    async (key) => {
+      const { run } = await setup();
+
+      const result = await run('config', 'set', '--key', key, '--value', '1', '--yes');
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('steps.<harness>.<stepKey>.<harness|model|effort>');
+      expect(existsSync(join(homeDir, 'config.json'))).toBe(false);
+    },
+  );
+
+  it('rejects a numeric limit given a non-number', async () => {
+    const { run } = await setup();
+
+    const result = await run('config', 'set', '--key', 'limits.review.iterations', '--value', 'many', '--yes');
+
+    expect(result.code).toBe(1);
+    expect(existsSync(join(homeDir, 'config.json'))).toBe(false);
+  });
+
+  it('rejects a --key without a --value', async () => {
+    const { run } = await setup();
+
+    const result = await run('config', 'set', '--key', 'output', '--yes');
+
+    expect(result.code).toBe(1);
+    expect(existsSync(join(homeDir, 'config.json'))).toBe(false);
+  });
+
   it('takes the edited file from --file', async () => {
     const edited = join(root, 'edited.json');
     writeFileSync(edited, JSON.stringify({ reviewers: ['a', 'b'] }));

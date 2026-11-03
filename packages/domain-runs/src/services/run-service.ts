@@ -4,6 +4,7 @@ import { err, ok } from '@agentic/kernel-result';
 
 import { parseRunSpec } from '../model/run-spec.js';
 import { Run } from '../model/run.js';
+import { sequenceStream } from '../model/sequence-stream.js';
 
 export const DEFAULT_MAX_FINISHED_RUNS = 100;
 
@@ -62,9 +63,9 @@ export function createRunService({
     start(spec) {
       const parsed = parseRunSpec(spec);
       if (!parsed.ok) return parsed;
-      const { args, cli, cwd } = parsed.value;
+      const { args, cli, cwd, next = [] } = parsed.value;
       const run = new Run(newId(), parsed.value, now());
-      const stream = runner.stream({ args, cli, ...(cwd === undefined ? {} : { cwd }) });
+      const stream = sequenceStream(runner, [{ args, cli, ...(cwd === undefined ? {} : { cwd }) }, ...next]);
       runs.set(run.id, { run, stream });
       void drive(run, stream);
       return ok(run.summary());

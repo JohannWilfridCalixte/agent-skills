@@ -1,4 +1,4 @@
-import type { CommandCli } from './command.js';
+import type { Command, CommandCli } from './command.js';
 import type { HistoryScope } from './history.js';
 
 export type CancelRunError = RunNotFound | RunNotRunning;
@@ -30,6 +30,8 @@ export interface RunSpec {
   readonly args: readonly string[];
   readonly cli: CommandCli;
   readonly cwd?: string;
+  /** Commands run after this one, in order, each only when the previous exited 0; same run, one history entry. */
+  readonly next?: readonly Command[];
   /** History scope the outcome is recorded under: `global` or `project:<id>`. */
   readonly scope: HistoryScope;
   /** One-line description for history: `Install claude plugin`. */

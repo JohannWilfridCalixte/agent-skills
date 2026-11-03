@@ -8,12 +8,20 @@ import { HARNESS_CLI } from '@agentic/domain-install';
 import { err, ok } from '@agentic/kernel-result';
 
 /** Probes are quick; model listing may hit the network. */
-const TIMEOUT_MS = { models: 20_000, probe: 5000 } as const;
+const TIMEOUT_MS = { models: 20_000, probe: 5000, status: 60_000 } as const;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 
-/** Harness CLIs through `CliExec` (no shell, fixed args) and folders under `userHome`; failures become reasons. */
+/** Harness CLIs and catalogue status commands through `CliExec` (no shell, fixed args) and folders under `userHome`; failures become reasons. */
 export function createCliHarnessEnvironment(cliExec: CliExec, userHome: string) {
   return {
+    exec: async ({ args, cli, cwd }) => {
+      try {
+        const result = await cliExec.run({ args, cli, maxOutputBytes: MAX_OUTPUT_BYTES, timeoutMs: TIMEOUT_MS.status, ...(cwd === undefined ? {} : { cwd }) });
+        return result.ok ? ok(result.value.stdout) : err({ reason: result.error.message });
+      } catch (error) {
+        return err({ reason: error instanceof Error ? error.message : String(error) });
+      }
+    },
     homeFolderExists: async (name) => {
       try {
         return (await stat(join(userHome, name))).isDirectory();

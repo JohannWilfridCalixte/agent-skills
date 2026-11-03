@@ -177,3 +177,52 @@ describe('retention', () => {
     expect(service.get(third.id).ok).toBe(true);
   });
 });
+
+describe('ordered command sequence (`next`)', () => {
+  const SEQUENCE: RunSpec = { ...SPEC, args: ['plugin', 'marketplace', 'update', 'agentic'], next: [{ args: ['plugin', 'update', 'agentic@agentic'], cli: 'claude' }], summary: 'Update claude plugin' };
+
+  it('runs each command after the previous exits 0, in one run with one history entry', async () => {
+    const runner = new FakeCommandRunner({ hold: true });
+    const { history, service } = setup(runner);
+    const run = started(service, SEQUENCE);
+    const events = collect(service, run.id);
+
+    runner.streams[0]?.emit({ line: 'marketplace updated', type: 'stdout' });
+    runner.streams[0]?.finish(ok({ exitCode: 0 }));
+    await waitFor(() => runner.streams.length === 2);
+    runner.streams[1]?.emit({ line: 'plugin updated', type: 'stdout' });
+    runner.streams[1]?.finish(ok({ exitCode: 0 }));
+
+    expect(await events).toEqual([
+      { line: 'marketplace updated', type: 'stdout' },
+      { line: 'plugin updated', type: 'stdout' },
+      { exitCode: 0, type: 'exit' },
+      { status: 'succeeded', type: 'status' },
+    ]);
+    expect(runner.commands.map((command) => command.args)).toEqual([SEQUENCE.args, ['plugin', 'update', 'agentic@agentic']]);
+    expect(history.entries).toMatchObject([{ exitCode: 0, outputTail: 'marketplace updated\nplugin updated', summary: 'Update claude plugin' }]);
+  });
+
+  it('stops at the first nonzero exit and records it as failed', async () => {
+    const runner = new FakeCommandRunner({ hold: true });
+    const { history, service } = setup(runner);
+    const run = started(service, SEQUENCE);
+    const events = collect(service, run.id);
+
+    runner.streams[0]?.finish(ok({ exitCode: 2 }));
+
+    expect((await events).at(-1)).toEqual({ status: 'failed', type: 'status' });
+    expect(runner.streams).toHaveLength(1);
+    expect(history.entries).toMatchObject([{ exitCode: 2 }]);
+  });
+
+  it('rejects a `next` entry with an unknown cli', () => {
+    const result = parseRunSpec({ ...SEQUENCE, next: [{ args: [], cli: 'sh' }] });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+async function waitFor(condition: () => boolean) {
+  for (let attempt = 0; attempt < 200 && !condition(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 1));
+}

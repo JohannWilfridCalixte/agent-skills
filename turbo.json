@@ -60,6 +60,29 @@
     "e2e": {
       "cache": false
     },
+    "//#lint:root": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!packages/**",
+        "!applications/**"
+      ],
+      "outputs": [
+        ".eslintcache"
+      ]
+    },
+    "//#lint:manifests": {
+      "inputs": [
+        "package.json",
+        "applications/*/package.json",
+        "packages/*/package.json",
+        "scripts/check-workspace-manifests.ts"
+      ]
+    },
+    "//#test:root": {
+      "inputs": [
+        "scripts/**"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true

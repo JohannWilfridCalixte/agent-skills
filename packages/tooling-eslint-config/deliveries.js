@@ -29,6 +29,29 @@ export function serverBoundaries() {
   ];
 }
 
+const CLI_PURE_CLIENT = {
+  group: ['@agentic/*', '!@agentic/contract-http', '!@agentic/contract-http/*'],
+  message: 'The CLI is a pure client of the local API: depend on @agentic/contract-http only, never on server or domain code.',
+};
+
+/**
+ * `applications/cli`: a pure client of the API (contract-http only). Tests run on bun test against the real server app
+ * (`createTestApp`, which needs bun:sqlite), so they may import the server and test doubles.
+ */
+export function cliBoundaries() {
+  return [
+    {
+      files: ['src/**/*.ts'],
+      ignores: ['src/**/*.test.ts'],
+      rules: { 'no-restricted-imports': ['error', { paths: serverRestrictedImportPaths, patterns: [NO_ESCAPE, CLI_PURE_CLIENT] }] },
+    },
+    {
+      files: ['src/**/*.test.ts'],
+      rules: { 'no-restricted-imports': ['error', { paths: serverRestrictedImportPaths, patterns: [NO_ESCAPE] }] },
+    },
+  ];
+}
+
 const SERVER_FUNCTIONS_MESSAGE =
   'The web app is a TanStack Start SPA without server functions (ADR 0005): Hono is the only backend. Call the API through the api client.';
 

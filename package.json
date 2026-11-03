@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "agentic": "bun --conditions development applications/cli/src/main.ts",
     "build": "turbo run build",
     "dev": "turbo run dev --concurrency 100",
     "fix": "turbo run lint:fix && eslint . --fix",

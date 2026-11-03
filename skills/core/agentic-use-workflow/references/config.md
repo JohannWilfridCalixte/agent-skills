@@ -27,10 +27,13 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
       "review": { "model": "composer-2.5" },
       "review.claude-security-review": { "model": "claude-opus-5-5", "effort": "high" }
     },
-    "claude": { "implement": { "model": "sonnet", "effort": "medium" } },
+    "claude": {
+      "implement": { "model": "sonnet", "effort": "medium" },
+      "review.super-review": { "harness": "codex", "model": "gpt-6.1-sol", "effort": "high" }
+    },
     "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
-  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
+  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2, "crossHarness.timeout": 600 }
 }
 ```
 
@@ -45,7 +48,7 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 | `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: codestyle skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
 | `reviewers` | string[] | see below | Skill names; `agentic-review` runs one subagent per entry, step key `review.<name>` |
-| `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
+| `steps` | `{harness: {stepKey: {harness?, model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
 
 `{field}` in any skill = that field's resolved value; a dot names a nested key (`{knowledge.root}` → `knowledge.root`). `{knowledge.root}` resolves in the checkout being read or written (`workspace.path` once recorded).
@@ -53,6 +56,8 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 Every skill name (`profiles[].skills`, `reviewers`, a unit's `Skills`) may be any skill the harness can load (agentic, vendored, or installed separately); it is reached per the Skills section of `agentic-use-workflow`.
 
 `effort`: `low | medium | high`, or any harness-native level (`xhigh`, `max`, `ultra`), passed as-is. `model` is a harness model id, passed as-is. How each harness applies them: [delegation.md](delegation.md).
+
+`harness` (in a step entry): `cursor`, `claude` or `codex`, the CLI that runs the step when it differs from your own runtime ([delegation.md](delegation.md#cross-harness)); `model` / `effort` are then that harness's ids and levels. Absent or equal to your own → native spawn. Non-interactive steps only.
 
 ### Built-in profiles
 
@@ -101,7 +106,7 @@ Used for work outside the steps above. Defaults are model ids per harness, on pu
 
 ## Resolution
 
-For each of `model` and `effort` separately, first hit wins:
+For each of `harness`, `model` and `effort` separately, first hit wins (`harness`: levels 1-2 only, else your own):
 
 1. `steps.{harness}.{key}`
 2. `steps.{harness}.{parent}` — key up to the first `.` (`review` for `review.ub-mode`); `context.*` → `explore`
@@ -109,6 +114,10 @@ For each of `model` and `effort` separately, first hit wins:
 4. Harness default
 
 Example (cursor, config above): `review.code-review` → model `composer-2.5` (from `review`), effort `medium` (built-in `review`). `review.claude-security-review` → model `claude-opus-5-5`, effort `high` (both explicit). `implement` → model `composer-2.5`, effort `medium` (built-in).
+
+Example (claude, config above): `review.super-review` → `codex exec`, model `gpt-6.1-sol`, effort `high`.
+
+Resolved `harness` ≠ own: levels 3-4 map to the target harness's models. A child inheriting a parent's `harness` must use that harness's ids: set `harness` on the entry that sets `model`.
 
 ## Limits
 
@@ -119,3 +128,4 @@ Example (cursor, config above): `review.code-review` → model `composer-2.5` (f
 | `review.iterations` | 3 | Stop the fix loop, ask the user |
 | `babysit.rounds` | 5 | Fix rounds on the PR. Stop fixing, ask the user (watching itself isn't capped) |
 | `implement.retries` | 2 | Stop the unit, ask the user |
+| `crossHarness.timeout` | 600 | Minutes a cross-harness CLI may run. Kill it, fall back ([delegation.md](delegation.md#cross-harness)) |

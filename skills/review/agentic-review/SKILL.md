@@ -35,6 +35,7 @@ One subagent per reachable reviewer, all in parallel, step key `review.<reviewer
   - `pr-security-review`: its context comes from the brief's diff command and commit list, file list `git diff --name-only <base>...HEAD`, in place of its `git fetch`, `git status` and `origin/<base>` commands: committed range only.
   - `ub-mode`: its principles are the standard to judge the diff against; its Practice section is out of scope.
 - Return counts per severity.
+- Cross-harness reviewer (resolved `harness` ≠ own): launch per agentic-use-workflow `references/delegation.md` Cross-harness instead of a subagent, in parallel with the rest, same brief and contract. Before section 3, its file must exist and parse per finding.md; else its fallback applies.
 
 Done when every reachable reviewer's file exists and its counts are logged.
 

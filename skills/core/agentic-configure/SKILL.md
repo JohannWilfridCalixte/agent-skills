@@ -14,7 +14,7 @@ Ask one thing at a time, always with a recommended answer. Use the harness's mul
 ## 1. Scope and existing files
 
 - **Global** `~/.agentic/config.json`: personal, mostly models per harness. **Project** `.agentic.json`: folders, profiles, reviewers, project-specific overrides. Recommend models in global, the rest in project; `--global` / `--project` skip the question.
-- Read both files if present. Review them against the contract: unknown keys, removed step keys (`triage`, `review.fix`, `babysit.fix`, old lens keys like `review.security`), keys with no effect (e.g. a parent key whose only child is set explicitly), model ids the harness doesn't offer, effort levels the model doesn't support, invalid JSON. Report findings before proposing anything.
+- Read both files if present. Review them against the contract: unknown keys, removed step keys (`triage`, `review.fix`, `babysit.fix`, old lens keys like `review.security`), keys with no effect (e.g. a parent key whose only child is set explicitly), model ids the harness doesn't offer (the entry's `harness` when set), `harness` on `grill`, effort levels the model doesn't support, invalid JSON. Report findings before proposing anything.
 
 ## 2. Harnesses
 
@@ -36,6 +36,8 @@ Propose only ids from those lists (or a Claude Code alias). A command fails → 
 
 Map the built-in defaults to real models per harness: `frontier`, `code`, `fast` → the best match in each list; `chore` and `explore` → their pinned defaults if available, else the closest cheap / mid model. Show one table: step key (every built-in key plus `review.<name>` per reviewer) × harness → model / effort, with a one-line why per capability class.
 
+Several harnesses detected → offer `harness` on `review.<name>` steps (config.md, e.g. `super-review` on another vendor's model): the step's `model` / `effort` then come from the target harness's list. Recommend it only when the target CLI is authenticated (`codex login status`, `claude auth status`, `agent status`).
+
 Ask: does it suit? If not, which steps, harnesses or values to change. Validate every change (model in the list, effort supported) and show the updated table until approved. Remind that `grill` runs in the session: its value is a recommendation.
 
 ## 5. Folders, profiles, limits
@@ -50,4 +52,4 @@ Confirm, with defaults from the contract:
 
 ## 6. Write and validate
 
-Write only what the user changed from the proposals and defaults, plus existing values they kept; accepted proposals stay defaults, so later default updates still reach them. Show the final JSON and the diff with any existing file; write only after a yes. Then re-read it: valid JSON, only known keys, every model in its harness list, every reviewer and profile skill exists. Report the file paths, any skill installed, and a one-line summary per harness.
+Write only what the user changed from the proposals and defaults, plus existing values they kept; accepted proposals stay defaults, so later default updates still reach them. Show the final JSON and the diff with any existing file; write only after a yes. Then re-read it: valid JSON, only known keys, every model in its harness list (the `harness` field's, when set), every reviewer and profile skill exists. Report the file paths, any skill installed, and a one-line summary per harness.

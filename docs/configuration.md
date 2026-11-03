@@ -33,10 +33,13 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
       "review": { "model": "composer-2.5" },
       "review.super-review": { "model": "claude-opus-5-5", "effort": "high" }
     },
-    "claude": { "implement": { "model": "sonnet", "effort": "medium" } },
+    "claude": {
+      "implement": { "model": "sonnet", "effort": "medium" },
+      "review.super-review": { "harness": "codex", "model": "gpt-6.1-sol", "effort": "high" }
+    },
     "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
-  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
+  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2, "crossHarness.timeout": 600 }
 }
 ```
 
@@ -51,8 +54,8 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
 | `reviewers` | see [Reviewers](#reviewers) | Skill names. One review subagent runs per entry, with step key `review.<name>` |
 | `profiles` | built-ins | `{name, detect?, skills}[]`, added to the built-ins. Stack → codestyle skills. `detect` is a list of files or globs at the project root |
 | `selectedProfiles` | `[]` | Profiles in use. When empty, every profile whose `detect` matches is used |
-| `steps` | `{}` | Model and effort per step, per harness (`cursor`, `claude`, `codex`) |
-| `limits` | see [Limits](#limits) | Loop caps, as flat dotted keys |
+| `steps` | `{}` | Model, effort and optionally another harness per step, per harness (`cursor`, `claude`, `codex`) |
+| `limits` | see [Limits](#limits) | Loop caps and timeouts, as flat dotted keys |
 
 Any skill name (in `profiles[].skills`, `reviewers`, or a task's `Skills` in `plan.md`) can be any skill the harness can load: agentic, vendored, or installed separately.
 
@@ -79,10 +82,11 @@ Default:
 
 ## Steps
 
-Each entry is `"<step key>": { "model": "<harness model id>", "effort": "<level>" }`. Both fields are optional and passed as-is.
+Each entry is `"<step key>": { "harness": "<harness>", "model": "<harness model id>", "effort": "<level>" }`. Every field is optional; `model` and `effort` are passed as-is.
 
 - **Model**: a Cursor id from `agent models` (e.g. `claude-opus-5-5`), a Codex slug from `codex debug models` (e.g. `gpt-6.1-sol`), or a Claude Code alias (`opus`, `sonnet`, `haiku`) or full id.
 - **Effort**: `low | medium | high`, or a harness-native level (`xhigh`, `max`, `ultra`).
+- **Harness**: run the step through another harness's CLI (`codex exec`, `claude -p`, `agent -p`) instead of a subagent of your session, e.g. `super-review` on a GPT model from a Claude Code session. `model` and `effort` are then that harness's. Leave it out to stay in your own harness. Not for `grill`, which runs in your session.
 
 Built-in defaults are capability classes, not model ids: `frontier` (the strongest reasoning model available), `code` (a strong, balanced coding model) and `fast` (the cheapest fast model).
 
@@ -117,15 +121,19 @@ These cover work outside the steps above. Their defaults are deliberately model 
 3. The built-in default: the key's own row, otherwise its parent's
 4. The harness default
 
+`harness` resolves through levels 1 and 2 only, otherwise your own harness. With another harness, levels 3 and 4 map to that harness's models. A child inherits its parent's `harness`, so set `harness` on the same entry as `model` to keep the id valid.
+
 Worked examples, for cursor with the config above:
 
 - `review.code-review`: model `composer-2.5` (from `review`), effort `medium` (built-in `review`).
 - `review.super-review`: model `claude-opus-5-5`, effort `high` (both set explicitly).
 - `implement`: model `composer-2.5`, effort `medium` (built-in).
+- From Claude Code, `review.super-review`: runs through `codex exec`, model `gpt-6.1-sol`, effort `high`.
 
 ### Harness notes
 
 - **Claude Code**: if `CLAUDE_CODE_EFFORT_LEVEL` is set, it overrides every effort setting and is logged as the effort used.
+- **Another harness** (`harness` set): its CLI must be on `PATH` and logged in (`codex login status`, `claude auth status`, `agent status`). If it is missing or the run fails (error, `crossHarness.timeout`, missing or malformed output), you get one warning and the step reruns in your own harness with the built-in default model. Commands per harness: [`delegation.md`](../skills/core/agentic-use-workflow/references/delegation.md#cross-harness).
 - **Codex**: worktrees sit outside the repo, so the sandbox may block writes to them. Restart Codex with `--add-dir <path>`, or add the path to `sandbox_workspace_write.writable_roots` in `~/.codex/config.toml`.
 
 ## Limits
@@ -135,3 +143,4 @@ Worked examples, for cursor with the config above:
 | `review.iterations` | 3 | The review fix loop stops and asks you |
 | `babysit.rounds` | 5 | PR fix rounds stop and ask you. Watching the PR itself is not capped |
 | `implement.retries` | 2 | A red unit stops and asks you |
+| `crossHarness.timeout` | 600 | Minutes a step on another harness's CLI may run. It is killed and reruns in your own harness |

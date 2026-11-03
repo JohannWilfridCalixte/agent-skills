@@ -32,7 +32,7 @@ Vendored skills that expect setup (a tracker "already provided", a board, a merg
 Every step has a key (`grill`, `implement`, `review.code-review`, …). Resolve `model` and `effort` each on its own per config.md Resolution; map capability classes (`frontier`, `code`, `fast`) to the closest model the harness offers.
 
 - Interactive steps (capture, grill, gate) stay in the main session. Resolved value is a recommendation: warn once if the session runs something else, then go on.
-- Non-interactive steps always run as subagents with the resolved `{model, effort}`.
+- Non-interactive steps always run as subagents with the resolved `{model, effort}`; resolved `harness` ≠ own → that harness's CLI instead, per [references/delegation.md](references/delegation.md#cross-harness).
 
 ## Cheap routing
 

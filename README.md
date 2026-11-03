@@ -471,6 +471,7 @@ Maintenance (check, update, add, remove): [Vendoring script](#vendoring-script).
 | [0003](docs/tech/adr/0003-implement-feature-light-mode.md) | Implement-feature light mode |
 | [0004](docs/tech/adr/0004-security-audit-and-review.md) | Security audit and review |
 | [0005](docs/tech/adr/0005-ponytail-in-grills.md) | Ponytail in grills |
+| [0006](docs/tech/adr/0006-cross-harness-steps.md) | Cross-harness steps |
 
 Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 
@@ -478,7 +479,7 @@ Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 
 ### Swap reviewers
 
-`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`.
+`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`, or run it on another harness's CLI with its `harness` field (e.g. `super-review` through `codex exec` from Claude Code).
 
 ### Swap codestyle
 

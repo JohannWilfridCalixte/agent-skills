@@ -54,4 +54,22 @@ Built-in explore agents often pick their own model or inherit the session's. Use
 - Custom agents in `.codex/agents/*.toml` that set `model` / `model_reasoning_effort` win over spawn values: if one matches the step, its settings are what ran.
 - Read-only steps: say so in the spawn request with the `explore` model, or use a custom agent with write tools disabled. A custom agent named `explorer` replaces the built-in one.
 
+## Cross-harness
+
+Step whose resolved `harness` ≠ own: run it as a non-interactive CLI of that harness instead of a subagent. Same brief, with absolute SKILL.md paths and the no-Skill-tool `Skills:` line, `harness` = target in `Progress:`. Log its `started` with `data.harness` = target.
+
+1. Write the brief to a temp file. Launch in the background (harness background shell, else `&`), cwd = `workspace.path`, brief on stdin, stdout/stderr to a temp log. Parallel steps → one process each.
+2. Wait for exit; no exit after `limits.crossHarness.timeout` minutes → kill it.
+3. Its stdout (Codex: `-o` file) is the return. Writing step → check `Write:` exists and follows its contract.
+
+Invocations (`{wi}` = work-item path, needed writable when outside `workspace.path`; `{gitdir}` = `git rev-parse --git-common-dir` in `workspace.path`, needed writable for commits when it is a worktree):
+
+- **codex**: `codex exec -m {model} -c model_reasoning_effort="{effort}" -c approval_policy="never" -s workspace-write -c sandbox_workspace_write.network_access=true -C {workspace.path} --add-dir {wi} --add-dir {gitdir} -o {return file} - < {brief}`.
+- **claude**: `claude -p --model {model} --effort {effort} --permission-mode acceptEdits --allowed-tools Bash --permission-prompts none --add-dir {wi} < {brief}`. `CLAUDE_CODE_EFFORT_LEVEL` in the env wins.
+- **cursor**: `agent -p --force --model {model} --workspace {workspace.path} "$(cat {brief})"` (`cursor-agent` same). Effort: the model id variant that encodes it (`agent models`).
+
+Auth check before launch: `codex login status`, `claude auth status`, `agent status`.
+
+Failure (CLI not on `PATH`, not authenticated, non-zero exit, timeout, output missing or malformed): log `failed` for the attempt, `data: {reason}`; warn once; re-run the step as a native subagent, model / effort from Resolution levels 3-4 (built-in default, else harness default) on your own harness.
+
 Native features change fast: prefer the harness's current docs over this file when they disagree.

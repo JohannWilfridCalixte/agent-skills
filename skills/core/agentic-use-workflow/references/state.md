@@ -76,7 +76,7 @@ One JSON object per line, appended, never edited. Exactly the fields and `type` 
 
 | Type | `data` |
 |---|---|
-| `started` (subagent) | `{goal, files?}` |
+| `started` (subagent) | `{goal, files?, harness?}` — `harness`: target of a cross-harness step |
 | `started` (`step: null`) | optional `{title}` |
 | `progress` | optional `{files?, commit?, tests?}` |
 | `completed` (subagent) | `{files?, commits?, tests?, counts?}` — `counts`: `{blocker, major, minor, nit}` for reviewers |

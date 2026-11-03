@@ -11,6 +11,8 @@ import { Badge, Button, Callout } from '@agentic/design-system';
 interface RunView {
   readonly exitCode?: number;
   readonly lines: readonly string[];
+  /** Set when the bounded re-reads gave up while the run still looked active. */
+  readonly lostContact?: boolean;
   readonly notice?: string;
   readonly status: RunStatus;
 }
@@ -23,6 +25,12 @@ const STATUS_BADGES = {
 } as const satisfies Record<RunStatus, { readonly label: string; readonly variant: string }>;
 
 const INTERRUPTED = 'Live output was interrupted; showing the output saved on the server.';
+const RECONNECTING = 'Connection interrupted, reconnecting. Following the output saved on the server.';
+const LOST_CONTACT = 'Lost contact with the run; it may still be running on the server. Reload the run to check again.';
+
+/** After the stream drops, the saved run is re-read every 2 s, at most 30 times (one minute), until it finishes. */
+const READ_INTERVAL_MS = 2000;
+const MAX_READS = 30;
 
 interface RunPanelProps {
   readonly onFinished: () => void;
@@ -31,12 +39,15 @@ interface RunPanelProps {
   readonly title: string;
 }
 
+type Update = (change: (view: RunView) => RunView) => void;
+
 export function RunPanel({ onFinished, onRunAgain, runId, title }: RunPanelProps) {
   const api = useApi();
   const [view, setView] = useState<RunView>({ lines: [], status: 'running' });
   const [cancelError, setCancelError] = useState<string>();
   const logRef = useRef<HTMLOListElement>(null);
   const notifyFinished = useEffectEvent(onFinished);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -45,6 +56,15 @@ export function RunPanel({ onFinished, onRunAgain, runId, title }: RunPanelProps
       controller.abort();
     };
   }, [api, runId]);
+
+  useEffect(() => {
+    if (reloads === 0) return;
+    const controller = new AbortController();
+    void followSavedRun(api, runId, controller.signal, setView);
+    return () => {
+      controller.abort();
+    };
+  }, [api, reloads, runId]);
 
   const finished = view.status !== 'running';
   useEffect(() => {
@@ -84,7 +104,19 @@ export function RunPanel({ onFinished, onRunAgain, runId, title }: RunPanelProps
       </div>
       {view.notice !== undefined && (
         <Callout title="Live output interrupted" tone="warning">
-          {view.notice}
+          <p>{view.notice}</p>
+          {view.lostContact === true && (
+            <Button
+              className="mt-3"
+              onClick={() => {
+                setReloads((count) => count + 1);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              Reload run
+            </Button>
+          )}
         </Callout>
       )}
       {cancelError !== undefined && (
@@ -120,8 +152,8 @@ export function RunPanel({ onFinished, onRunAgain, runId, title }: RunPanelProps
   );
 }
 
-/** Follows a run over SSE; when the stream drops, reads `GET /runs/:id` once instead and says so. */
-async function followRun(api: ApiClient, runId: string, signal: AbortSignal, update: (change: (view: RunView) => RunView) => void) {
+/** Follows a run over SSE; when the stream drops, follows `GET /runs/:id` instead and says so. */
+async function followRun(api: ApiClient, runId: string, signal: AbortSignal, update: Update) {
   let finished = false;
   for await (const event of api.subscribeToRun(runId, { signal })) {
     if (signal.aborted) return;
@@ -148,17 +180,44 @@ async function followRun(api: ApiClient, runId: string, signal: AbortSignal, upd
     }
   }
   if (finished || signal.aborted) return;
-  await readSavedRun(api, runId, signal, update);
+  await followSavedRun(api, runId, signal, update);
 }
 
-async function readSavedRun(api: ApiClient, runId: string, signal: AbortSignal, update: (change: (view: RunView) => RunView) => void) {
-  const detail = await api.get(`/runs/${encodeURIComponent(runId)}`, RunDetail, { signal });
-  if (signal.aborted) return;
-  if (!detail.ok) {
-    const failure = describeApiError(detail.error);
-    update((view) => ({ ...view, notice: `${INTERRUPTED} ${failure.message} ${failure.nextStep}` }));
-    return;
+/**
+ * Re-reads the saved run until it finishes, bounded by MAX_READS; the saved output replaces the shown lines, so
+ * nothing is duplicated. The command is never resubmitted.
+ */
+async function followSavedRun(api: ApiClient, runId: string, signal: AbortSignal, update: Update) {
+  update((view) => ({ ...view, lostContact: false, notice: RECONNECTING }));
+  for (let read = 0; read < MAX_READS; read += 1) {
+    if (read > 0 && !(await sleep(READ_INTERVAL_MS, signal))) return;
+    if (await readSavedRun(api, runId, signal, update)) return;
+    if (signal.aborted) return;
   }
+  update((view) => ({ ...view, lostContact: true, notice: LOST_CONTACT }));
+}
+
+/** Reads the saved run once; true when it has finished. */
+async function readSavedRun(api: ApiClient, runId: string, signal: AbortSignal, update: Update) {
+  const detail = await api.get(`/runs/${encodeURIComponent(runId)}`, RunDetail, { signal });
+  if (signal.aborted || !detail.ok) return false;
   const { exitCode, output, status } = detail.value;
-  update((view) => ({ ...view, lines: output, notice: INTERRUPTED, status, ...(exitCode === undefined ? {} : { exitCode }) }));
+  const finished = status !== 'running';
+  update((view) => ({ ...view, lines: output, notice: finished ? INTERRUPTED : RECONNECTING, status, ...(exitCode === undefined ? {} : { exitCode }) }));
+  return finished;
+}
+
+/** Resolves false when aborted first. */
+function sleep(ms: number, signal: AbortSignal) {
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', stop);
+      resolve(true);
+    }, ms);
+    function stop() {
+      clearTimeout(timer);
+      resolve(false);
+    }
+    signal.addEventListener('abort', stop, { once: true });
+  });
 }

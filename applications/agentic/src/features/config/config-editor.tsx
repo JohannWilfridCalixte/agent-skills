@@ -238,7 +238,7 @@ function ProfilesField({ issues, onChange, profiles }: { readonly issues: readon
         const number = String(index + 1);
         return (
           // eslint-disable-next-line react/no-array-index-key -- profiles are edited in place; position is their identity here
-          <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end" key={index}>
+          <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-start" key={index}>
             <Field issues={issues.filter(matches(`profiles.${String(index)}.name`))} label={`Profile ${number} name`}>
               {(control) => (
                 <TextInput
@@ -250,28 +250,24 @@ function ProfilesField({ issues, onChange, profiles }: { readonly issues: readon
                 />
               )}
             </Field>
-            <Field issues={issues.filter(matches(`profiles.${String(index)}.detect`))} label={`Profile ${number} detect (comma-separated)`}>
-              {(control) => (
-                <TextInput
-                  {...control}
-                  onChange={(detect) => {
-                    update(index, { detect });
-                  }}
-                  value={profile.detect}
-                />
-              )}
-            </Field>
-            <Field issues={issues.filter(matches(`profiles.${String(index)}.skills`))} label={`Profile ${number} skills (comma-separated)`}>
-              {(control) => (
-                <TextInput
-                  {...control}
-                  onChange={(skills) => {
-                    update(index, { skills });
-                  }}
-                  value={profile.skills}
-                />
-              )}
-            </Field>
+            <StringListField
+              issues={issues.filter(matches(`profiles.${String(index)}.detect`))}
+              itemLabel={`Profile ${number} detect glob`}
+              label={`Profile ${number} detect globs`}
+              onChange={(detect) => {
+                update(index, { detect });
+              }}
+              values={profile.detect}
+            />
+            <StringListField
+              issues={issues.filter(matches(`profiles.${String(index)}.skills`))}
+              itemLabel={`Profile ${number} skill`}
+              label={`Profile ${number} skills`}
+              onChange={(skills) => {
+                update(index, { skills });
+              }}
+              values={profile.skills}
+            />
             <Button
               aria-label={`Remove profile ${number}`}
               onClick={() => {
@@ -289,7 +285,7 @@ function ProfilesField({ issues, onChange, profiles }: { readonly issues: readon
       <div>
         <Button
           onClick={() => {
-            onChange([...profiles, { detect: '', name: '', skills: '' }]);
+            onChange([...profiles, { detect: [], name: '', raw: {}, skills: [] }]);
           }}
           size="sm"
           type="button"

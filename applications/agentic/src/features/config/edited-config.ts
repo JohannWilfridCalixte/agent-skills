@@ -18,11 +18,12 @@ export interface ConfigForm {
 }
 
 export interface ProfileForm {
-  /** Comma-separated globs. */
-  readonly detect: string;
+  /** One entry per glob; never joined, so brace globs with commas survive. */
+  readonly detect: readonly string[];
   readonly name: string;
-  /** Comma-separated skill names. */
-  readonly skills: string;
+  /** The profile's original file object: the row's identity, folded back on save so unknown keys survive. */
+  readonly raw: Readonly<Record<string, unknown>>;
+  readonly skills: readonly string[];
 }
 
 export interface StepForm {
@@ -41,12 +42,6 @@ const asString = (value: unknown) => (typeof value === 'string' ? value : '');
 
 const asStrings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
 
-const splitList = (text: string) =>
-  text
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item !== '');
-
 export function formFromRaw(raw: RawConfig) {
   const knowledge = isRecord(raw['knowledge']) ? raw['knowledge'] : {};
   const limits = isRecord(raw['limits']) ? raw['limits'] : {};
@@ -58,9 +53,10 @@ export function formFromRaw(raw: RawConfig) {
     limits: Object.fromEntries(Object.entries(limits).map(([key, value]) => [key, typeof value === 'number' ? String(value) : ''])),
     output: asString(raw['output']),
     profiles: (Array.isArray(raw['profiles']) ? raw['profiles'] : []).filter(isRecord).map((profile) => ({
-      detect: asStrings(profile['detect']).join(', '),
+      detect: asStrings(profile['detect']),
       name: asString(profile['name']),
-      skills: asStrings(profile['skills']).join(', '),
+      raw: profile,
+      skills: asStrings(profile['skills']),
     })),
     reviewers: asStrings(raw['reviewers']),
     selectedProfiles: asStrings(raw['selectedProfiles']),
@@ -145,10 +141,15 @@ function stepsFromRaw(rawSteps: unknown) {
   return steps;
 }
 
+/** Folds a profile row back over its original object: only the known fields are overlaid, absent ones stay absent. */
 function toProfile(profile: ProfileForm) {
-  const detect = splitList(profile.detect);
-  const skills = splitList(profile.skills);
-  return detect.length === 0 ? { name: profile.name, skills } : { detect, name: profile.name, skills };
+  const entry: Record<string, unknown> = { ...profile.raw };
+  const detect = profile.detect.filter((item) => item.trim() !== '');
+  const skills = profile.skills.filter((item) => item.trim() !== '');
+  setOrDelete(entry, 'name', profile.name, profile.name === '' && !('name' in profile.raw));
+  setOrDelete(entry, 'detect', detect, detect.length === 0 && !('detect' in profile.raw));
+  setOrDelete(entry, 'skills', skills, skills.length === 0 && !('skills' in profile.raw));
+  return entry;
 }
 
 /** API path of a scope (`global` or `project:<id>`); the colon stays readable, the id is encoded. */

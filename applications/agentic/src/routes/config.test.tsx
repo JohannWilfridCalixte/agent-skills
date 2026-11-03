@@ -132,6 +132,24 @@ describe('config page: edit, review and save', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
+  it('sends profile detect globs as an array, brace globs and unknown profile keys intact', async () => {
+    const user = userEvent.setup();
+    const config = { profiles: [{ detect: ['**/{src,test}/**/*.ts'], future: { keep: 42 }, name: 'ts', skills: ['react'] }] };
+    const stub = configServer({ 'GET /config/global': () => json(raw(config)), 'POST /config/global/preview': () => json(preview()) });
+    renderApp('/config#token=abc', stub.fetch);
+
+    await openEditTab(user);
+    expect(screen.getByLabelText('Profile 1 detect glob 1')).toHaveValue('**/{src,test}/**/*.ts');
+    await user.click(screen.getByRole('button', { name: 'Add profile 1 detect glob' }));
+    await user.type(screen.getByLabelText('Profile 1 detect glob 2'), 'lib/**');
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+
+    await screen.findByRole('list', { name: 'Proposed changes' });
+    expect(stub.calls.find((call) => call.method === 'POST')?.body).toEqual({
+      profiles: [{ detect: ['**/{src,test}/**/*.ts', 'lib/**'], future: { keep: 42 }, name: 'ts', skills: ['react'] }],
+    });
+  });
+
   it('shows validation issues next to their field and blocks the save', async () => {
     const user = userEvent.setup();
     const issues = [{ message: 'Expected a non-empty string', path: 'worktrees' }];

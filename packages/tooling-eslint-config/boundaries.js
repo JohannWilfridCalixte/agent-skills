@@ -133,3 +133,15 @@ const NO_DOMAIN_POLICY = {
 export function adapterBoundaries(slug) {
   return [{ files: SOURCE_FILES, rules: { 'no-restricted-imports': restrictAdapter(NO_DOMAIN_POLICY, noEscape(slug)) } }];
 }
+
+const NO_WIRE_OR_POLICY = {
+  group: [`${SCOPE}/*`, `${SCOPE}/*/**`, 'node:*'],
+  message:
+    'design-system is presentation only: no internal packages (contracts, domain, kernel, adapters) and no node:* modules. Pass data in through props.',
+};
+
+/** `design-system`: React, Radix and styling libraries only; never contracts, domain or any other internal package. */
+export function designSystemBoundaries() {
+  const escape = noEscape('design-system');
+  return [{ files: SOURCE_FILES, rules: { 'no-restricted-imports': restrict(NO_WIRE_OR_POLICY, escape) } }];
+}

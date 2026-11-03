@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.bundler.base.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "rootDir": ".",
+    "types": ["vite/client", "@testing-library/jest-dom/vitest"]
+  },
+  "include": ["src", "*.ts", "*.js"]
+}

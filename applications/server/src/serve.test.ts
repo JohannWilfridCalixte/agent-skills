@@ -66,15 +66,15 @@ describe('start folder registration (AC1)', () => {
   it('registers a valid folder once, then reports it as known', async () => {
     const { logger, projects } = projectsWithLog();
 
-    expect(await registerStartFolder(projects, root, logger)).toBe('registered');
-    expect(await registerStartFolder(projects, root, logger)).toBe('already_known');
+    expect(await registerStartFolder(projects, root, logger)).toEqual({ projectId: 'id-1', status: 'registered' });
+    expect(await registerStartFolder(projects, root, logger)).toEqual({ projectId: 'id-1', status: 'already_known' });
     expect((await projects.list()).map((project) => project.path)).toEqual([root]);
   });
 
   it('skips a missing folder with a warning and registers nothing', async () => {
     const { lines, logger, projects } = projectsWithLog();
 
-    expect(await registerStartFolder(projects, join(root, 'missing'), logger)).toBe('invalid');
+    expect(await registerStartFolder(projects, join(root, 'missing'), logger)).toEqual({ status: 'invalid' });
     expect(await projects.list()).toEqual([]);
     expect(lines.join('\n')).toContain('start_folder_not_registered');
   });
@@ -112,7 +112,7 @@ describe('serve startup on a busy port (D38)', () => {
     const homeDir = join(root, 'home');
     const errors: string[] = [];
     try {
-      const exitCode = await serve({
+      const result = await serve({
         argv: ['--port', String(blocker.port), '--project', root],
         cwd: root,
         env: { AGENTIC_HOME: homeDir },
@@ -121,12 +121,64 @@ describe('serve startup on a busy port (D38)', () => {
         stdout: () => undefined,
       });
 
-      expect(exitCode).toBe(1);
+      expect(result).toEqual({ exitCode: 1 });
       expect(errors.join('')).toContain('already in use');
       expect(existsSync(join(homeDir, 'agentic.db'))).toBe(false);
       expect(existsSync(serveFilePath(homeDir))).toBe(false);
     } finally {
       await blocker.stop(true);
+    }
+  });
+});
+
+async function freePort() {
+  const probe = Bun.serve({ fetch: () => new Response(''), hostname: '127.0.0.1', port: 0 });
+  const port = probe.port ?? 0;
+  await probe.stop(true);
+  return port;
+}
+
+async function startServe(homeDir: string) {
+  const output: string[] = [];
+  const started = await serve({
+    argv: ['--port', String(await freePort()), '--project', root],
+    cwd: root,
+    env: { AGENTIC_HOME: homeDir },
+    logSink: () => undefined,
+    stderr: () => undefined,
+    stdout: (text) => output.push(text),
+  });
+  if (!('stop' in started)) throw new Error(`serve failed with exit code ${String(started.exitCode)}`);
+  return { output: output.join(''), stop: started.stop };
+}
+
+describe('serve startup (AC1, D28)', () => {
+  it('prints a URL that opens the UI on the registered start folder', async () => {
+    const homeDir = join(root, 'home');
+    const { output, stop } = await startServe(homeDir);
+    try {
+      const listed = await fetch(`${/http:\/\/[^/]+/.exec(output)?.[0] ?? ''}/api/projects`);
+      const { projects } = (await listed.json()) as { projects: { id: string; path: string }[] };
+
+      expect(projects.map((project) => project.path)).toEqual([root]);
+      expect(output).toMatch(new RegExp(String.raw`/#token=[\w-]+&project=${projects[0]?.id ?? 'none'}\n$`));
+    } finally {
+      await stop();
+    }
+  });
+
+  it('creates the home directory 0700 and the database and serve.json 0600', async () => {
+    const homeDir = join(root, 'home');
+    const { stop } = await startServe(homeDir);
+    try {
+      expect(statSync(homeDir).mode & 0o777).toBe(0o700);
+      expect(statSync(join(homeDir, 'agentic.db')).mode & 0o777).toBe(0o600);
+      for (const sidecar of ['agentic.db-wal', 'agentic.db-shm']) {
+        if (existsSync(join(homeDir, sidecar))) expect(statSync(join(homeDir, sidecar)).mode & 0o777).toBe(0o600);
+      }
+      expect(statSync(serveFilePath(homeDir)).mode & 0o777).toBe(0o600);
+    } finally {
+      await stop();
     }
   });
 });

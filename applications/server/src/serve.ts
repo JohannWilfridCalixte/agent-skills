@@ -54,26 +54,26 @@ export function parseServeArgs(argv: readonly string[], cwd: string) {
   return ok({ port, projectDir: resolve(cwd, values.project ?? '.') });
 }
 
-/** Registers the folder serve started in, when valid and not yet known; never fails the start. */
+/** Registers the folder serve started in, when valid and not yet known; never fails the start. Gives its project id when known. */
 export async function registerStartFolder(projects: Pick<ProjectsService, 'add'>, folder: string, logger: Logger) {
   const added = await projects.add(folder);
   if (added.ok) {
     logger.info('project_registered', { project_id: added.value.id });
-    return 'registered';
+    return { projectId: added.value.id, status: 'registered' } as const;
   }
-  const reason = added.error.type;
-  switch (reason) {
+  const { error } = added;
+  switch (error.type) {
     case 'path_not_absolute':
     case 'path_not_directory':
     case 'path_not_found': {
-      logger.warn('start_folder_not_registered', { reason });
-      return 'invalid';
+      logger.warn('start_folder_not_registered', { reason: error.type });
+      return { status: 'invalid' } as const;
     }
     case 'project_already_known': {
-      return 'already_known';
+      return { projectId: error.projectId, status: 'already_known' } as const;
     }
     default: {
-      return reason satisfies never;
+      return error satisfies never;
     }
   }
 }
@@ -82,13 +82,16 @@ export function removeServeFile(path: string) {
   rmSync(path, { force: true });
 }
 
-/** `agentic serve`: start the API, register the folder, publish port and token, clean up on exit. Resolves to the exit code on startup failure. */
+/**
+ * `agentic serve`: start the API, register the folder, publish port and token, clean up on exit. Resolves to
+ * `{ exitCode }` on startup failure, or to `{ stop }` once serving.
+ */
 export async function serve(io: ServeIo) {
   const settings = loadSettings(io.env);
   const args = parseServeArgs(io.argv, io.cwd);
   if (!args.ok) {
     io.stderr(`Invalid --port "${args.error.value}": expected an integer between 1 and 65535.\n`);
-    return 1;
+    return { exitCode: 1 } as const;
   }
   const port = args.value.port ?? settings.port;
   const token = randomBytes(32).toString('base64url');
@@ -102,35 +105,51 @@ export async function serve(io: ServeIo) {
         ? `Port ${String(port)} on ${HOSTNAME} is already in use. Stop the other process or choose another port with --port or AGENTIC_PORT.\n`
         : `Could not listen on ${HOSTNAME}:${String(port)}.\n`,
     );
-    return 1;
+    return { exitCode: 1 } as const;
   }
   const server = bound.value;
+  /** Everything serve creates under the home (database, serve.json) is readable by the user only (D28). */
+  const previousUmask = process.umask(0o077);
+  mkdirSync(settings.homeDir, { mode: 0o700, recursive: true });
+  chmodSync(settings.homeDir, 0o700);
 
   const webRoot = hasWebUi(DEFAULT_WEB_ROOT) ? DEFAULT_WEB_ROOT : undefined;
   if (webRoot === undefined) io.stderr('Web UI not built; run `bun run build`\n');
   const { app, db, logger, projects } = await compose({ logSink: io.logSink, settings: { ...settings, port }, token, webRoot });
   handle = app.fetch;
 
-  await registerStartFolder(projects, args.value.projectDir, logger);
+  const startFolder = await registerStartFolder(projects, args.value.projectDir, logger);
 
   const servePath = serveFilePath(settings.homeDir);
   writeServeFile(servePath, { pid: process.pid, port, token });
   logger.info('server_started', { port });
-  io.stdout(`agentic is running at http://${HOSTNAME}:${String(port)}/#token=${token}\n`);
+  io.stdout(`agentic is running at ${startupUrl(port, token, 'projectId' in startFolder ? startFolder.projectId : undefined)}\n`);
 
-  process.once('exit', () => {
+  const onExit = () => {
     removeServeFile(servePath);
-  });
-  const shutdown = () => {
-    removeServeFile(servePath);
-    void server
-      .stop()
-      .then(() => db.destroy())
-      .finally(() => process.exit(0));
   };
+  const stop = async () => {
+    process.off('exit', onExit);
+    process.off('SIGINT', shutdown);
+    process.off('SIGTERM', shutdown);
+    removeServeFile(servePath);
+    await server.stop();
+    await db.destroy();
+    process.umask(previousUmask);
+  };
+  function shutdown() {
+    void stop().finally(() => process.exit(0));
+  }
+  process.once('exit', onExit);
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
-  return undefined;
+  return { stop } as const;
+}
+
+/** The startup URL: the token, and the start folder's project so the UI opens on it (AC1). Both in the fragment, never sent to the server. */
+export function startupUrl(port: number, token: string, projectId: string | undefined) {
+  const project = projectId === undefined ? '' : `&project=${encodeURIComponent(projectId)}`;
+  return `http://${HOSTNAME}:${String(port)}/#token=${token}${project}`;
 }
 
 /** Writes `serve.json` readable by the user only (D28); creates the directory (0700) when missing. */

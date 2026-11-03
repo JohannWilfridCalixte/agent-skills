@@ -208,3 +208,20 @@ describe('config page: edit, review and save', () => {
     expect(await screen.findByText('Nothing changed: the file already holds this config.')).toBeInTheDocument();
   });
 });
+
+describe('config page: startup project (AC1)', () => {
+  it('opens on the project serve started in', async () => {
+    const project = { createdAt: '2026-11-03T10:00:00.000Z', id: 'p-1', path: '/work/app' };
+    const server = configServer({
+      'GET /config/project:p-1': () => json({ ...raw(), scope: 'project:p-1' }),
+      'GET /config/project:p-1/effective': () => json({ ...effective(), scope: 'project:p-1' }),
+      'GET /projects': () => json({ projects: [project] }),
+    });
+
+    renderApp('/config#token=abc&project=p-1', server.fetch);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Scope')).toHaveValue('project:p-1');
+    });
+  });
+});

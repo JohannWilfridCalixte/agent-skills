@@ -1,7 +1,7 @@
 import { stdoutSink } from './platform/log.js';
 import { serve } from './serve.js';
 
-const exitCode = await serve({
+const started = await serve({
   argv: process.argv.slice(2),
   cwd: process.cwd(),
   env: process.env,
@@ -9,4 +9,4 @@ const exitCode = await serve({
   stderr: (text) => process.stderr.write(text),
   stdout: (text) => process.stdout.write(text),
 });
-if (exitCode !== undefined) process.exit(exitCode);
+if ('exitCode' in started) process.exit(started.exitCode);

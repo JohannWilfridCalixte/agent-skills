@@ -1,6 +1,6 @@
 import type { Database as Schema } from './schema.js';
 
-import { mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { Database } from 'bun:sqlite';
@@ -11,9 +11,9 @@ import { MIGRATIONS } from './migrations/index.js';
 
 export type AppDatabase = Kysely<Schema>;
 
-/** Opens (creating its directory) and migrates the sqlite database (D22, D38). */
+/** Opens (creating its directory, 0700) and migrates the sqlite database (D22, D38); the files are 0600. */
 export async function openDatabase(path: string): Promise<AppDatabase> {
-  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+  if (path !== ':memory:') mkdirSync(dirname(path), { mode: 0o700, recursive: true });
   const sqlite = new Database(path, { create: true, strict: true });
   sqlite.run('PRAGMA journal_mode = WAL');
   sqlite.run('PRAGMA foreign_keys = ON');
@@ -25,5 +25,13 @@ export async function openDatabase(path: string): Promise<AppDatabase> {
     await db.destroy();
     throw new Error('Database migration failed', { cause: error });
   }
+  if (path !== ':memory:') restrictToUser(path);
   return db;
+}
+
+/** The database holds config snapshots and run output: user-only (D28). */
+function restrictToUser(path: string) {
+  for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+    if (existsSync(file)) chmodSync(file, 0o600);
+  }
 }

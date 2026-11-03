@@ -611,12 +611,15 @@ A local web UI and CLI to manage agentic from a clone of this repository (needs 
 
 ```bash
 bun install
-bun run serve          # builds the web UI, then starts the server
+bun run serve                              # builds the web UI, then serves with this clone registered
+bun run serve -- --project /path/to/repo   # registers and opens on another folder
 ```
+
+`agentic serve` registers the folder it starts in (cwd, or `--project <dir>`) as a project. `bun run serve` runs from the clone, so it registers the clone; pass `--project <dir>` (or run `bun run agentic -- serve --project "$PWD"` from your repository) to register another folder.
 
 It manages registered projects, global and project configuration (with history), harness installs and their status, live command runs, run and config history, browsing work items, and vendored skills.
 
-The server prints `http://127.0.0.1:<port>/#token=<token>` (default port 8787; `--port` or `AGENTIC_PORT` to change it): open that URL, the token authorises changes. It listens on 127.0.0.1 only and rejects other hosts and origins. Port and token are also written to `~/.agentic/serve.json` (`AGENTIC_HOME` to move it) while the server runs.
+The server prints `http://127.0.0.1:<port>/#token=<token>&project=<id>` (default port 8787; `--port` or `AGENTIC_PORT` to change it): open that URL, the UI opens on the registered project and the token authorises changes and the commands the UI runs. It listens on 127.0.0.1 only and rejects other hosts and origins. Port and token are also written to `~/.agentic/serve.json` (`AGENTIC_HOME` to move it) while the server runs.
 
 The same API is scriptable from the CLI: `bun run agentic -- <command>` (`bun run agentic -- help` for the list).
 

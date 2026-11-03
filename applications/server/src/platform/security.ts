@@ -21,12 +21,19 @@ export function hostAllowlist(port: number): MiddlewareHandler<AppEnv> {
   };
 }
 
-/** CSRF protection (D19): same-origin only. A missing Origin is a non-browser client, which still needs the token to write. */
+/** Fetch Metadata values a browser sends for the app's own page (`same-origin`) or a typed URL (`none`). */
+const ALLOWED_FETCH_SITES: ReadonlySet<string> = new Set(['none', 'same-origin']);
+
+/**
+ * CSRF protection (D19): same-origin only. Browsers omit Origin on cross-site no-cors GETs (`<img src>`) but always
+ * send `Sec-Fetch-Site`, so a present one must say same-origin or none. Neither header: a non-browser client (CLI, curl).
+ */
 export function originAllowlist(port: number): MiddlewareHandler<AppEnv> {
   const allowed = new Set(localHosts(port).map((host) => `http://${host}`));
   return async (c, next) => {
     const origin = c.req.header('origin');
-    if (origin !== undefined && !allowed.has(origin)) {
+    const site = c.req.header('sec-fetch-site');
+    if ((origin !== undefined && !allowed.has(origin)) || (site !== undefined && !ALLOWED_FETCH_SITES.has(site))) {
       return problem(c, { status: 403, title: 'Origin not allowed', type: 'origin_not_allowed' });
     }
     return next();
@@ -35,11 +42,18 @@ export function originAllowlist(port: number): MiddlewareHandler<AppEnv> {
 
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
-/** Write methods need `Authorization: Bearer <token>` (D28); digests make the compare constant-time whatever the length. */
-export function bearerTokenOnWrites(token: string): MiddlewareHandler<AppEnv> {
+const withoutTrailingSlash = (path: string) => (path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path);
+
+/**
+ * Writes, and GETs that launch a subprocess (`processGets`, full paths), need `Authorization: Bearer <token>` (D28,
+ * ADR 0009); pure reads stay tokenless. Digests make the compare constant-time whatever the length.
+ */
+export function bearerToken(token: string, processGets: readonly string[]): MiddlewareHandler<AppEnv> {
   const expected = digest(token);
+  const guardedGets = new Set(processGets.map(withoutTrailingSlash));
   return async (c, next) => {
-    if (!WRITE_METHODS.has(c.req.method)) return next();
+    const needsToken = WRITE_METHODS.has(c.req.method) || guardedGets.has(withoutTrailingSlash(c.req.path));
+    if (!needsToken) return next();
     const presented = /^Bearer (\S+)$/.exec(c.req.header('authorization') ?? '')?.[1];
     if (presented !== undefined && timingSafeEqual(digest(presented), expected)) return next();
     c.header('WWW-Authenticate', 'Bearer');

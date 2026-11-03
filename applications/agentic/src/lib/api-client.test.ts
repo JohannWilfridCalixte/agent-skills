@@ -71,13 +71,13 @@ describe('createApiClient', () => {
     expect(headersOf(fetch).get('authorization')).toBe(`Bearer ${TOKEN}`);
   });
 
-  it('does not send the token on reads', async () => {
+  it('sends the bearer token on reads, which process-spawning GETs require (ADR 0009)', async () => {
     const fetch = stubFetch(() => json({ projects: [] }));
     const api = createApiClient({ fetch, getToken: () => TOKEN });
 
-    await api.get('/projects', ProjectList);
+    await api.get('/install/status?scope=global', ProjectList);
 
-    expect(headersOf(fetch).has('authorization')).toBe(false);
+    expect(headersOf(fetch).get('authorization')).toBe(`Bearer ${TOKEN}`);
   });
 
   it('sends a correlation id on every request', async () => {

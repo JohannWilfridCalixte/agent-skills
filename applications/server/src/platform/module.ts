@@ -15,5 +15,7 @@ export interface ServerModule {
   /** Overrides `/api/<name>` for a slice nested under another resource (work-items lives under `/api/projects`). */
   readonly mountPath?: `/api/${string}`;
   readonly name: string;
+  /** GET routes (relative to the mount) that launch a subprocess: they need the bearer token like writes (ADR 0009). */
+  readonly processGets?: readonly string[];
   registerRoutes(app: Hono<AppEnv>): void;
 }

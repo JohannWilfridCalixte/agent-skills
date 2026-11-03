@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { captureToken } from './token';
+import { captureToken, readStartProject } from './token';
 
 function browserAt(url: string) {
   window.history.replaceState(null, '', url);
@@ -35,5 +35,21 @@ describe('captureToken', () => {
 
   it('returns undefined when there is no token anywhere', () => {
     expect(captureToken(browserAt('/'))).toBeUndefined();
+  });
+});
+
+describe('startup project (AC1)', () => {
+  it('moves #project= from the fragment into sessionStorage and strips it with the token', () => {
+    captureToken(browserAt('/#token=abc123&project=p-1'));
+
+    expect(readStartProject(window)).toBe('p-1');
+    expect(window.location.hash).toBe('');
+  });
+
+  it('has no startup project when serve gave none', () => {
+    sessionStorage.clear();
+    captureToken(browserAt('/#token=abc123'));
+
+    expect(readStartProject(window)).toBeUndefined();
   });
 });

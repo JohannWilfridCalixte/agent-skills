@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 
 import { useApi } from '@/lib/api-context';
+import { startScope } from '@/lib/start-scope';
 import { useListQuery } from '@/lib/use-list-query';
 import { EffectiveConfigResponse, RawConfigResponse } from '@agentic/contract-http/config';
 import { ProjectList } from '@agentic/contract-http/projects';
@@ -16,7 +17,7 @@ const GLOBAL_SCOPE = 'global';
 export function ConfigPage() {
   const api = useApi();
   const scopeId = useId();
-  const [scope, setScope] = useState(GLOBAL_SCOPE);
+  const [scope, setScope] = useState(startScope);
   const [tab, setTab] = useState('effective');
   const projects = useListQuery(['projects'], async (signal) => api.get('/projects', ProjectList, { signal }));
   const scopePath = configPath(scope);

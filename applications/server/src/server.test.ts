@@ -1,8 +1,11 @@
+import type { CliExec } from '@agentic/adapter-cli-exec';
+
 import type { ServerModule } from './platform/module.js';
 
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 
+import { fakeCliError } from '@agentic/adapter-cli-exec/testing';
 import { PROBLEM_CONTENT_TYPE, ProblemDetails } from '@agentic/contract-http/problem';
 
 import { createTestApp, TEST_HOST } from './platform/testing/test-app.js';
@@ -165,5 +168,72 @@ describe('request log (D33)', () => {
     const response = await request('/api/health', { headers: { 'x-correlation-id': 'bad id\n' } });
 
     expect(response.headers.get('x-correlation-id')).toMatch(/^[\w-]{8,}$/);
+  });
+});
+
+/** A CliExec that records every command, so tests can assert a rejected request spawned nothing. */
+function recordingCliExec() {
+  const commands: string[] = [];
+  const cliExec: CliExec = {
+    run: (command) => {
+      commands.push([command.cli, ...command.args].join(' '));
+      return Promise.resolve(fakeCliError(command.cli, 'not_found'));
+    },
+    stream: () => {
+      throw new Error('recordingCliExec: no streams expected');
+    },
+  };
+  return { cliExec, commands };
+}
+
+const PROCESS_SPAWNING_GETS = ['/api/install/harnesses', '/api/install/status?scope=global', '/api/models?harness=codex'] as const;
+
+describe('process-spawning GETs (AC25, ADR 0009)', () => {
+  for (const path of PROCESS_SPAWNING_GETS) {
+    it(`rejects a cross-site no-Origin no-token GET ${path} and spawns nothing`, async () => {
+      const { cliExec, commands } = recordingCliExec();
+      const { request } = await createTestApp({ cliExec });
+
+      const response = await request(path, { headers: { 'authorization': '', 'sec-fetch-dest': 'image', 'sec-fetch-mode': 'no-cors', 'sec-fetch-site': 'cross-site' } });
+
+      await expectProblem(response, 403, 'origin_not_allowed');
+      expect(commands).toEqual([]);
+    });
+
+    it(`requires the token on GET ${path} and spawns nothing without it`, async () => {
+      const { cliExec, commands } = recordingCliExec();
+      const { request } = await createTestApp({ cliExec });
+
+      const response = await request(path, { headers: { authorization: '' } });
+
+      await expectProblem(response, 401, 'unauthorized');
+      expect(commands).toEqual([]);
+    });
+
+    it(`answers GET ${path} with the token`, async () => {
+      const { cliExec, commands } = recordingCliExec();
+      const { request } = await createTestApp({ cliExec });
+
+      const response = await request(path, { headers: { 'sec-fetch-site': 'same-origin' } });
+
+      expect(response.status).toBe(200);
+      expect(commands.length).toBeGreaterThan(0);
+    });
+  }
+
+  it('rejects a cross-site request even on a tokenless read', async () => {
+    const { request } = await createTestApp();
+
+    const response = await request('/api/projects', { headers: { 'authorization': '', 'sec-fetch-site': 'cross-site' } });
+
+    await expectProblem(response, 403, 'origin_not_allowed');
+  });
+
+  it('keeps pure reads tokenless (D28)', async () => {
+    const { request } = await createTestApp();
+
+    const response = await request('/api/projects', { headers: { 'authorization': '', 'sec-fetch-site': 'none' } });
+
+    expect(response.status).toBe(200);
   });
 });

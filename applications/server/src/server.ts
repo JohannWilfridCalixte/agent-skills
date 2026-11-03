@@ -8,7 +8,7 @@ import { assertModules } from './module-registry.js';
 import { correlationId } from './platform/correlation.js';
 import { problem } from './platform/problem.js';
 import { requestLog } from './platform/request-log.js';
-import { bearerTokenOnWrites, hostAllowlist, originAllowlist } from './platform/security.js';
+import { bearerToken, hostAllowlist, originAllowlist } from './platform/security.js';
 import { registerWebUi } from './platform/web-ui.js';
 
 export interface AppDependencies {
@@ -26,12 +26,14 @@ export function createApp({ logger, modules, port, token, webRoot }: AppDependen
   assertModules(modules);
   const app = new Hono<AppEnv>();
 
-  app.use(correlationId(), requestLog(logger), hostAllowlist(port), originAllowlist(port), bearerTokenOnWrites(token));
+  const mountPathOf = (module: ServerModule) => module.mountPath ?? `/api/${module.name}`;
+  const processGets = modules.flatMap((module) => (module.processGets ?? []).map((path) => `${mountPathOf(module)}${path}`));
+  app.use(correlationId(), requestLog(logger), hostAllowlist(port), originAllowlist(port), bearerToken(token, processGets));
 
   for (const module of modules) {
     const router = new Hono<AppEnv>();
     module.registerRoutes(router);
-    app.route(module.mountPath ?? `/api/${module.name}`, router);
+    app.route(mountPathOf(module), router);
   }
 
   if (webRoot !== undefined) registerWebUi(app, webRoot);

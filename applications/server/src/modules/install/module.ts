@@ -26,10 +26,10 @@ export function createInstallModule({ cliExec, projects, runs, userHome }: Insta
   const environment = createCliHarnessEnvironment(cliExec, userHome);
   const service = createInstallService(environment);
   const catalogue = createCatalogueService({ environment, projects, runs, userHome });
-  const install = { name: 'install', registerRoutes: (app) => {
+  const install = { name: 'install', processGets: ['/harnesses', '/status'], registerRoutes: (app) => {
     registerInstallRoutes(app, service, catalogue);
   } } satisfies ServerModule;
-  const models = { name: 'models', registerRoutes: (app) => {
+  const models = { name: 'models', processGets: ['/'], registerRoutes: (app) => {
     registerModelsRoutes(app, service);
   } } satisfies ServerModule;
   return { modules: [install, models], service };

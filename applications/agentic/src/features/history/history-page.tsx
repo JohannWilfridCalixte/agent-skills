@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { ProjectSelect } from '@/features/projects/project-select';
 import { useApi } from '@/lib/api-context';
 import { ApiRequestError, describeApiError, unwrap } from '@/lib/api-error';
+import { startScope } from '@/lib/start-scope';
 import { useListQuery } from '@/lib/use-list-query';
 import { ConfigRestorePreviewResponse, ConfigRestoreResponse } from '@agentic/contract-http/config';
 import { HistoryList } from '@agentic/contract-http/history';
@@ -23,7 +24,7 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
 
 export function HistoryPage() {
   const api = useApi();
-  const [scope, setScope] = useState('global');
+  const [scope, setScope] = useState(startScope);
   const [selectedId, setSelectedId] = useState<string>();
   const projects = useListQuery(['projects'], async (signal) => api.get('/projects', ProjectList, { signal }));
   const history = useListQuery(['history', scope], async (signal) => api.get(`/history?scope=${encodeURIComponent(scope)}`, HistoryList, { signal }));

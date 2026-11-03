@@ -31,7 +31,7 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 interface ApiClientConfig {
   readonly baseUrl?: string;
   readonly fetch?: Fetch;
-  /** Read on every write, so a token captured after the client was built is still used. */
+  /** Read on every request, so a token captured after the client was built is still used. */
   readonly getToken: () => string | undefined;
 }
 
@@ -54,20 +54,20 @@ const networkError = (correlationId: string) => (cause: unknown) =>
 export type ApiClient = ReturnType<typeof createApiClient>;
 
 /**
- * Every call resolves to a `Result`; it never rejects. The bearer token goes on writes only (the API requires it
- * there, D28); every request carries an `x-correlation-id`.
+ * Every call resolves to a `Result`; it never rejects. The bearer token goes on every request: writes and the GETs that
+ * launch a subprocess require it (D28, ADR 0009), pure reads ignore it. Every request carries an `x-correlation-id`.
  */
 export function createApiClient({ baseUrl = '/api', fetch = async (input, init) => globalThis.fetch(input, init), getToken }: ApiClientConfig) {
-  function headersFor(withToken: boolean, accept: string) {
+  function headersFor(accept: string) {
     const correlationId = crypto.randomUUID();
     const headers = new Headers({ accept, 'x-correlation-id': correlationId });
-    const token = withToken ? getToken() : undefined;
+    const token = getToken();
     if (token !== undefined && token !== '') headers.set('authorization', `Bearer ${token}`);
     return { correlationId, headers };
   }
 
   async function request<T>(path: string, { body, method = 'GET', schema, signal }: RequestOptions<T>) {
-    const { correlationId, headers } = headersFor(method !== 'GET', 'application/json');
+    const { correlationId, headers } = headersFor('application/json');
     if (body !== undefined) headers.set('content-type', 'application/json');
     const toNetworkError = networkError(correlationId);
 
@@ -90,7 +90,7 @@ export function createApiClient({ baseUrl = '/api', fetch = async (input, init) 
    * event; an error is yielded once and ends the stream.
    */
   async function* subscribeToRun(runId: string, { signal }: CallOptions = {}) {
-    const { correlationId, headers } = headersFor(true, 'text/event-stream');
+    const { correlationId, headers } = headersFor('text/event-stream');
     const toNetworkError = networkError(correlationId);
 
     const response = await fromPromise(

@@ -28,7 +28,7 @@ export function createApp({ logger, modules, port, token }: AppDependencies) {
   for (const module of modules) {
     const router = new Hono<AppEnv>();
     module.registerRoutes(router);
-    app.route(`/api/${module.name}`, router);
+    app.route(module.mountPath ?? `/api/${module.name}`, router);
   }
 
   app.notFound((c) => problem(c, { status: 404, title: 'Not found', type: 'not_found' }));

@@ -10,8 +10,10 @@ export interface ModuleContext {
   readonly homeDir: string;
 }
 
-/** A feature slice, mounted at `/api/<name>`; routes are relative to that prefix. */
+/** A feature slice, mounted at `/api/<name>` (or `mountPath`); routes are relative to that prefix. */
 export interface ServerModule {
+  /** Overrides `/api/<name>` for a slice nested under another resource (work-items lives under `/api/projects`). */
+  readonly mountPath?: `/api/${string}`;
   readonly name: string;
   registerRoutes(app: Hono<AppEnv>): void;
 }

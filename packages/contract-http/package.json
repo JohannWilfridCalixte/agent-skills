@@ -34,6 +34,11 @@
       "development": "./src/runs/index.ts",
       "types": "./dist/runs/index.d.ts",
       "default": "./dist/runs/index.js"
+    },
+    "./work-items": {
+      "development": "./src/work-items/index.ts",
+      "types": "./dist/work-items/index.d.ts",
+      "default": "./dist/work-items/index.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 import { restrictedSyntax } from '@w5s/eslint-config';
 
 import { plugin } from './module-isolation.js';
-import { restrictedImportPaths } from './restricted-import-paths.js';
+import { restrictedImportPaths, serverRestrictedImportPaths } from './restricted-import-paths.js';
 
 const NO_ESCAPE = {
   group: ['**/applications/**', '**/packages/**'],
@@ -16,11 +16,11 @@ export function serverBoundaries() {
     { plugins: { agentic: plugin } },
     {
       files: ['src/**/*.ts'],
-      rules: { 'no-restricted-imports': ['error', { paths: restrictedImportPaths, patterns: [NO_ESCAPE] }] },
+      rules: { 'no-restricted-imports': ['error', { paths: serverRestrictedImportPaths, patterns: [NO_ESCAPE] }] },
     },
     {
       files: ['src/**/*.test.ts'],
-      rules: { 'no-restricted-imports': ['error', { paths: restrictedImportPaths, patterns: [NO_ESCAPE] }] },
+      rules: { 'no-restricted-imports': ['error', { paths: serverRestrictedImportPaths, patterns: [NO_ESCAPE] }] },
     },
     {
       files: ['src/modules/**/*.ts'],

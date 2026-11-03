@@ -1,4 +1,4 @@
-import { restrictedImportPaths } from './restricted-import-paths.js';
+import { adapterRestrictedImportPaths, restrictedImportPaths } from './restricted-import-paths.js';
 
 const SCOPE = '@agentic';
 const SOURCE_FILES = ['src/**/*.{ts,tsx}'];
@@ -37,6 +37,7 @@ const NO_PORTS = {
 };
 
 const restrict = (...patterns) => ['error', { paths: restrictedImportPaths, patterns }];
+const restrictAdapter = (...patterns) => ['error', { paths: adapterRestrictedImportPaths, patterns }];
 
 function pureBlocks({ allow, layered, slug }) {
   const production = allowOnly(
@@ -130,5 +131,5 @@ const NO_DOMAIN_POLICY = {
 
 /** `adapter-*` (and other infrastructure packages): runtime SDKs are fine, module domain policy is not. @param {string} slug */
 export function adapterBoundaries(slug) {
-  return [{ files: SOURCE_FILES, rules: { 'no-restricted-imports': restrict(NO_DOMAIN_POLICY, noEscape(slug)) } }];
+  return [{ files: SOURCE_FILES, rules: { 'no-restricted-imports': restrictAdapter(NO_DOMAIN_POLICY, noEscape(slug)) } }];
 }

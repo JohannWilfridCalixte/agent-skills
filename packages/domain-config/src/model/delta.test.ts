@@ -42,6 +42,44 @@ describe('delta (AC5, AC6)', () => {
     expect(unknownKeys).toEqual(['knowledge.extra', 'review']);
   });
 
+  it('keeps a built-in-equal profile carrying an unknown key, and reports it', () => {
+    const { content, unknownKeys } = contentOf({ profiles: [{ ...BUILT_IN_PROFILES[0], extra: 1 }] });
+
+    expect(content).toEqual({ profiles: [{ ...BUILT_IN_PROFILES[0], extra: 1 }] });
+    expect(unknownKeys).toEqual(['profiles.0.extra']);
+  });
+
+  it('keeps only the unknown-bearing entry of a mixed profile list', () => {
+    const { content } = contentOf({ output: 'new', profiles: [{ name: 'custom', skills: ['x'] }, { ...BUILT_IN_PROFILES[0], future: { keep: 42 } }] });
+
+    expect(content).toEqual({ output: 'new', profiles: [{ name: 'custom', skills: ['x'] }, { ...BUILT_IN_PROFILES[0], future: { keep: 42 } }] });
+  });
+
+  it('keeps unknown keys nested in step and knowledge entries', () => {
+    const { content } = contentOf({ knowledge: { root: 'docs', x: 1 }, steps: { claude: { explore: { effort: 'medium', y: 2 } } } });
+
+    expect(content).toEqual({ knowledge: { x: 1 }, steps: { claude: { explore: { y: 2 } } } });
+  });
+
+  it.each([undefined, { output: 'g', profiles: [...BUILT_IN_PROFILES] }])('every reported unknown key exists in the written text (global %#)', (global) => {
+    const raw = {
+      knowledge: { root: 'docs', u1: 1 },
+      limits: { 'review.iterations': 3 },
+      output: '.agentic/work',
+      profiles: [{ ...BUILT_IN_PROFILES[0], u2: { deep: true } }, { name: 'c', skills: [], u3: [] }],
+      steps: { claude: { 'explore': { effort: 'medium', u4: 'a' }, 'review.x': { model: 'm', u5: null } } },
+      u7: 'top',
+    };
+    const result = delta(raw, global === undefined ? undefined : (parseConfigFile(global) as { value: ConfigFile }).value);
+    if (!result.ok) throw new Error('invalid');
+    const written: unknown = JSON.parse(result.value.text);
+    const at = (value: unknown, path: string): unknown =>
+      path.split('.').reduce<unknown>((node, key) => (typeof node === 'object' && node !== null && key in node ? (node as Record<string, unknown>)[key] : Symbol.for('missing')), value);
+
+    expect(result.value.unknownKeys.length).toBeGreaterThanOrEqual(6);
+    for (const key of result.value.unknownKeys) expect({ key, value: at(written, key) }).toEqual({ key, value: at(raw, key) });
+  });
+
   it('writes fields in documented order, unknown keys last', () => {
     expect(Object.keys(contentOf({ output: 'o', review: {}, worktrees: 'w' }).content)).toEqual(['output', 'worktrees', 'review']);
   });
@@ -72,10 +110,31 @@ describe('delta against the global file (project scope)', () => {
     expect(result.ok && result.value.content).toEqual({ limits: { 'review.iterations': 3 }, output: '.agentic/work' });
   });
 
-  it('drops a project value equal to what the global file already sets', () => {
+  it('keeps a project value equal to a non-default global value (pinned)', () => {
     const result = delta({ limits: { 'review.iterations': 5 }, worktrees: '../wt' }, globalFile({ limits: { 'review.iterations': 5 }, worktrees: '../wt' }));
 
-    expect(result.ok && result.value.content).toEqual({});
+    expect(result.ok && result.value.content).toEqual({ limits: { 'review.iterations': 5 }, worktrees: '../wt' });
+  });
+
+  it('saves an unchanged project file unchanged when global has the same values', () => {
+    const project = { commitWork: true, output: 'out', reviewers: ['code-review'] };
+    const result = delta(project, globalFile({ output: 'out', reviewers: ['code-review'] }));
+
+    expect(result.ok && result.value.content).toEqual(project);
+  });
+
+  it('drops a project value equal to the built-in default when global does not differ', () => {
+    const result = delta({ output: '.agentic/work', worktrees: '../wt' }, globalFile({ worktrees: '../other' }));
+
+    expect(result.ok && result.value.content).toEqual({ worktrees: '../wt' });
+  });
+
+  it('keeps a profile with unknown keys equal to the global profile, and reports the key', () => {
+    const result = delta({ profiles: [{ name: 'custom', note: 'keep me', skills: ['x'] }] }, globalFile({ profiles: [{ name: 'custom', skills: ['x'] }] }));
+    if (!result.ok) throw new Error('invalid');
+
+    expect(JSON.parse(result.value.text)).toEqual({ profiles: [{ name: 'custom', note: 'keep me', skills: ['x'] }] });
+    expect(result.value.unknownKeys).toEqual(['profiles.0.note']);
   });
 
   /** Strips origins: what agents would actually use, field by field and per step leaf. */
@@ -116,10 +175,11 @@ describe('delta against the global file (project scope)', () => {
     expect(result.ok && result.value.content).toEqual({ knowledge: { extra: 42, root: 'kb' } });
   });
 
-  it('still drops a project value it would inherit from the global file', () => {
-    const result = delta({ knowledge: { root: 'kb' }, steps: { claude: { 'review.super-review': { model: 'r' } } } }, globalFile({ knowledge: { root: 'kb' }, steps: { claude: { review: { model: 'r' } } } }));
+  it('keeps non-default project values even when the global file gives the same result', () => {
+    const edited = { knowledge: { root: 'kb' }, steps: { claude: { 'review.super-review': { model: 'r' } } } };
+    const result = delta(edited, globalFile({ knowledge: { root: 'kb' }, steps: { claude: { review: { model: 'r' } } } }));
 
-    expect(result.ok && result.value.content).toEqual({});
+    expect(result.ok && result.value.content).toEqual(edited);
   });
 });
 

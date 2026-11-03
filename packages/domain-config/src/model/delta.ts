@@ -42,26 +42,28 @@ type Path = readonly (number | string)[];
 
 /**
  * Validates an edited (full or partial) config and reduces it to what the file must hold (D11).
- * A known value is dropped only when removing it leaves the effective config unchanged: against the
- * built-in defaults for the global file (`global` absent), against `global` merged over the defaults for a
- * project file, with the whole-replacement rules of `effective` applied. Unknown keys, top-level or nested in
- * known objects, are copied untouched and flagged.
+ * A known value is dropped only when it equals the built-in default: removing it leaves the config over the
+ * built-in defaults unchanged. For a project file it must also leave `global` merged over the defaults unchanged,
+ * so a value equal to the built-in default that overrides a differing global value stays; a value merely equal to
+ * global is kept (the user pinned it). Unknown keys, at any depth, are never removed (nor anything holding one) and are flagged.
  */
 export function delta(edited: unknown, global?: ConfigFile): Result<ConfigDelta, readonly ConfigIssue[]> {
   const parsed = parseConfigFile(edited);
   if (!parsed.ok) return parsed;
   const { raw, unknownKeys, values } = parsed.value;
 
-  const viewOf = (content: Json) => {
+  const layerOf = (content: Json) => {
     const file = parseConfigFile(content);
-    const layer = file.ok ? file.value : EMPTY_CONFIG_FILE;
-    return global === undefined ? effective(layer) : effective(global, layer);
+    return file.ok ? file.value : EMPTY_CONFIG_FILE;
   };
-  const target = meaning(viewOf(raw));
+  const builtIn = (content: Json) => meaning(effective(layerOf(content)));
+  const inherited = (content: Json) => (global === undefined ? undefined : meaning(effective(global, layerOf(content))));
+  const targetBuiltIn = builtIn(raw);
+  const targetInherited = inherited(raw);
   let content: Json = raw;
   for (const path of removablePaths(raw)) {
     const candidate = without(content, path, unknownKeys);
-    if (candidate !== undefined && jsonEqual(meaning(viewOf(candidate)), target)) content = candidate;
+    if (candidate !== undefined && jsonEqual(builtIn(candidate), targetBuiltIn) && jsonEqual(inherited(candidate), targetInherited)) content = candidate;
   }
 
   const ordered: Record<string, unknown> = {};
@@ -129,14 +131,13 @@ function without(content: Json, path: Path, unknownKeys: readonly string[]): Rec
   let parent: unknown = copy;
   for (const segment of path.slice(0, -1)) parent = isObject(parent) || Array.isArray(parent) ? (parent as Record<number | string, unknown>)[segment] : undefined;
   const last = path.at(-1);
+  const dotted = path.join('.');
+  if (unknownKeys.some((key) => key === dotted || key.startsWith(`${dotted}.`))) return undefined;
   if (Array.isArray(parent) && typeof last === 'number') {
     parent.splice(last, 1);
     return copy;
   }
   if (!isObject(parent) || typeof last !== 'string' || !(last in parent)) return undefined;
-  const target = parent[last];
-  const dotted = path.join('.');
-  if (isObject(target) && unknownKeys.some((key) => key === dotted || key.startsWith(`${dotted}.`))) return undefined;
   Reflect.deleteProperty(parent, last);
   return copy;
 }

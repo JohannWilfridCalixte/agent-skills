@@ -5,6 +5,11 @@
   "description": "HTTP wire contract between server and web: zod schemas and inferred types, one subpath per module (declarative only).",
   "type": "module",
   "exports": {
+    "./config": {
+      "development": "./src/config/index.ts",
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
     "./history": {
       "development": "./src/history/index.ts",
       "types": "./dist/history/index.d.ts",

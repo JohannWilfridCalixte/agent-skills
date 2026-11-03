@@ -6,6 +6,8 @@ import type { AppDatabase } from './db/db.js';
 /** What a feature module may build its adapters from. */
 export interface ModuleContext {
   readonly db: AppDatabase;
+  /** `AGENTIC_HOME` or `~/.agentic`; holds the global `config.json`. */
+  readonly homeDir: string;
 }
 
 /** A feature slice, mounted at `/api/<name>`; routes are relative to that prefix. */

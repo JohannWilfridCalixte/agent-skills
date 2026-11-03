@@ -7,6 +7,8 @@ export const TEST_HOST = `127.0.0.1:${String(TEST_PORT)}`;
 const TEST_TOKEN = 'test-token-0123456789abcdef';
 
 export interface TestAppOptions {
+  /** `AGENTIC_HOME` for the run (global `config.json` lives here); defaults to a path that does not exist. */
+  readonly homeDir?: string;
   readonly modules?: readonly ServerModule[];
 }
 
@@ -14,12 +16,12 @@ export interface TestAppOptions {
  * The real app over an in-memory sqlite (D30). `request()` adds a valid Host and the bearer token;
  * pass `host` or `authorization` in `init.headers` to override them (empty string removes the token).
  */
-export async function createTestApp({ modules = [] }: TestAppOptions = {}) {
+export async function createTestApp({ homeDir = '/nonexistent/agentic-test-home', modules = [] }: TestAppOptions = {}) {
   const logLines: string[] = [];
   const { app, db, historyLog } = await compose({
     extraModules: modules,
     logSink: (line) => logLines.push(line),
-    settings: { dbPath: ':memory:', homeDir: '/nonexistent/agentic-test-home', port: TEST_PORT },
+    settings: { dbPath: ':memory:', homeDir, port: TEST_PORT },
     token: TEST_TOKEN,
   });
 

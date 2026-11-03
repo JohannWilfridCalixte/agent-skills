@@ -18,7 +18,7 @@ export interface CompositionInput {
 export async function compose({ extraModules = [], logSink, settings, token }: CompositionInput) {
   const db = await openDatabase(settings.dbPath);
   const logger = createLogger(logSink);
-  const { historyLog, modules, projects } = createModules({ db });
+  const { historyLog, modules, projects } = createModules({ db, homeDir: settings.homeDir });
   const app = createApp({ logger, modules: [...modules, ...extraModules], port: settings.port, token });
   return { app, db, historyLog, logger, projects };
 }

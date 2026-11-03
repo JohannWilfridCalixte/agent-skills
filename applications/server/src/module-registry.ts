@@ -2,6 +2,7 @@ import type { HistoryLog } from '@agentic/domain-shared';
 
 import type { ModuleContext, ServerModule } from './platform/module.js';
 
+import { createConfigModule } from './modules/config/module.js';
 import { createHistoryModule } from './modules/history/module.js';
 import { createProjectsModule } from './modules/projects/module.js';
 import { healthModule } from './platform/health.js';
@@ -25,6 +26,7 @@ export function createModules(context: ModuleContext) {
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
-  const modules: readonly ServerModule[] = [healthModule, projects, history];
+  const config = createConfigModule(context, { projects: projects.service });
+  const modules: readonly ServerModule[] = [healthModule, projects, history, config];
   return { historyLog, modules, projects: projects.service };
 }

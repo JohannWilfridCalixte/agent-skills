@@ -1,5 +1,5 @@
 import type { CliExec } from '@agentic/adapter-cli-exec';
-import type { CommandRunner, HistoryLog, ModelSource, RunService } from '@agentic/domain-shared';
+import type { CommandRunner, HistoryLog, HistoryReader, ModelSource, RunService } from '@agentic/domain-shared';
 
 import type { ModuleContext, ServerModule } from './platform/module.js';
 
@@ -41,10 +41,16 @@ export function createModules(context: ModuleContext, { cliExec, commandRunner =
   const projects = createProjectsModule(context);
   const history = createHistoryModule(context);
   const historyLog: HistoryLog = history.service;
+  const historyReader: HistoryReader = {
+    get: async (id) => {
+      const found = await history.service.get(id);
+      return found.ok ? found.value : undefined;
+    },
+  };
   const runs: RunService = createRunService({ history: historyLog, runner: commandRunner });
   const install = createInstallModule({ cliExec, projects: projects.service, runs, userHome });
   const models: ModelSource = install.service;
-  const config = createConfigModule(context, { history: historyLog, models, projects: projects.service });
+  const config = createConfigModule(context, { history: historyLog, historyReader, models, projects: projects.service });
   const modules: readonly ServerModule[] = [healthModule, projects, history, config, createRunsModule(runs), ...install.modules];
   return { historyLog, modules, projects: projects.service, runs };
 }

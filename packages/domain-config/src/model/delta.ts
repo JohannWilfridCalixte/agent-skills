@@ -2,12 +2,13 @@ import type { Result } from '@agentic/kernel-result';
 
 import type { ConfigIssue, ConfigValues } from './config-file.js';
 import type { Harness } from './defaults.js';
+import type { EffectiveConfig } from './effective.js';
 
 import { ok } from '@agentic/kernel-result';
 
-import { parseConfigFile } from './config-file.js';
-import { BUILT_IN_PROFILES, CONFIG_FIELDS, DEFAULT_LIMITS, FIELD_DEFAULTS, HARNESSES } from './defaults.js';
-import { defaultStep } from './effective.js';
+import { EMPTY_CONFIG_FILE, parseConfigFile } from './config-file.js';
+import { BUILT_IN_PROFILES, CONFIG_FIELDS, HARNESSES } from './defaults.js';
+import { effective } from './effective.js';
 
 /** The file content to write for an edited config: only non-default values, unknown keys untouched. */
 export interface ConfigDelta {
@@ -40,10 +41,11 @@ export const serialiseConfig = (content: Json) => `${JSON.stringify(content, nul
 
 /**
  * Validates an edited (full or partial) config and reduces it to what the file must hold.
- * A value equal to its built-in default is dropped even when the file already had it: the file stays
- * minimal (D11). Unknown keys, top-level or nested in known objects, are copied untouched and flagged.
+ * A value equal to what `baseline` already gives is dropped even when the file already had it: the file
+ * stays minimal (D11). `baseline` is the built-in defaults for the global file, and defaults merged with
+ * the global file for a project file, so a project value overriding a global one is kept. Unknown keys, top-level or nested in known objects, are copied untouched and flagged.
  */
-export function delta(edited: unknown): Result<ConfigDelta, readonly ConfigIssue[]> {
+export function delta(edited: unknown, baseline: EffectiveConfig = effective(EMPTY_CONFIG_FILE)): Result<ConfigDelta, readonly ConfigIssue[]> {
   const parsed = parseConfigFile(edited);
   if (!parsed.ok) return parsed;
   const { raw, unknownKeys, values } = parsed.value;
@@ -51,7 +53,7 @@ export function delta(edited: unknown): Result<ConfigDelta, readonly ConfigIssue
   const content: Record<string, unknown> = {};
   for (const field of CONFIG_FIELDS) {
     if (!(field in raw)) continue;
-    const reduced = reduceField(field, raw[field]);
+    const reduced = reduceField(field, raw[field], baseline);
     if (reduced !== undefined) content[field] = reduced;
   }
   for (const [key, value] of Object.entries(raw)) if (!KNOWN.has(key)) content[key] = value;
@@ -61,21 +63,21 @@ export function delta(edited: unknown): Result<ConfigDelta, readonly ConfigIssue
 
 const nonEmpty = (value: Json) => (Object.keys(value).length > 0 ? value : undefined);
 
-function reduceField(field: (typeof CONFIG_FIELDS)[number], value: unknown): unknown {
+function reduceField(field: (typeof CONFIG_FIELDS)[number], value: unknown, baseline: EffectiveConfig): unknown {
   switch (field) {
     case 'commitWork':
     case 'output':
     case 'reviewers':
     case 'selectedProfiles':
     case 'worktrees': {
-      return jsonEqual(value, FIELD_DEFAULTS[field]) ? undefined : value;
+      return jsonEqual(value, baseline[field].value) ? undefined : value;
     }
     case 'knowledge': {
       const { root, ...rest } = value as Json;
-      return nonEmpty(root === undefined || root === FIELD_DEFAULTS['knowledge.root'] ? rest : { ...rest, root });
+      return nonEmpty(root === undefined || root === baseline.knowledge.root.value ? rest : { ...rest, root });
     }
     case 'limits': {
-      const entries = Object.entries(value as Json).filter(([key, limit]) => DEFAULT_LIMITS[key] !== limit);
+      const entries = Object.entries(value as Json).filter(([key, limit]) => baseline.limits[key]?.value !== limit);
       return nonEmpty(Object.fromEntries(entries));
     }
     case 'profiles': {
@@ -83,7 +85,7 @@ function reduceField(field: (typeof CONFIG_FIELDS)[number], value: unknown): unk
       return kept.length > 0 ? kept : undefined;
     }
     case 'steps': {
-      return reduceSteps(value as Json);
+      return reduceSteps(value as Json, baseline);
     }
     default: {
       return field satisfies never;
@@ -91,25 +93,25 @@ function reduceField(field: (typeof CONFIG_FIELDS)[number], value: unknown): unk
   }
 }
 
-function reduceStepEntry(harness: Harness, key: string, entry: Json) {
-  const base = defaultStep(harness, key);
+function reduceStepEntry(harness: Harness, key: string, entry: Json, baseline: EffectiveConfig) {
+  const base = baseline.steps[harness][key] ?? {};
   const kept: Record<string, unknown> = {};
   for (const [field, leaf] of Object.entries(entry)) {
-    const builtIn = field === 'effort' || field === 'model' || field === 'harness' ? base[field]?.value : undefined;
-    const isDefault = field === 'harness' ? leaf === harness : leaf === builtIn;
+    const inherited = field === 'effort' || field === 'model' || field === 'harness' ? base[field]?.value : undefined;
+    const isDefault = field === 'harness' ? leaf === (base.harness?.value ?? harness) : leaf === inherited;
     if (!isDefault) kept[field] = leaf;
   }
   return nonEmpty(kept);
 }
 
-function reduceSteps(steps: Json) {
+function reduceSteps(steps: Json, baseline: EffectiveConfig) {
   const result: Record<string, unknown> = {};
   for (const harness of HARNESSES) {
     const entries = steps[harness];
     if (!isObject(entries)) continue;
     const kept: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(entries)) {
-      const reduced = reduceStepEntry(harness, key, entry as Json);
+      const reduced = reduceStepEntry(harness, key, entry as Json, baseline);
       if (reduced !== undefined) kept[key] = reduced;
     }
     const harnessSteps = nonEmpty(kept);

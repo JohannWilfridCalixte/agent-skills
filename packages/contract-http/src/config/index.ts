@@ -105,3 +105,25 @@ export const ConfigSaveResponse = z.object({
 });
 
 export type ConfigSaveResponse = z.infer<typeof ConfigSaveResponse>;
+
+/** `POST /api/config/restore/:id/preview`: diff of the file on disk against history entry `entryId`'s content; nothing is written. */
+export const ConfigRestorePreviewResponse = z.object({
+  diff: z.array(ConfigDiffLine),
+  entryId: z.string(),
+  proposedText: z.string(),
+  /** The entry's scope, which is the file restored. */
+  scope: z.string(),
+});
+
+export type ConfigRestorePreviewResponse = z.infer<typeof ConfigRestorePreviewResponse>;
+
+/** `POST /api/config/restore/:id`: the entry's content was written; the pre-restore content and the restore are new history entries. */
+export const ConfigRestoreResponse = z.object({
+  /** `false` when the file already held this text: nothing written or recorded. */
+  changed: z.boolean(),
+  restoredFrom: z.string(),
+  scope: z.string(),
+  text: z.string(),
+});
+
+export type ConfigRestoreResponse = z.infer<typeof ConfigRestoreResponse>;

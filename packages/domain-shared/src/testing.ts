@@ -5,6 +5,7 @@ import type { HistoryEntry, HistoryScope, NewHistoryEntry } from './model/histor
 import type { Project } from './model/project.js';
 import type { CommandRunner } from './ports/command-runner.js';
 import type { HistoryLog } from './ports/history-log.js';
+import type { HistoryReader } from './ports/history-reader.js';
 import type { ProjectRegistry } from './ports/project-registry.js';
 
 import { err, ok } from '@agentic/kernel-result';
@@ -39,8 +40,12 @@ export class FakeCommandRunner implements CommandRunner {
 }
 
 /** Keeps run output whole (no tail cap: that rule lives in `domain-history`); lists newest first. */
-export class InMemoryHistoryLog implements HistoryLog {
+export class InMemoryHistoryLog implements HistoryLog, HistoryReader {
   readonly entries: HistoryEntry[] = [];
+
+  get(id: string) {
+    return Promise.resolve(this.entries.find((entry) => entry.id === id));
+  }
 
   list(scope: HistoryScope, { limit }: { readonly limit?: number } = {}) {
     const matching = this.entries.filter((entry) => entry.scope === scope).toReversed();

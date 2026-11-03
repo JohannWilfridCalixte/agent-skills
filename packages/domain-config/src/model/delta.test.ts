@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseConfigFile } from './config-file.js';
 import { BUILT_IN_PROFILES, DEFAULT_REVIEWERS } from './defaults.js';
 import { delta } from './delta.js';
+import { effective } from './effective.js';
 
 const contentOf = (edited: unknown) => {
   const result = delta(edited);
@@ -53,5 +54,25 @@ describe('delta (AC5, AC6)', () => {
     const result = delta({ limits: { 'review.iterations': 'x' }, steps: { claude: { implement: { effort: 1 } }, vim: {} } });
 
     expect(!result.ok && result.error.map((issue) => issue.path)).toEqual(['limits.review.iterations', 'steps.claude.implement.effort', 'steps.vim']);
+  });
+});
+
+describe('delta against an inherited baseline (project scope)', () => {
+  const globalBaseline = (file: unknown) => {
+    const parsed = parseConfigFile(file);
+    if (!parsed.ok) throw new Error('bad fixture');
+    return effective(parsed.value);
+  };
+
+  it('keeps a project value equal to a built-in default when it overrides a non-default global value', () => {
+    const result = delta({ limits: { 'review.iterations': 3 }, output: '.agentic/work' }, globalBaseline({ limits: { 'review.iterations': 5 }, output: 'elsewhere' }));
+
+    expect(result.ok && result.value.content).toEqual({ limits: { 'review.iterations': 3 }, output: '.agentic/work' });
+  });
+
+  it('drops a project value equal to what the global file already sets', () => {
+    const result = delta({ limits: { 'review.iterations': 5 }, worktrees: '../wt' }, globalBaseline({ limits: { 'review.iterations': 5 }, worktrees: '../wt' }));
+
+    expect(result.ok && result.value.content).toEqual({});
   });
 });

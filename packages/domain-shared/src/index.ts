@@ -5,6 +5,7 @@ export type { Project } from './model/project.js';
 export type { CancelRunError, InvalidRunSpec, RunEvent, RunNotFound, RunNotRunning, RunSpec, RunStatus, RunSummary, RunView } from './model/run.js';
 export type { CommandRunner } from './ports/command-runner.js';
 export type { HistoryLog } from './ports/history-log.js';
+export type { HistoryReader } from './ports/history-reader.js';
 export type { HarnessName, ModelListing, ModelSource } from './ports/model-source.js';
 export type { ProjectRegistry } from './ports/project-registry.js';
 export type { RunService } from './ports/run-service.js';

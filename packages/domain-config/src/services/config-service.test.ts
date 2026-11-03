@@ -9,7 +9,8 @@ const PROJECT_PATH = '/work/app';
 
 function setup() {
   const store = new InMemoryConfigStore();
-  const service = createConfigService({ history: new InMemoryHistoryLog(), projects: new InMemoryProjectRegistry([PROJECT_PATH]), store });
+  const historyLog = new InMemoryHistoryLog();
+  const service = createConfigService({ history: historyLog, historyReader: historyLog, projects: new InMemoryProjectRegistry([PROJECT_PATH]), store });
   return { service, store };
 }
 

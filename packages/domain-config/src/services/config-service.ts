@@ -1,9 +1,9 @@
-import type { HistoryLog, ProjectRegistry } from '@agentic/domain-shared';
+import type { HistoryLog, HistoryReader, ProjectRegistry } from '@agentic/domain-shared';
 import type { Result } from '@agentic/kernel-result';
 
 import type { ConfigFile, ConfigIssue } from '../model/config-file.js';
 import type { DiffLine } from '../model/diff.js';
-import type { ConfigProjectNotFound, ReadConfigError, SaveConfigError } from '../model/errors.js';
+import type { ConfigProjectNotFound, ReadConfigError, RestoreConfigError, SaveConfigError } from '../model/errors.js';
 import type { ConfigScope } from '../model/scope.js';
 import type { ConfigLocation, ConfigStore } from '../ports/config-store.js';
 import type { ModelCatalog } from '../ports/model-catalog.js';
@@ -28,6 +28,22 @@ export interface ConfigPreview {
   readonly warnings: readonly ConfigIssue[];
 }
 
+export interface ConfigRestored {
+  /** `false` when the file already held exactly this text: nothing written or recorded. */
+  readonly changed: boolean;
+  readonly restoredFrom: string;
+  readonly scope: string;
+  readonly text: string;
+}
+
+/** What restoring history entry `entryId` would write; nothing is written. */
+export interface ConfigRestorePreview {
+  readonly diff: readonly DiffLine[];
+  readonly entryId: string;
+  readonly proposedText: string;
+  readonly scope: string;
+}
+
 export interface ConfigSaved {
   /** `false` when the file already held exactly this text: nothing written or recorded. */
   readonly changed: boolean;
@@ -41,6 +57,8 @@ export type ConfigService = ReturnType<typeof createConfigService>;
 
 export interface ConfigServiceDependencies {
   readonly history: HistoryLog;
+  /** Reads the entries restore brings back. */
+  readonly historyReader: HistoryReader;
   /** Absent until a CLI-backed catalog exists (T9): then no model warnings. */
   readonly models?: ModelCatalog;
   readonly projects: ProjectRegistry;
@@ -63,7 +81,15 @@ interface Prepared {
   readonly warnings: readonly ConfigIssue[];
 }
 
-export function createConfigService({ history, models, projects, store }: ConfigServiceDependencies) {
+interface PreparedRestore {
+  readonly content: string;
+  readonly current: null | string;
+  readonly entryId: string;
+  readonly location: ConfigLocation;
+  readonly scope: string;
+}
+
+export function createConfigService({ history, historyReader, models, projects, store }: ConfigServiceDependencies) {
   const locate = async (scope: ConfigScope): Promise<Result<ConfigLocation, ConfigProjectNotFound>> => {
     if (scope.kind === 'global') return ok({ kind: 'global' });
     const project = await projects.get(scope.projectId);
@@ -110,6 +136,13 @@ export function createConfigService({ history, models, projects, store }: Config
     return ok(effective(global.value.file, project?.value.file));
   };
 
+  /** Built-in defaults for the global file; defaults under the global file for a project (an unreadable global file counts as empty). */
+  const baselineFor = async (scope: ConfigScope) => {
+    if (scope.kind === 'global') return effective(EMPTY_CONFIG_FILE);
+    const global = await readScope({ kind: 'global' });
+    return effective(global.ok ? global.value.file : EMPTY_CONFIG_FILE);
+  };
+
   /** Resolves the scope and reads the current text without parsing it, so a broken file can still be replaced. */
   const prepare = async (scopeText: string, edited: unknown): Promise<Result<Prepared, SaveConfigError>> => {
     const scope = parseScope(scopeText);
@@ -118,7 +151,7 @@ export function createConfigService({ history, models, projects, store }: Config
     if (!location.ok) return location;
     const read = await store.read(location.value);
     const current = read.exists ? read.text : null;
-    const proposed = delta(edited);
+    const proposed = delta(edited, await baselineFor(scope.value));
     const warnings = proposed.ok ? await modelWarnings(proposed.value.values, models) : [];
     return ok({ current, location: location.value, proposed, scope: formatScope(scope.value), warnings });
   };
@@ -151,5 +184,52 @@ export function createConfigService({ history, models, projects, store }: Config
     return ok({ ...saved, changed: true });
   };
 
-  return { effective: effectiveView, preview, raw, save };
+  /** The entry must hold config content that still parses as a config file; its own scope is the file restored. */
+  const prepareRestore = async (entryId: string): Promise<Result<PreparedRestore, RestoreConfigError>> => {
+    const entry = await historyReader.get(entryId);
+    if (entry === undefined) return err({ id: entryId, type: 'history_entry_not_found' });
+    if (entry.kind === 'run' || entry.content === null) return err({ id: entryId, kind: entry.kind, type: 'entry_not_restorable' });
+    const scope = parseScope(entry.scope);
+    if (!scope.ok) return scope;
+    const issues = contentIssues(entry.content);
+    if (issues.length > 0) return err({ issues, scope: entry.scope, type: 'config_invalid' });
+    const location = await locate(scope.value);
+    if (!location.ok) return location;
+    const read = await store.read(location.value);
+    return ok({ content: entry.content, current: read.exists ? read.text : null, entryId, location: location.value, scope: formatScope(scope.value) });
+  };
+
+  const restorePreview = async (entryId: string): Promise<Result<ConfigRestorePreview, RestoreConfigError>> => {
+    const prepared = await prepareRestore(entryId);
+    if (!prepared.ok) return prepared;
+    const { content, current, scope } = prepared.value;
+    return ok({ diff: lineDiff(current, content), entryId, proposedText: content, scope });
+  };
+
+  /** Same flow as save: snapshot what is on disk, write the entry's content, record it as a new `config_restore` entry (history stays append-only, so a restore is undoable). */
+  const restore = async (entryId: string): Promise<Result<ConfigRestored, RestoreConfigError>> => {
+    const prepared = await prepareRestore(entryId);
+    if (!prepared.ok) return prepared;
+    const { content, current, location, scope } = prepared.value;
+    const restored = { restoredFrom: entryId, scope, text: content };
+    if (current === content) return ok({ ...restored, changed: false });
+
+    if (current !== null) await history.record({ content: current, kind: 'config_write', scope, summary: `Content on disk before restore of ${entryId}` });
+    await store.write(location, content);
+    await history.record({ content, kind: 'config_restore', scope, summary: `Restored from history entry ${entryId}` });
+    return ok({ ...restored, changed: true });
+  };
+
+  return { effective: effectiveView, preview, raw, restore, restorePreview, save };
+}
+
+function contentIssues(text: string): readonly ConfigIssue[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (cause) {
+    return [{ message: cause instanceof Error ? cause.message : 'Invalid JSON', path: '' }];
+  }
+  const parsed = parseConfigFile(json);
+  return parsed.ok ? [] : parsed.error;
 }

@@ -11,7 +11,7 @@ const PROJECT = { kind: 'project', projectPath: PROJECT_PATH } as const;
 function setup(models?: InMemoryModelCatalog) {
   const store = new InMemoryConfigStore();
   const history = new InMemoryHistoryLog();
-  const service = createConfigService({ history, projects: new InMemoryProjectRegistry([PROJECT_PATH]), store, ...(models === undefined ? {} : { models }) });
+  const service = createConfigService({ history, historyReader: history, projects: new InMemoryProjectRegistry([PROJECT_PATH]), store, ...(models === undefined ? {} : { models }) });
   return { history, service, store };
 }
 

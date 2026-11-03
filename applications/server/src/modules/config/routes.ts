@@ -1,7 +1,7 @@
 import type { Context, Hono } from 'hono';
 
-import type { ConfigPreviewResponse, ConfigSaveResponse, EffectiveConfigResponse, RawConfigResponse } from '@agentic/contract-http/config';
-import type { ConfigService, ReadConfigError, SaveConfigError } from '@agentic/domain-config';
+import type { ConfigPreviewResponse, ConfigRestorePreviewResponse, ConfigRestoreResponse, ConfigSaveResponse, EffectiveConfigResponse, RawConfigResponse } from '@agentic/contract-http/config';
+import type { ConfigService, ReadConfigError, RestoreConfigError, SaveConfigError } from '@agentic/domain-config';
 
 import type { AppEnv } from '../../platform/app-env.js';
 
@@ -10,8 +10,24 @@ import { EditedConfig } from '@agentic/contract-http/config';
 import { problem } from '../../platform/problem.js';
 import { validate } from '../../platform/validation.js';
 
-/** Mounted under `/api/config`; `:scope` is `global` or `project:<id>`, never a path (D31). Saves go through preview (diff) then PUT. */
+/**
+ * Mounted under `/api/config`; `:scope` is `global` or `project:<id>`, never a path (D31). Saves go through preview (diff) then PUT.
+ * Restore of a history entry lives here too (`/restore/:id[/preview]`): restoring is a config write, and the history module stays read-only.
+ */
 export function registerConfigRoutes(app: Hono<AppEnv>, service: ConfigService) {
+  app.post('/restore/:id/preview', async (c) => {
+    const preview = await service.restorePreview(c.req.param('id'));
+    if (!preview.ok) return configProblem(c, preview.error);
+    const { diff, entryId, proposedText, scope } = preview.value;
+    return c.json({ diff: [...diff], entryId, proposedText, scope } satisfies ConfigRestorePreviewResponse);
+  });
+
+  app.post('/restore/:id', async (c) => {
+    const restored = await service.restore(c.req.param('id'));
+    if (!restored.ok) return configProblem(c, restored.error);
+    return c.json(restored.value satisfies ConfigRestoreResponse);
+  });
+
   app.get('/:scope/effective', async (c) => {
     const scope = c.req.param('scope');
     const view = await service.effective(scope);
@@ -48,7 +64,7 @@ export function registerConfigRoutes(app: Hono<AppEnv>, service: ConfigService) 
   });
 }
 
-function configProblem(c: Context<AppEnv>, error: ReadConfigError | SaveConfigError) {
+function configProblem(c: Context<AppEnv>, error: ReadConfigError | RestoreConfigError | SaveConfigError) {
   switch (error.type) {
     case 'config_invalid': {
       return problem(c, { detail: `The edited ${error.scope} config is invalid; nothing was written.`, issues: error.issues, status: 422, title: 'Invalid config', type: error.type });
@@ -61,6 +77,12 @@ function configProblem(c: Context<AppEnv>, error: ReadConfigError | SaveConfigEr
         title: 'Config file unreadable',
         type: error.type,
       });
+    }
+    case 'entry_not_restorable': {
+      return problem(c, { detail: `History entry ${error.id} (${error.kind}) holds no config content to restore.`, status: 422, title: 'History entry not restorable', type: error.type });
+    }
+    case 'history_entry_not_found': {
+      return problem(c, { detail: `No history entry ${error.id}.`, status: 404, title: 'History entry not found', type: error.type });
     }
     case 'invalid_scope': {
       return problem(c, { detail: 'Scope must be "global" or "project:<id>".', status: 422, title: 'Invalid config scope', type: error.type });

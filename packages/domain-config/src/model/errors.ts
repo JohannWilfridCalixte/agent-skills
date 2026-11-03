@@ -23,12 +23,28 @@ export interface ConfigUnreadable {
   readonly type: 'config_unreadable';
 }
 
+/** The entry holds no config content (a run), so there is nothing to restore. */
+export interface EntryNotRestorable {
+  readonly id: string;
+  readonly kind: string;
+  readonly type: 'entry_not_restorable';
+}
+
+/** No history entry has this id. */
+export interface HistoryEntryNotFound {
+  readonly id: string;
+  readonly type: 'history_entry_not_found';
+}
+
 export interface InvalidScope {
   readonly scope: string;
   readonly type: 'invalid_scope';
 }
 
 export type ReadConfigError = ConfigProjectNotFound | ConfigUnreadable | InvalidScope;
+
+/** Errors of restore preview and restore; `config_invalid` when the stored content no longer parses as a config file. */
+export type RestoreConfigError = ConfigInvalid | ConfigProjectNotFound | EntryNotRestorable | HistoryEntryNotFound | InvalidScope;
 
 /** Errors of preview and save: the scope must resolve; save also needs a valid config. */
 export type SaveConfigError = ConfigInvalid | ConfigProjectNotFound | InvalidScope;

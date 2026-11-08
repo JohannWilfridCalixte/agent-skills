@@ -1,0 +1,7 @@
+{
+  "_source": "https://cursor.com/docs/agent/hooks, doc-derived 2026-11-08, not captured",
+  "conversation_id": "conv-0001-fake", "generation_id": "gen-0001-fake", "model": "claude-sonnet-5-5", "cursor_version": "2.0.0", "workspace_roots": ["/home/dev/demo"], "user_email": "dev@example.com", "transcript_path": "/home/dev/.cursor/transcripts/conv-0001-fake.jsonl",
+  "hook_event_name": "sessionStart",
+  "session_id": "sess-0001-fake",
+  "is_background_agent": false
+}

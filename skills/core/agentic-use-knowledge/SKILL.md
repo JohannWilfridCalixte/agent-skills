@@ -9,7 +9,7 @@ description: The project's knowledge base (ADRs, principles, glossary, product, 
 
 ## Structure
 
-Every folder has a `README.md` index.
+Every folder has a `README.md` index. A repo-level layout doc (named by the project's instructions) overrides this section's indexes and filenames; keep the rest.
 
 ```
 {knowledge.root}/
@@ -52,7 +52,7 @@ Outside a workflow, at the end of a conversation that decided or learned somethi
 
 Rules:
 
-- `ls` the folder for the next ADR/RFC number; never guess.
+- Next ADR/RFC number = `ls` of the folder at the moment of writing, plus one. A number chosen earlier in the session is stale: other branches may have taken it.
 - Update the section `README.md` on every add, rename or removal. An unindexed doc is lost.
 - Changing an ADR (refinement, partial reversal, status) → edit it in place, add a `History` row. Never write a new ADR to override part of one.
 - Decision fully retired → new ADR; old one `Superseded by [NNNN]` plus a `History` row.

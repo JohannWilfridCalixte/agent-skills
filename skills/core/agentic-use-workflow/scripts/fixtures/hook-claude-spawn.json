@@ -1,0 +1,8 @@
+{
+  "_source": "https://code.claude.com/docs/en/hooks, doc-derived 2026-11-08, not captured",
+  "session_id": "sess-0001-fake", "transcript_path": "/home/dev/.claude/projects/demo/sess-0001-fake.jsonl", "cwd": "/home/dev/demo", "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": { "prompt": "Step: implement", "description": "Implement unit", "subagent_type": "general-purpose", "model": "sonnet" },
+  "tool_use_id": "toolu_fake0001"
+}

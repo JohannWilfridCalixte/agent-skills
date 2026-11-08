@@ -7,6 +7,27 @@ description: "Runtime every agentic-* skill loads first. Use at the start of any
 
 Runtime every agentic skill loads first. Contracts read by other skills or outside tooling live in `references/`; follow them exactly.
 
+## Helper
+
+`{agentic-use-workflow}` = this skill's base directory, the folder holding this SKILL.md (e.g. `.agents/skills/agentic-use-workflow` with the skills CLI, `${CLAUDE_PLUGIN_ROOT}/skills/core/agentic-use-workflow` in the Claude plugin).
+
+Every mechanic below runs through `bun {agentic-use-workflow}/scripts/agentic.ts <command>` (`agentic.ts` below). **bun is a hard requirement**: no manual fallback; bun missing → hooks exit non-blocking with one line, commands fail loudly. No args → usage.
+
+| Command | Does |
+|---|---|
+| `start <workflow> --harness h [--title] [--work slug]` | Creates the work item if new, mints the 4-hex `run`, logs workflow `started` |
+| `event --type t --summary s [flags]` | Validated append to `events.jsonl`; fills ts/work/run/harness/workflow; invalid → nothing written |
+| `state` | Re-derives `state.json` from the log |
+| `resume` | ≤15-line summary: status, phase, current step, escalations, pending units, last events, next command |
+| `decide --tag --focus --q --a --why` | Appends the next `D<n>` to `decisions.md` + logs the `decision` event |
+| `step <key> [--task] [--unit] [--agent] [--skills]` | Resolves model + effort, prints the filled brief, logs `started` before the spawn |
+| `review eligible --base <ref> [--iteration n]` | Computed reviewer list |
+| `hub sync` | Upserts the work item's mirror comments on its hub issue (GitHub, via `gh`). No hub or no `gh` → prints `skipped: …`, exit 0 |
+| `cleanup check` | Archive-ready check (PR-state check skipped with a message when `gh` is missing) |
+| `hook spawn` / `hook compact` | Harness hook entry points (shipped by the plugins' hooks; skills-CLI installs: wire them per the README) |
+
+Exit 0 ok, 1 validation/runtime failure, 2 usage error. Subagents never run it: they only append `progress` lines with `>>`.
+
 ## Config
 
 Read [references/config.md](references/config.md) before resolving any config value: lookup and merge, fields, defaults, profiles, step keys, limits. No config file found → built-in defaults; say so once and suggest the user run `/agentic-configure` (Codex: `$agentic-configure`).
@@ -29,10 +50,10 @@ Vendored skills that expect setup (a tracker "already provided", a board, a merg
 
 ## Step → model and effort
 
-Every step has a key (`grill`, `implement`, `review.code-review`, …). Resolve `model` and `effort` each on its own per config.md Resolution; map capability classes (`frontier`, `code`, `fast`) to the closest model the harness offers.
+`agentic.ts step <key>` resolves `model` and `effort` per config.md and prints them in the brief; spawn with exactly those.
 
-- Interactive steps (capture, grill, gate) stay in the main session. Resolved value is a recommendation: warn once if the session runs something else, then go on.
-- Non-interactive steps always run as subagents with the resolved `{model, effort}`; resolved `harness` ≠ own → that harness's CLI instead, per [references/delegation.md](references/delegation.md#cross-harness).
+- Interactive steps (capture, grill, gate) stay in the main session. Warn once if the session model differs from the resolved one, then go on.
+- Non-interactive steps always run as subagents.
 
 ## Cheap routing
 
@@ -48,12 +69,11 @@ One subagent per step key and unit; parallel when independent (no shared writes,
 
 ## Work item
 
-`{output}/{YYYYMMDD}-{slug}/`, layout in [references/state.md](references/state.md).
+`{output}/{YYYYMMDD}-{slug}/`, layout in [references/state.md](references/state.md). The helper resolves `{output}` in the main checkout (first `git worktree list` entry), even from a worktree.
 
-- No slug → new work item: short kebab slug from the request, create the folder, write the raw request to `input.md`.
-- Slug given → folder named `{slug}` or ending in `-{slug}`; resume per [references/state.md](references/state.md#resume). Several matches → ask.
-- `{output}` always resolves in the main checkout (first entry of `git worktree list`), even from inside a worktree: one audit trail per work item.
-- `agentic-cleanup` archives merged work items to `{output}/_archive/{work-item}/`. Never deleted; slug lookup skips them.
+- No slug → short kebab slug from the request; `agentic.ts start` creates the folder; write the raw request to `input.md`.
+- Slug given → folder named `{slug}` or ending in `-{slug}`; run `agentic.ts resume` and follow [state.md](references/state.md#resume). Several matches → ask.
+- `agentic-cleanup` archives merged items to `{output}/_archive/`; slug lookup skips them.
 - Keep `{output}` in `.gitignore` unless `commitWork: true`.
 
 ## Workspace
@@ -68,7 +88,7 @@ Branch or path already taken → ask. Before the first write, check `workspace.p
 
 ## Events and state
 
-`events.jsonl` must let someone outside the session follow the work: who started what, on which model, which milestones it went through, how it ended. Milestones, not tool calls. Before your first event, read [references/state.md](references/state.md): the line contract, who logs what, how `state.json` derives from the log.
+`events.jsonl` lets someone outside the session follow the work: who started what, on which model, which milestones, how it ended. Milestones, not tool calls. Log with `agentic.ts start` / `event` / `decide`; `state.json` is derived by `agentic.ts state` only. Before your first event, read [references/state.md](references/state.md): enums, who logs what, derivation.
 
 Step fails → `failed` event, tell the user; continue only on their answer.
 

@@ -1,31 +1,16 @@
 # Delegation
 
-## Subagent prompt
+## Spawn
 
-Names and paths only. Spawn it with a fresh context window (never a fork of the session); it loads skills and reads files itself, so nested references keep working and the prompt stays small.
+1. Run `bun {agentic-use-workflow}/scripts/agentic.ts step <key> [--task t] [--unit id] [--agent label] [--skills a,b]`. It prints the model, effort and the filled brief ([brief-template.md](brief-template.md)) and logs `started` before any spawn.
+2. Spawn a fresh-context subagent (never a fork) with exactly that model and effort and the brief, replacing each `{{x}}`. It loads skills and reads files itself; the prompt carries names and paths.
+3. Keep every line `hook spawn` checks, else the hook blocks the spawn: `Step:`, `Work item:` (existing, non-archived), `Skills:`, `Progress:` (or `read-only`), `Agent:` with its `started` event. No work item: `Work item: none`.
 
-```
-Step: {step key}
-Work item: {work-item path}
-Workspace: {workspace.path}     # run every code read, write, check and commit here
-Load skills: {model-invoked step skill}, {codestyle skills}     # names; absolute SKILL.md paths when the harness has no Skill tool
-Skills: load each via the Skill tool. No Skill tool → open the SKILL.md path given and follow it;
-        a skill you follow that says "call the Skill tool with X" → open ../X/SKILL.md next to it
-        (else the installed X) and follow that.
-Follow: {absolute SKILL.md path of a user-invoked skill}        # omit when none
-Read: {input paths}
-Write: {output path}            # omit for read-only steps
-Goal: {one or two sentences of intent}
-Agent: {agent label, e.g. impl-T2, review.ub-mode-1}
-Progress: at each milestone, append one line to {work-item path}/events.jsonl with a single
-          shell append (>>):                                                # omit for read-only steps
-          {"ts":"<UTC now>","work":"{work}","run":"{run}","harness":"{harness}","workflow":"{workflow}","step":"{step key}",
-           "task":"{task}","agent":"{agent}","type":"progress","summary":"<what just happened>","data":{}}
-Return: short summary + output path (read-only: cited findings).
-events.jsonl: append only; state.json belongs to the orchestrator.
-```
+## Rules
 
-Copy the `Skills:`, `Progress:` and `events.jsonl:` lines verbatim, placeholders filled (`run`, `harness` included): the subagent never loads agentic-use-workflow, so the brief is its only copy of these rules. Everything else goes in as a name or a path.
+- Reports: ≤15 lines + path to full output.
+- Green gate: once per commit SHA.
+- Parallel units: each gets its own worktree, cut from the work branch; `step --unit` prints the `git worktree add` command. Merge units back in task order before the gate. `resume` lists pending units.
 
 ## Harness mapping
 
@@ -53,23 +38,5 @@ Built-in explore agents often pick their own model or inherit the session's. Use
 - Model / effort: explicit spawn values → `[agents]` defaults (`default_subagent_model`, `default_subagent_reasoning_effort`) → parent's. Effort is `model_reasoning_effort`: `low | medium | high | xhigh | max | ultra` depending on the model.
 - Custom agents in `.codex/agents/*.toml` that set `model` / `model_reasoning_effort` win over spawn values: if one matches the step, its settings are what ran.
 - Read-only steps: say so in the spawn request with the `explore` model, or use a custom agent with write tools disabled. A custom agent named `explorer` replaces the built-in one.
-
-## Cross-harness
-
-Step whose resolved `harness` ≠ own: run it as a non-interactive CLI of that harness instead of a subagent. Same brief, with absolute SKILL.md paths and the no-Skill-tool `Skills:` line, `harness` = target in `Progress:`. Log its `started` with `data.harness` = target.
-
-1. Write the brief to a temp file. Launch in the background (harness background shell, else `&`), cwd = `workspace.path`, brief on stdin, stdout/stderr to a temp log. Parallel steps → one process each.
-2. Wait for exit; no exit after `limits.crossHarness.timeout` minutes → kill it.
-3. Its stdout (Codex: `-o` file) is the return. Writing step → check `Write:` exists and follows its contract.
-
-Invocations (`{wi}` = work-item path, needed writable when outside `workspace.path`; `{gitdir}` = `git rev-parse --git-common-dir` in `workspace.path`, needed writable for commits when it is a worktree):
-
-- **codex**: `codex exec -m {model} -c model_reasoning_effort="{effort}" -c approval_policy="never" -s workspace-write -c sandbox_workspace_write.network_access=true -C {workspace.path} --add-dir {wi} --add-dir {gitdir} -o {return file} - < {brief}`.
-- **claude**: `claude -p --model {model} --effort {effort} --permission-mode acceptEdits --allowed-tools Bash --permission-prompts none --add-dir {wi} < {brief}`. `CLAUDE_CODE_EFFORT_LEVEL` in the env wins.
-- **cursor**: `agent -p --force --model {model} --workspace {workspace.path} "$(cat {brief})"` (`cursor-agent` same). Effort: the model id variant that encodes it (`agent models`).
-
-Auth check before launch: `codex login status`, `claude auth status`, `agent status`.
-
-Failure (CLI not on `PATH`, not authenticated, non-zero exit, timeout, output missing or malformed): log `failed` for the attempt, `data: {reason}`; warn once; re-run the step as a native subagent, model / effort from Resolution levels 3-4 (built-in default, else harness default) on your own harness.
 
 Native features change fast: prefer the harness's current docs over this file when they disagree.

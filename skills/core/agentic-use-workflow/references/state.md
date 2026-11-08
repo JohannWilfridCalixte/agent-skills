@@ -5,7 +5,7 @@
 ```
 {output}/{YYYYMMDD}-{slug}/
 ├── events.jsonl      # append-only audit log (source of truth)
-├── state.json        # snapshot derived from the log
+├── state.json        # derived by `agentic.ts state`, never hand-written
 ├── input.md
 ├── context.md        # cited, one section per context subagent
 ├── decisions.md      # grill answers, contract below
@@ -25,7 +25,7 @@
 {output}/_archive/{YYYYMMDD}-{slug}/   # moved here by agentic-cleanup once merged, never deleted
 ```
 
-`{output}` lives in the main checkout, never in a worktree. Work-item id (`work`) = folder name, e.g. `20261026-tenant-export`. Date = creation day, never changes.
+`{output}` lives in the main checkout, never in a worktree; the helper resolves it. Work-item id (`work`) = folder name, e.g. `20261026-tenant-export`. Date = creation day, never changes.
 
 Workflow and phase ids (`workflow` in `events.jsonl`, `phase` / `phases` in `state.json`) are the skill names without the `agentic-` prefix: `agentic-to-spec` logs as `to-spec`.
 
@@ -49,7 +49,7 @@ Every grill answer, appended right after the user gives it, then logged as a `de
 
 ## events.jsonl
 
-One JSON object per line, appended, never edited. Exactly the fields and `type` values below; anything more goes in `data`, shaped per type.
+One JSON object per line, appended, never edited. Orchestrator appends via `agentic.ts event` (validates every enum below, fills ts/work/run/harness/workflow). Exactly the fields and `type` values below; anything more goes in `data`, shaped per type.
 
 ```json
 {"ts":"2026-10-26T13:40:00Z","work":"20261026-tenant-export","run":"a3f9","harness":"cursor","workflow":"implement","step":"implement","task":"T2","type":"started","model":"composer-2.5","effort":"medium","agent":"impl-T2","summary":"T2 started: DELETE /exports/:id with tenant guard","data":{"goal":"Delete an export, tenant-scoped","files":["src/exports/routes.ts","src/exports/service.ts"]}}
@@ -59,7 +59,7 @@ One JSON object per line, appended, never edited. Exactly the fields and `type` 
 |---|---|---|
 | `ts` | yes | ISO 8601 UTC |
 | `work` | yes | Work-item id |
-| `run` | yes | 4 hex chars, new per workflow invocation |
+| `run` | yes | 4 hex chars, minted by `agentic.ts start` |
 | `harness` | yes | `claude`, `cursor` or `codex`: the harness writing the line |
 | `workflow` | yes | `to-spec`, `to-plan`, `to-tickets`, `implement`, `review`, `babysit-pr`, `cleanup`, `grill-me`, `grill-product`, `grill-functional`, `grill-tech`, `implement-feature`, `change-feature`, `debug`, `pr-review`, `security-audit` |
 | `step` | yes | Step key (`context.code`, `review.code-review`, …), interactive step (`capture`, `grill`, `gate`, `checks`), playbook step (`start`, `diagnose`, `audit`, `report`, `publish`, or the flow skill it runs: `to-spec`, `implement`, …), or `null` for the workflow itself |
@@ -76,7 +76,7 @@ One JSON object per line, appended, never edited. Exactly the fields and `type` 
 
 | Type | `data` |
 |---|---|
-| `started` (subagent) | `{goal, files?, harness?}` — `harness`: target of a cross-harness step |
+| `started` (subagent) | `{goal, files?}` |
 | `started` (`step: null`) | optional `{title}` |
 | `progress` | optional `{files?, commit?, tests?}` |
 | `completed` (subagent) | `{files?, commits?, tests?, counts?}` — `counts`: `{blocker, major, minor, nit}` for reviewers |
@@ -84,7 +84,7 @@ One JSON object per line, appended, never edited. Exactly the fields and `type` 
 | `decision` | `{id, question, answer, tag, focus}`, as in decisions.md. Workspace: `{workspace: {kind, branch, base, path}}`. Choice (any non-grill answer): `{choice: {key, value}}`. Undotted key = up-front answer, reused on resume (`tickets`, `tracker`, `branch`). Dotted key = one occurrence (a unit, a round, a thread, a pass), read only by the skill that asked (`interrupted.{run}.{unit}`, `unit.{task}`, `review.{n}`, `review.output`, `needs-user.{id}`, `pr.{round}.{thread}`, `pr.{round}.conflict`, `disclosure.{destination}`, `seam.{run}`, `profile.run-{N}`, `destination.run-{N}`) |
 | `gate` | Per decision: `{decision, outcome}` — `outcome` `confirm`, `escalate`, `revisit`. Gate passed: `{passed: true, decisions: [ids]}` (ids reviewed, empty when none). Override: `{override: true, escalations: [ids]}` |
 | `escalation` | `{id, status, ref}` — `id` the decision (`D4`), `status` `open` or `resolved`, `ref` its ADR or RFC |
-| `artifact` | `{name, path}` for a file, and/or one merged shape: `{tickets: {parent, tasks}}`, `{issues: {parent, children}}` (agentic-security-audit; never units), `{pr: {url, round}}` (agentic-babysit-pr, alone) |
+| `artifact` | `{name, path}` for a file, and/or one merged shape: `{tickets: {parent, tasks}}`, `{issues: {parent, children}}` (agentic-security-audit; never units), `{pr: {url, round}}` (agentic-babysit-pr, alone), `{hub: <issue number>}` (optional: GitHub hub issue number; read by `hub sync`). Legacy fallback: `decision` choice key `hub` with a numeric value, still read by the helper |
 
 ### What to log
 
@@ -128,11 +128,12 @@ A task, read from the log:
   "units": { "T1": "done", "T2": "in_progress" },
   "choices": { "tickets": "no" },
   "pr": { "url": null, "round": 0 },
+  "hub": null,
   "updated": "2026-10-26T13:52:00Z"
 }
 ```
 
-Rewritten by the orchestrator after every event it logs, derived from the log only; on disagreement the log wins.
+Derived by `agentic.ts state` (also run by `start`, `event`, `decide`) from the log only; never hand-write it. On disagreement the log wins.
 
 | Field | From |
 |---|---|
@@ -143,15 +144,16 @@ Rewritten by the orchestrator after every event it logs, derived from the log on
 | `artifacts` | `data.name` → `data.path` |
 | `escalations` | Latest status per `id` |
 | `tickets`, `issues`, `pr` | Merged from `artifact` data |
-| `steps` | Per playbook step (events whose `workflow` is a playbook, `step` not null) of the current pass, i.e. after that playbook's latest workflow-level `completed`: `in_progress` on `started`, `done` on `completed`, `failed` on `failed`. Cleanup events (`workflow` or `step` = `cleanup`) never open a pass: ignored here |
+| `hub` | Optional. Latest `artifact` `data.hub` (GitHub issue number), else numeric `choice` `hub`, else `null` (project has no hub) |
+| `steps` | Per playbook step (events whose `workflow` is a playbook, `step` not null) of the current pass, i.e. after that playbook's latest workflow-level `completed`: `in_progress` on `started`, `done` on `completed`, `failed` on `failed`. Cleanup events (`step = cleanup` or `data.skill = cleanup`) never open a pass: ignored here |
 | `units` | Latest status per `task` of `implement` events: plan tasks, tickets, fix groups. `in_progress` on the subagent `started`; `done` on a green gate (`step: checks`, `completed`) naming it; `failed` on a `failed` with `step: implement` (subagent failed, or stopped after `limits.implement.retries`); `skipped` on a `choice` `unit.{task}` = `skip`; pending again on an `interrupted` `failed`. Red gates don't change it. Absent → pending |
 | `choices` | Latest `value` per `data.choice.key` |
-| `status` | `archived` once `cleanup` completes; else `awaiting_decision` if any escalation `open`; else `blocked` if latest `failed` has `data.blocked`; else from the latest workflow-level event (`step: null`, cleanup events excluded), so a new pass after `completed` reads as not done: `failed` → `failed`; `completed` of `babysit-pr` or a playbook (`implement-feature`, `change-feature`, `debug`, `pr-review`, `security-audit`) → `done`; anything else → `in_progress` |
+| `status` | `archived` once `cleanup` completes (`cleanup check` also needs the PR merged and branch + worktree gone); else `awaiting_decision` if any escalation `open`; else `blocked` if latest `failed` has `data.blocked`; else from the latest workflow-level event (`step: null`, cleanup events excluded as above), so a new pass after `completed` reads as not done: `failed` → `failed`; `completed` of `babysit-pr` or a playbook (`implement-feature`, `change-feature`, `debug`, `pr-review`, `security-audit`) → `done`; anything else → `in_progress` |
 | `updated` | `ts` of the last event |
 
 ## Resume
 
-Any agentic skill given a slug resumes its work item, from any harness: `/agentic-<skill> <slug>` (Claude Code, Cursor) or `$agentic-<skill> <slug>` (Codex). Same machine only: `{output}` is gitignored in the main checkout and `workspace.path` is absolute.
+Resume = run `agentic.ts resume` for the state summary (the compact hook injects the same output). Any agentic skill given a slug resumes its work item, from any harness: `/agentic-<skill> <slug>` (Claude Code, Cursor) or `$agentic-<skill> <slug>` (Codex). Same machine only: `{output}` is gitignored in the main checkout and `workspace.path` is absolute.
 
 Before logging the new run's `started`, in order:
 

@@ -13,3 +13,7 @@ Runs once the grills of a skill are done (`agentic-to-spec`, `agentic-to-plan`, 
 4. **Promote**: Call the Skill tool with "agentic-use-knowledge" (write mode), in `workspace.path`, with the confirmed and escalated decisions plus anything the calling skill adds (principles, terms). Commit there (`docs: …`). Done when committed, or nothing to promote.
 
 Escalated decisions get settled at the next skill start: [state.md](state.md#resume) Resume step 0.
+
+## Retry before escalating
+
+A failed step (`limits.*.retries`, [config.md](config.md#limits)) or a network / env-denied error (ENOTFOUND, sandbox denial) retries up to 3 times with backoff. Still failing → escalate with the command and its error.

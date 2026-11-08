@@ -2,10 +2,11 @@
   "name": "agentic",
   "displayName": "Agentic",
   "description": "Composable spec-driven development workflows: spec, plan, tickets, implement, review, babysit PR. Per-step model and effort, auditable work items.",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "author": {
     "name": "Johann Wilfrid-Calixte"
   },
+  "hooks": "./hooks/cursor.json",
   "skills": [
     "./skills/core/agentic-use-workflow",
     "./skills/core/agentic-use-knowledge",

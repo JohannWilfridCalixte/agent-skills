@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" spawn --harness codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" compact --harness codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

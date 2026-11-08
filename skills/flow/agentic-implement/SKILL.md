@@ -16,7 +16,7 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 - No workspace → ask where to build and set it up per `agentic-use-workflow` Workspace. Everything below runs in `workspace.path`.
 - Units `in_progress` in `state.json` `units` → recover each per [references/interrupted.md](references/interrupted.md) before the baseline.
 - Uncommitted edits outside every interrupted unit's files → show them and ask. Never reset them.
-- Find the project's checks (build, lint, typecheck, tests) from scripts, Makefile, CI config, docs, and run them. Red → stop and report.
+- Baseline = the checks of the repo's verify recipe named in AGENTS/CLAUDE.md, else scripts/Makefile/CI, run in order. Skip a check needing infra this session lacks (database, docker, browser) and state each skip. Red → stop and report.
 
 Done when the workspace exists, no unit is `in_progress`, the tree holds no unexplained edits, and the baseline is green.
 
@@ -35,23 +35,25 @@ Done when every pending unit is listed with its blocking edges (`Depends on`, ti
 
 ## 3. Dispatch
 
-Order by blocking edges. Sequential by default; parallel only when units are independent **and** their files are disjoint.
+Order by blocking edges. Sequential by default, in the one workspace; parallel only when units are independent **and** their files are disjoint.
 
-One subagent per unit, step key `implement`, agent label `impl-{unit}`, resolved model and effort. Its `started` line carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled (`Skills:` and `Progress:` copied verbatim, `run` and `harness` set), with, as paths:
+One subagent per unit, step key `implement`, agent label `impl-{unit}`. Print its brief with `agentic.ts step implement --unit {unit} --agent impl-{unit} --skills tdd`; the `started` event carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled, with, as paths:
+
+- Parallel unit: the brief's Workspace is the unit's own worktree. Run the printed `git worktree add` command before spawning. Merge back onto the work branch in task order, using the `git merge` commands `agentic.ts resume` lists, before the green gate.
 
 - Workspace path, work-item path, the unit (task id in `plan.md`, ticket file or key, or fix-list path + finding ids), `spec.md` and `context.md` when present.
 - Read `../implement/SKILL.md`, as an absolute path resolved from this skill's base directory, and follow it for this unit, skipping its code-review step: `agentic-review` covers it. The tracker is provided: the ticket file or key above. Pre-agreed seams = test seams in `plan.md` / `decisions.md`; the unit's acceptance criteria (step 2) are the behaviour to cover.
-- Load skills: each profile skill and each of the unit's `Skills`.
+- TDD is a hard rule: every unit of behaviour starts red, then green (`tdd` loaded via `--skills tdd`). Exceptions: generated code, pure wiring, config.
 - Stay inside the unit. Unplanned files or decisions go in the summary.
 - Exactly one conventional commit for the unit, staging only its files, message citing the unit id, ticket key or finding ids.
 - Fix-list unit: report each finding `fixed` or `disputed` with the reason.
-- Return files, tests, commit sha, decisions, finding statuses.
+- Report ≤15 lines: files, tests, commit sha, decisions, finding statuses. More detail goes in a file; the report gives its path.
 
 ## 4. Green gate
 
-After each unit or parallel batch, run the full checks yourself.
+After each unit, or each parallel batch once merged, run the baseline checks yourself. Gate once per commit SHA: a SHA already gated green is not re-gated.
 
-- Green → log the gate, next unit.
+- Green → log the gate with the SHA, next unit.
 - Red → failure output back to the same subagent (resume it, or brief a fresh one with the unit and the output). Its repair is a follow-up commit citing the unit.
 - Still red after `limits.implement.retries` → log the subagent `failed`, then stop and ask: suggested direction, skip the unit, or abort. Log the answer as a `choice`, key `unit.{task}` (abort is never reused: resuming asks again).
 

@@ -1,6 +1,6 @@
 # Finding contract
 
-Each reviewer writes `reviews/{n}-{reviewer}.md` (`n` = review iteration): a first line `verdict: pass | changes-requested` with counts per severity, then the reviewer's own report (its matrix, notes, what held), then `## Findings`: one block per finding, most severe first. No findings → say so.
+The report every reviewer returns is in [report.md](report.md) (file layout, verdict line, normative severity). This file holds the per-finding block, verdict rule, scale translation, needs-user and fix-list formats.
 
 ```markdown
 ### {reviewer}-{k}: {short title}
@@ -22,12 +22,7 @@ Each reviewer writes `reviews/{n}-{reviewer}.md` (`n` = review iteration): a fir
 
 ## Severity
 
-| Severity | Meaning | Blocks |
-|---|---|---|
-| blocker | Wrong behaviour, data loss, exploitable vulnerability, missing authz, leaked secret, test that proves nothing | yes |
-| major | Missing acceptance criterion or edge case on a critical path, weak validation, fragile test strategy, consequential standard violation | yes |
-| minor | Suboptimal but safe: low-risk edge case, readability, defense in depth, over-engineering, deepening opportunity | no |
-| nit | Cosmetic or preference | no |
+Meanings and what blocks: [report.md](report.md).
 
 Translate a reviewer's own scale into these four:
 
@@ -36,7 +31,7 @@ Translate a reviewer's own scale into these four:
 | `super-review` | Blocker → blocker · Should fix → major, except Over-engineering → minor · Deepening opportunity → minor · Nit → nit · Human gate → needs-user finding |
 | `claude-security-review`, `pr-security-review` | HIGH → blocker · MEDIUM → major · LOW → minor |
 | `code-review` | Spec: wrong behaviour → blocker, missing or partial requirement → major, scope creep → minor · Standards: hard violation → major, judgement-call smell → minor |
-| any other | By the meaning column above |
+| any other | By report.md's meanings |
 
 ## Needs-user findings
 

@@ -13,7 +13,7 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 - Slug → `workspace.branch` against `workspace.base`, in `workspace.path`.
 - No slug → the current branch against the given base ref or the default branch, as a new work item.
 - PR number or URL → PR mode (below).
-- Reviewers = config `reviewers`, each reached per agentic-use-workflow Skills; `--only` narrows to a subset. A reviewer not reachable → warn, record it `skipped` for the summary, continue with the rest.
+- Reviewers = `bun {agentic-use-workflow}/scripts/agentic.ts review eligible --base <base> [--iteration n] [--only a,b]` (`--only` adds on-demand reviewers). A reviewer not reachable → warn, record it `skipped` for the summary, continue with the rest.
 - Spec sources: `spec.md`, `plan.md`, tickets; none → PR description, ticket links, commit messages.
 - Standards: the codestyle union (agentic-use-workflow Config, Profiles) as skills; `{knowledge.root}/tech/principles.md` and ADRs as paths.
 - Diff command `git diff <base>...HEAD`, commit list `git log <base>..HEAD --oneline`. Confirm the base resolves and the diff is non-empty.
@@ -22,20 +22,19 @@ Done when every reviewer is reachable or recorded skipped, and the diff, spec so
 
 ## 2. Reviewers
 
-Iteration `n` starts at 1, or after the latest `reviews/{n}-*.md` on resume.
+Iteration `n` starts at 1, or after the latest `reviews/{n}-*.md` on resume. `n` > 1 → pass `--iteration n` to `review eligible`.
 
 One subagent per reachable reviewer, all in parallel, step key `review.<reviewer>`, agent label `review.<reviewer>-{n}`, resolved model and effort. Brief per agentic-use-workflow `references/delegation.md` (`Skills:` copied verbatim):
 
 - `Load skills:` `<reviewer>`, then the codestyle union. Goal: follow `<reviewer>` on this diff.
 - `Read:` diff command, commit list, spec sources, principles and ADR paths, this run's reviewer list, previous iteration's review and fix list when present (keep carried ids, judge disputed findings). PR mode adds the PR number and URL.
-- **Report-only**: the one write is `reviews/{n}-<reviewer>.md`, per [references/finding.md](references/finding.md) (absolute path). Code, commits, PR, board and merge stay untouched.
+- **Report-only**: the one write is `reviews/{n}-<reviewer>.md`, per [references/report.md](references/report.md) and [references/finding.md](references/finding.md) (absolute paths). Code, commits, PR, board and merge stay untouched.
 - Adjustments for third-party reviewers:
   - `code-review`: fixed point = base, spec = `spec.md`, else `plan.md` (light mode: its acceptance criteria), the tracker is the work item's tickets. Nested subagents unavailable → run both axes inline.
-  - `super-review`: follow [references/super-review.md](references/super-review.md) (absolute path): replaces its board, PR and merge steps and unvendored links.
+  - `super-review`: `Load skills:` adds `codebase-design`; follow [references/super-review.md](references/super-review.md) (absolute path): replaces its board, PR and merge steps and unvendored links.
   - `pr-security-review`: its context comes from the brief's diff command and commit list, file list `git diff --name-only <base>...HEAD`, in place of its `git fetch`, `git status` and `origin/<base>` commands: committed range only.
   - `ub-mode`: its principles are the standard to judge the diff against; its Practice section is out of scope.
-- Return counts per severity.
-- Cross-harness reviewer (resolved `harness` ≠ own): launch per agentic-use-workflow `references/delegation.md` Cross-harness instead of a subagent, in parallel with the rest, same brief and contract. Before section 3, its file must exist and parse per finding.md; else its fallback applies.
+- Return counts per severity (report.md).
 
 Done when every reachable reviewer's file exists and its counts are logged.
 
@@ -44,10 +43,10 @@ Done when every reachable reviewer's file exists and its counts are logged.
 1. Aggregate and dedupe: same location and issue across reviewers → keep the highest severity.
 2. Set needs-user findings aside for section 4.
 3. No blocker or major left → section 4.
-4. Write the blockers and majors to `reviews/{n}-fix.md` (Fix list in [references/finding.md](references/finding.md)), then call the Skill tool with "agentic-implement", passing that path.
-5. `n` + 1, re-run every reviewer (section 2): a fix for one can break another.
+4. Write the blockers and majors to `reviews/{n}-fix.md` (Fix list in [references/finding.md](references/finding.md)), then call the Skill tool with "agentic-implement", passing that path; one fix pass per iteration, never a raw `Agent`.
+5. `n` + 1, run section 2 with `review eligible --iteration n`: only reviewers that had findings re-run. When the fix can break the others, the orchestrator may widen with `--all --reason <why>` (logged as a `note`).
 
-Minors and nits are reported, not looped on. At `limits.review.iterations` with blockers or majors left → a `review.{n}` choice already logged stands; else ask: another round, accept with the remaining findings, or stop. Log the answer as a `choice`, key `review.{n}`, value `another`, `accept` or `stop`. `stop` → Done, needs-user findings listed as open.
+Minors and nits are reported, not looped on. Commits pushed after the PR opens get a re-review: section 2 again on the new range, same iteration rule. At `limits.review.iterations` with blockers or majors left → a `review.{n}` choice already logged stands; else ask: another round, accept with the remaining findings, or stop. Log the answer as a `choice`, key `review.{n}`, value `another`, `accept` or `stop`. `stop` → Done, needs-user findings listed as open.
 
 Done when no blocker or major is left, or `review.{n}` is `accept`.
 

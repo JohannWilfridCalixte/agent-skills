@@ -27,10 +27,10 @@ Every check applied to every row:
 - **Tenant isolation**: the tenant comes from the authenticated context, never from client input. Every data path is scoped: ORM and raw queries, caches and cache keys, search indexes, file storage paths, events, background jobs.
 - **Privilege escalation**: mass assignment of role, owner or tenant fields; admin operations without role checks; users changing their own role or ownership.
 - **Delegated actions**: jobs and webhooks acting for a user carry and check the original principal. Signed URLs and tokens are scoped and expire.
-- **Tests**: negative cases exist (other user, other tenant, lower role → denied). Missing on a protected entry point → major.
+- **Tests**: negative cases exist (other user, other tenant, lower role → denied) on every protected entry point.
 
-Unauthenticated or unscoped access to non-public data, or an escalation path → blocker. Check present but bypassable or inconsistent → major.
+Severity per the report contract ([../agentic-review/references/report.md](../agentic-review/references/report.md)). Unauthenticated or unscoped access to non-public data, or an escalation path → blocker. Check present but bypassable or inconsistent → major. Missing negative test → major.
 
 ## Report
 
-The matrix, then findings in agentic-review's finding contract ([../agentic-review/references/finding.md](../agentic-review/references/finding.md)), written to the path the caller gives; standalone → in the reply.
+The matrix, then the report contract ([../agentic-review/references/report.md](../agentic-review/references/report.md)) with findings per [finding.md](../agentic-review/references/finding.md), written to the path the caller gives; standalone → in the reply.

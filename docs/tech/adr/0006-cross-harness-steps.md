@@ -1,6 +1,6 @@
 # 0006 - Cross-harness steps
 
-**Status:** Accepted
+**Status:** Deprecated
 **Date:** 2026-11-02
 
 ## Context
@@ -37,3 +37,4 @@ Every step runs inside the harness that started the workflow, so every reviewer 
 | Date | Change |
 |---|---|
 | 2026-11-02 | Created |
+| 2026-11-08 | Deprecated in v4.0.0: cross-harness steps removed; every step runs in the session's own harness. See [ADR-0007](0007-helper-cli.md) |

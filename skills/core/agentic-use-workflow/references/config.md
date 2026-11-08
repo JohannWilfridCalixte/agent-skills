@@ -5,7 +5,7 @@
 1. `.agentic.json` at project root
 2. `~/.agentic/config.json`
 
-Project wins. `steps` merges per harness and step key, `limits` per key; any other top-level key present in the project file (`reviewers` included) replaces the user value. A key absent from both files → its default below, so a file holds only what differs from the defaults.
+Project wins (`agentic.ts step` applies this merge). `steps` merges per harness and step key, `limits` per key; any other top-level key present in the project file (`reviewers` included) replaces the user value. A key absent from both files → its default below, so a file holds only what differs from the defaults.
 
 ## Example
 
@@ -27,13 +27,10 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
       "review": { "model": "composer-2.5" },
       "review.claude-security-review": { "model": "claude-opus-5-5", "effort": "high" }
     },
-    "claude": {
-      "implement": { "model": "sonnet", "effort": "medium" },
-      "review.super-review": { "harness": "codex", "model": "gpt-6.1-sol", "effort": "high" }
-    },
+    "claude": { "implement": { "model": "sonnet", "effort": "medium" } },
     "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
-  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2, "crossHarness.timeout": 600 }
+  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
 }
 ```
 
@@ -47,8 +44,8 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 | `knowledge.root` | string | `docs` | Knowledge base folder (agentic-use-knowledge), relative to the repo root |
 | `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: codestyle skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
-| `reviewers` | string[] | see below | Skill names; `agentic-review` runs one subagent per entry, step key `review.<name>` |
-| `steps` | `{harness: {stepKey: {harness?, model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
+| `reviewers` | string[] | see below | Fallback only, used when `.agentic/review-gates.json` is absent (`review eligible` decides otherwise). Skill names; one subagent per entry, step key `review.<name>` |
+| `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
 
 `{field}` in any skill = that field's resolved value; a dot names a nested key (`{knowledge.root}` → `knowledge.root`). `{knowledge.root}` resolves in the checkout being read or written (`workspace.path` once recorded).
@@ -56,8 +53,6 @@ Project wins. `steps` merges per harness and step key, `limits` per key; any oth
 Every skill name (`profiles[].skills`, `reviewers`, a unit's `Skills`) may be any skill the harness can load (agentic, vendored, or installed separately); it is reached per the Skills section of `agentic-use-workflow`.
 
 `effort`: `low | medium | high`, or any harness-native level (`xhigh`, `max`, `ultra`), passed as-is. `model` is a harness model id, passed as-is. How each harness applies them: [delegation.md](delegation.md).
-
-`harness` (in a step entry): `cursor`, `claude` or `codex`, the CLI that runs the step when it differs from your own runtime ([delegation.md](delegation.md#cross-harness)); `model` / `effort` are then that harness's ids and levels. Absent or equal to your own → native spawn. Non-interactive steps only.
 
 ### Built-in profiles
 
@@ -70,7 +65,7 @@ A config profile named like a built-in replaces its `skills` whole: list `agenti
 
 `agentic-clean-architecture` and `agentic-write-instrumented-code` aren't stack-wide: `agentic-to-plan` assigns them per task (`Skills` in `plan.md`). Put them in a profile only to force them on every unit.
 
-### Default reviewers
+### Default reviewers (fallback)
 
 `["code-review", "ub-mode", "claude-security-review", "super-review", "agentic-review-secrets", "agentic-review-access-control"]`
 
@@ -78,22 +73,22 @@ Shipped but opt-in: `pr-security-review` (overlaps `claude-security-review`). Ad
 
 ## Built-in step defaults
 
-Capability classes, not model ids: `frontier` (strongest reasoning model available), `code` (strong, balanced coding model), `fast` (cheapest fast model).
+Capability classes, not model ids: `frontier` (strongest reasoning model), `code` (strong, balanced coding model), `fast` (cheapest). `agentic.ts step <key>` resolves them (Claude: `opus` / `sonnet` / `haiku`) and prints model + effort in the brief and event. No orchestrator key: the session model is the owner's setting.
 
 | Step key | Where | Default |
 |---|---|---|
 | `grill` | main session | frontier / high |
-| `context.code` | subagent, read-only | as `explore` |
-| `context.docs` | subagent, read-only | as `explore` |
-| `context.runtime` | subagent, read-only | as `explore` |
-| `tickets` | subagent | fast / low |
 | `implement` | subagent, one per unit (fix lists included) | code / medium |
-| `review` | parent of `review.<reviewer>`, one subagent per reviewer | code / medium |
-| `review.claude-security-review` | subagent | frontier / high |
-| `review.super-review` | subagent | frontier / high |
-| `review.agentic-review-access-control` | subagent | frontier / high |
-| `review.agentic-review-secrets` | subagent | frontier / medium |
-| `audit` | every agent `security-audit` launches under `agentic-security-audit` (reconnaissance, hunters, critics, verifiers) | frontier / high |
+| `tickets` | subagent | code / medium |
+| `explore`, `context.*` | subagent, read-only | code / medium |
+| `review` | parent of `review.<reviewer>`; `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
+| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | subagent | frontier / high |
+| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | subagent | frontier / high |
+| `audit` | every agent `security-audit` launches under `agentic-security-audit` | frontier / high |
+
+Projects override the example reviewers' rows via `.agentic/review-gates.json` or `.agentic.json` `steps`.
+
+1M context is an orchestrator session setting, owner-controlled, enabled when available in the harness. Sub-agents cannot get it through `Agent` (no 1M model id): the helper rejects a 1M step model.
 
 ### Routing keys
 
@@ -106,7 +101,7 @@ Used for work outside the steps above. Defaults are model ids per harness, on pu
 
 ## Resolution
 
-For each of `harness`, `model` and `effort` separately, first hit wins (`harness`: levels 1-2 only, else your own):
+For each of `model` and `effort` separately, first hit wins:
 
 1. `steps.{harness}.{key}`
 2. `steps.{harness}.{parent}` — key up to the first `.` (`review` for `review.ub-mode`); `context.*` → `explore`
@@ -114,10 +109,6 @@ For each of `harness`, `model` and `effort` separately, first hit wins (`harness
 4. Harness default
 
 Example (cursor, config above): `review.code-review` → model `composer-2.5` (from `review`), effort `medium` (built-in `review`). `review.claude-security-review` → model `claude-opus-5-5`, effort `high` (both explicit). `implement` → model `composer-2.5`, effort `medium` (built-in).
-
-Example (claude, config above): `review.super-review` → `codex exec`, model `gpt-6.1-sol`, effort `high`.
-
-Resolved `harness` ≠ own: levels 3-4 map to the target harness's models. A child inheriting a parent's `harness` must use that harness's ids: set `harness` on the entry that sets `model`.
 
 ## Limits
 
@@ -128,4 +119,3 @@ Resolved `harness` ≠ own: levels 3-4 map to the target harness's models. A chi
 | `review.iterations` | 3 | Stop the fix loop, ask the user |
 | `babysit.rounds` | 5 | Fix rounds on the PR. Stop fixing, ask the user (watching itself isn't capped) |
 | `implement.retries` | 2 | Stop the unit, ask the user |
-| `crossHarness.timeout` | 600 | Minutes a cross-harness CLI may run. Kill it, fall back ([delegation.md](delegation.md#cross-harness)) |

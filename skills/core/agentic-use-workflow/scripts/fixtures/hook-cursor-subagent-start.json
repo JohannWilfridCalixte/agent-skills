@@ -1,0 +1,12 @@
+{
+  "_source": "https://cursor.com/docs/agent/hooks, doc-derived 2026-11-08, not captured",
+  "conversation_id": "conv-0001-fake", "generation_id": "gen-0001-fake", "model": "claude-sonnet-5-5", "cursor_version": "2.0.0", "workspace_roots": ["/home/dev/demo"], "user_email": "dev@example.com", "transcript_path": "/home/dev/.cursor/transcripts/conv-0001-fake.jsonl",
+  "hook_event_name": "subagentStart",
+  "subagent_id": "sub-0001-fake",
+  "subagent_type": "generalPurpose",
+  "task": "Step: implement",
+  "parent_conversation_id": "conv-0000-fake",
+  "tool_call_id": "tc-0001-fake",
+  "subagent_model": "claude-sonnet-5-5",
+  "is_parallel_worker": false
+}

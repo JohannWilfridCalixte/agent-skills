@@ -9,6 +9,7 @@
   "plugins": [
     {
       "name": "agentic",
+      "version": "4.0.0",
       "source": "./",
       "category": "development",
       "description": "Composable spec-driven development workflows: spec, plan, tickets, implement, review, babysit PR. Per-step model and effort, auditable work items."

@@ -1,0 +1,8 @@
+{
+  "_source": "https://developers.openai.com/codex/hooks, doc-derived 2026-11-08, not captured",
+  "session_id": "sess-0001-fake", "transcript_path": "/home/dev/.claude/projects/demo/sess-0001-fake.jsonl", "cwd": "/home/dev/demo", "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "spawn_agent",
+  "tool_input": { "message": "Step: implement" },
+  "tool_use_id": "call_fake0001"
+}

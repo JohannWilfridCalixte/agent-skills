@@ -19,6 +19,7 @@ Docs site: <https://johannwilfridcalixte.github.io/agent-skills/>
   - [Fastest path](#fastest-path)
   - [Prerequisites](#prerequisites)
   - [Alternatives](#alternatives)
+  - [Hooks](#hooks)
   - [Update](#update)
 - [Use](#use)
   - [First 5 minutes](#first-5-minutes)
@@ -70,6 +71,7 @@ Optional next step: `/agentic-configure` (`$agentic-configure` in Codex) detects
 |---|---|
 | Claude Code, Cursor or Codex | Running the skills |
 | `git` | Worktrees, commits, cleanup |
+| `bun` | The helper CLI and the hooks. Required; the skills can still be read without it |
 | `gh`, or a Bitbucket/GitLab CLI or MCP | `agentic-babysit-pr`, `agentic-pr-review`, `agentic-cleanup`, and publishing audit issues to GitHub |
 | `node` / `npx` (or `bunx`, `pnpx`, `pnpm dlx`) | The skills CLI install path; the vendoring script |
 | `jq` (optional) | [Following a run live](#work-item-state-audit-log) |
@@ -112,6 +114,56 @@ for d in ~/development/agent-skills/skills/*/*/; do
   ln -s "${d%/}" ~/.claude/skills/
 done
 ```
+
+### Hooks
+
+Two hooks back the workflow: `hook spawn` blocks a subagent spawn whose brief wasn't produced by `agentic.ts step`, and `hook compact` re-injects the resume summary after context compaction. Details: [docs/configuration.md](docs/configuration.md#hooks).
+
+- **Plugins** (Claude Code, Cursor, Codex) ship them. Codex: review and trust the plugin hooks with `/hooks`.
+- **skills CLI installs** get no hooks. Wire them by hand, adjusting the path if the skills landed elsewhere than `.agents/skills`.
+
+Claude Code, `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh spawn --harness claude", "timeout": 30 }]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh compact --harness claude", "timeout": 30 }]
+      }
+    ]
+  }
+}
+```
+
+Codex, `.codex/hooks.json`: same shape, with `--harness codex`.
+
+Cursor, `.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "subagentStart": [
+      { "command": "bash .agents/skills/agentic-use-workflow/scripts/hook.sh spawn --harness cursor", "timeout": 30, "failClosed": true }
+    ],
+    "sessionStart": [
+      { "command": "bash .agents/skills/agentic-use-workflow/scripts/hook.sh compact --harness cursor", "timeout": 30 }
+    ]
+  }
+}
+```
+
+Cursor has no post-compaction event, so `hook compact` runs at every session start there. Without bun, the hooks do nothing.
+
+`hub sync` and the PR-state part of `cleanup check` need GitHub and `gh`. Other forges (GitLab, …) are unsupported there: those commands skip with a message.
 
 ### Update
 
@@ -435,7 +487,7 @@ Defaults:
 - **Worktrees**: `../{repo}-worktrees`.
 - **Knowledge**: `docs`.
 - **Profiles**: `typescript`, `python`.
-- **Models**: frontier for grill, security reviews and audit; code for implement and review; fast for tickets.
+- **Models**: frontier for grill, security reviews and audit; code for implement, review and tickets.
 
 Full reference (fields, profiles, step keys, routing, resolution, limits, harness notes): [docs/configuration.md](docs/configuration.md).
 
@@ -471,7 +523,8 @@ Maintenance (check, update, add, remove): [Vendoring script](#vendoring-script).
 | [0003](docs/tech/adr/0003-implement-feature-light-mode.md) | Implement-feature light mode |
 | [0004](docs/tech/adr/0004-security-audit-and-review.md) | Security audit and review |
 | [0005](docs/tech/adr/0005-ponytail-in-grills.md) | Ponytail in grills |
-| [0006](docs/tech/adr/0006-cross-harness-steps.md) | Cross-harness steps |
+| [0006](docs/tech/adr/0006-cross-harness-steps.md) | Cross-harness steps (deprecated in v4) |
+| [0007](docs/tech/adr/0007-helper-cli.md) | Helper CLI and hooks (v4) |
 
 Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 
@@ -479,7 +532,7 @@ Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 
 ### Swap reviewers
 
-`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`, or run it on another harness's CLI with its `harness` field (e.g. `super-review` through `codex exec` from Claude Code).
+`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`. With `.agentic/review-gates.json`, `reviewers` is only a fallback: see [Review gates](docs/configuration.md#review-gates).
 
 ### Swap codestyle
 
@@ -561,6 +614,13 @@ Caveats:
 - **super-review standalone.** Invoked outside `agentic-review`, it still runs its board, PR and merge steps, and links to super-board files that aren't vendored. Use it through `agentic-review`, which maps them ([super-review.md](skills/review/agentic-review/references/super-review.md)).
 - **Name collisions.** Installing the upstream skills or plugins as well (`mattpocock/skills`, `super-board`, `ub-mode`, `security-audit-skill`, `ponytail`) gives you two skills with the same name. Keep one copy per harness.
 
+### Breaking changes in v4
+
+- **bun is required** for the helper CLI and the hooks. Skills stay readable without it.
+- **Cross-harness steps are removed** ([ADR-0006](docs/tech/adr/0006-cross-harness-steps.md) deprecated, see [ADR-0007](docs/tech/adr/0007-helper-cli.md)). Delete `harness` from step entries and `limits.crossHarness` from `.agentic.json`.
+
+Details: [CHANGELOG.md](CHANGELOG.md).
+
 ### Breaking changes in v3
 
 - Skills are grouped under `skills/{core,codestyle,flow,review,playbooks}`, and the manifests list every folder.
@@ -574,7 +634,7 @@ Caveats:
 - Step keys `triage`, `review.fix` and `babysit.fix` were removed, since fixes use `implement`. `review.<lens>` became `review.<reviewer>`.
 - Third-party skills are vendored in the repo, so there is nothing extra to install.
 
-Rationale: [ADR-0002](docs/tech/adr/0002-skill-composition.md) (v3), [ADR-0003](docs/tech/adr/0003-implement-feature-light-mode.md) (light mode), [ADR-0004](docs/tech/adr/0004-security-audit-and-review.md) (security audit and review), [ADR-0005](docs/tech/adr/0005-ponytail-in-grills.md) (ponytail in grills), [ADR-0001](docs/tech/adr/0001-prompt-library-rework.md) (v2).
+Rationale: [ADR-0002](docs/tech/adr/0002-skill-composition.md) (v3), [ADR-0003](docs/tech/adr/0003-implement-feature-light-mode.md) (light mode), [ADR-0004](docs/tech/adr/0004-security-audit-and-review.md) (security audit and review), [ADR-0005](docs/tech/adr/0005-ponytail-in-grills.md) (ponytail in grills), [ADR-0007](docs/tech/adr/0007-helper-cli.md) (helper CLI and hooks), [ADR-0001](docs/tech/adr/0001-prompt-library-rework.md) (v2).
 
 ## Credits
 

@@ -34,12 +34,11 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
       "review.super-review": { "model": "claude-opus-5-5", "effort": "high" }
     },
     "claude": {
-      "implement": { "model": "sonnet", "effort": "medium" },
-      "review.super-review": { "harness": "codex", "model": "gpt-6.1-sol", "effort": "high" }
+      "implement": { "model": "sonnet", "effort": "medium" }
     },
     "codex": { "implement": { "model": "gpt-6.1-sol", "effort": "medium" } }
   },
-  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2, "crossHarness.timeout": 600 }
+  "limits": { "review.iterations": 3, "babysit.rounds": 5, "implement.retries": 2 }
 }
 ```
 
@@ -51,11 +50,11 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
 | `commitWork` | `false` | `false` keeps `output` out of git (gitignore it) |
 | `worktrees` | `../{repo}-worktrees` | Root for worktrees, relative to the main checkout. `{repo}` is that checkout's folder name |
 | `knowledge.root` | `docs` | Knowledge base folder (ADRs, principles, glossary, product, RFCs), relative to the repo root. Read and written by `agentic-use-knowledge` |
-| `reviewers` | see [Reviewers](#reviewers) | Skill names. One review subagent runs per entry, with step key `review.<name>` |
+| `reviewers` | see [Reviewers](#reviewers) | Fallback only, used when `.agentic/review-gates.json` is absent (see [Review gates](#review-gates)). Skill names; one review subagent runs per entry, step key `review.<name>` |
 | `profiles` | built-ins | `{name, detect?, skills}[]`, added to the built-ins. Stack → codestyle skills. `detect` is a list of files or globs at the project root |
 | `selectedProfiles` | `[]` | Profiles in use. When empty, every profile whose `detect` matches is used |
-| `steps` | `{}` | Model, effort and optionally another harness per step, per harness (`cursor`, `claude`, `codex`) |
-| `limits` | see [Limits](#limits) | Loop caps and timeouts, as flat dotted keys |
+| `steps` | `{}` | Model and effort per step, per harness (`cursor`, `claude`, `codex`) |
+| `limits` | see [Limits](#limits) | Loop caps, as flat dotted keys |
 
 Any skill name (in `profiles[].skills`, `reviewers`, or a task's `Skills` in `plan.md`) can be any skill the harness can load: agentic, vendored, or installed separately.
 
@@ -72,7 +71,7 @@ A config profile with the same name as a built-in replaces its `skills` entirely
 
 ## Reviewers
 
-Default:
+Fallback, used only when `.agentic/review-gates.json` is absent (all entries then count as `alwaysOn`). Default:
 
 ```json
 ["code-review", "ub-mode", "claude-security-review", "super-review", "agentic-review-secrets", "agentic-review-access-control"]
@@ -82,26 +81,25 @@ Default:
 
 ## Steps
 
-Each entry is `"<step key>": { "harness": "<harness>", "model": "<harness model id>", "effort": "<level>" }`. Every field is optional; `model` and `effort` are passed as-is.
+Each entry is `"<step key>": { "model": "<harness model id>", "effort": "<level>" }`. Every field is optional; `model` and `effort` are passed as-is.
 
-- **Model**: a Cursor id from `agent models` (e.g. `claude-opus-5-5`), a Codex slug from `codex debug models` (e.g. `gpt-6.1-sol`), or a Claude Code alias (`opus`, `sonnet`, `haiku`) or full id.
+- **Model**: a Cursor id from `agent models` (e.g. `claude-opus-5-5`), a Codex slug from `codex debug models` (e.g. `gpt-6.1-sol`), or a Claude Code alias (`opus`, `sonnet`, `haiku`) or full id. 1M-context variants (ids containing `[1m]` or `-1m`) are rejected: 1M context is an orchestrator session setting, not a step model.
 - **Effort**: `low | medium | high`, or a harness-native level (`xhigh`, `max`, `ultra`).
-- **Harness**: run the step through another harness's CLI (`codex exec`, `claude -p`, `agent -p`) instead of a subagent of your session, e.g. `super-review` on a GPT model from a Claude Code session. `model` and `effort` are then that harness's. Leave it out to stay in your own harness. Not for `grill`, which runs in your session.
 
-Built-in defaults are capability classes, not model ids: `frontier` (the strongest reasoning model available), `code` (a strong, balanced coding model) and `fast` (the cheapest fast model).
+Built-in defaults are capability classes, not model ids: `frontier` (the strongest reasoning model available), `code` (a strong, balanced coding model) and `fast` (the cheapest fast model). The helper resolves them (Claude Code: `opus` / `sonnet` / `haiku`).
 
 | Step key | Runs | Built-in default |
 |---|---|---|
 | `grill` | your session | frontier / high |
 | `context.code`, `context.docs`, `context.runtime` | read-only subagent (parent `explore`) | as `explore` |
-| `tickets` | subagent | fast / low |
+| `tickets` | subagent | code / medium |
 | `implement` | one subagent per unit, including every review and babysit fix | code / medium |
-| `review` | parent of `review.<reviewer>`, one subagent per reviewer | code / medium |
-| `review.claude-security-review`, `review.super-review`, `review.agentic-review-access-control` | subagent | frontier / high |
-| `review.agentic-review-secrets` | subagent | frontier / medium |
+| `review` | parent of `review.<reviewer>`, one subagent per reviewer. `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
+| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | subagent | frontier / high |
+| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | subagent | frontier / high |
 | `audit` | every agent that `security-audit` launches under `agentic-security-audit` (reconnaissance, hunters, critics, verifiers) | frontier / high |
 
-`grill` runs in your own session, so its value is only a recommendation. You get a warning if your session runs a different model.
+`grill` runs in your own session, so its value is only a recommendation. You get a warning if your session runs a different model. Projects override the example reviewers' rows through `steps` or `.agentic/review-gates.json`.
 
 ### Routing keys
 
@@ -121,19 +119,15 @@ These cover work outside the steps above. Their defaults are deliberately model 
 3. The built-in default: the key's own row, otherwise its parent's
 4. The harness default
 
-`harness` resolves through levels 1 and 2 only, otherwise your own harness. With another harness, levels 3 and 4 map to that harness's models. A child inherits its parent's `harness`, so set `harness` on the same entry as `model` to keep the id valid.
-
 Worked examples, for cursor with the config above:
 
-- `review.code-review`: model `composer-2.5` (from `review`), effort `medium` (built-in `review`).
+- `review.ub-mode`: model `composer-2.5` (from `review`), effort `medium` (built-in `review`).
 - `review.super-review`: model `claude-opus-5-5`, effort `high` (both set explicitly).
 - `implement`: model `composer-2.5`, effort `medium` (built-in).
-- From Claude Code, `review.super-review`: runs through `codex exec`, model `gpt-6.1-sol`, effort `high`.
 
 ### Harness notes
 
 - **Claude Code**: if `CLAUDE_CODE_EFFORT_LEVEL` is set, it overrides every effort setting and is logged as the effort used.
-- **Another harness** (`harness` set): its CLI must be on `PATH` and logged in (`codex login status`, `claude auth status`, `agent status`). If it is missing or the run fails (error, `crossHarness.timeout`, missing or malformed output), you get one warning and the step reruns in your own harness with the built-in default model. Commands per harness: [`delegation.md`](../skills/core/agentic-use-workflow/references/delegation.md#cross-harness).
 - **Codex**: worktrees sit outside the repo, so the sandbox may block writes to them. Restart Codex with `--add-dir <path>`, or add the path to `sandbox_workspace_write.writable_roots` in `~/.codex/config.toml`.
 
 ## Limits
@@ -143,4 +137,86 @@ Worked examples, for cursor with the config above:
 | `review.iterations` | 3 | The review fix loop stops and asks you |
 | `babysit.rounds` | 5 | PR fix rounds stop and ask you. Watching the PR itself is not capped |
 | `implement.retries` | 2 | A red unit stops and asks you |
-| `crossHarness.timeout` | 600 | Minutes a step on another harness's CLI may run. It is killed and reruns in your own harness |
+
+## Review gates
+
+`.agentic/review-gates.json` decides which reviewers run, computed by `review eligible`. Reviewers come from three arrays, each entry `{ "skill": "<name>", "triggers": { "changed": [globs], "added": [globs] } }`. `triggers` only matter in `conditional`.
+
+```json
+{
+  "alwaysOn": [
+    { "skill": "code-review" },
+    { "skill": "agentic-review-secrets" },
+    { "skill": "agentic-review-access-control" }
+  ],
+  "conditional": [
+    { "skill": "migrations-data", "triggers": { "changed": ["**/migrations/**"], "added": ["**/migrations/*.sql"] } }
+  ],
+  "onDemand": [{ "skill": "super-review" }],
+  "security": { "reviewers": ["agentic-review-secrets", "agentic-review-access-control"], "paths": ["**/auth/**", "**/payments/**"] }
+}
+```
+
+| Array | Picked when |
+|---|---|
+| `alwaysOn` | First iteration: always |
+| `conditional` | First iteration: a file in the diff against `--base` matches `triggers.changed`, or an added file matches `triggers.added` |
+| `onDemand` | Only when named in `--only` |
+
+Later iterations (`--iteration` above 1) pick, instead:
+
+- Every reviewer whose previous report (`reviews/<n-1>-<name>.md`) starts with `verdict: changes-requested`.
+- The security reviewers, when the diff touches a security path.
+
+`--all --reason <text>` widens to every reviewer and logs a `note` event. `--only a,b` adds the named reviewers; an unknown name fails.
+
+`security` is optional:
+
+| Key | Default |
+|---|---|
+| `paths` | `**/auth/**`, `**/tenant/**`, `**/tenants/**`, `**/rls/**`, `**/policies/**` |
+| `reviewers` | The `alwaysOn` entries whose name contains `security`, `access` or `tenant` |
+
+Fallback: with no `review-gates.json`, `.agentic.json` `reviewers` is used and every entry counts as `alwaysOn`. With neither, `review eligible` exits 1.
+
+## Helper CLI
+
+`agentic.ts` does the workflow bookkeeping: events, state, step and model resolution, review eligibility, cleanup checks, spawn gating. It needs [bun](https://bun.sh).
+
+```bash
+bun <agentic-use-workflow dir>/scripts/agentic.ts <command>
+```
+
+| Command | Purpose |
+|---|---|
+| `start <workflow> --harness h` | Create the work item if new, log workflow `started` |
+| `event --type t --summary s` | Validated append to `events.jsonl` |
+| `state` | Re-derive `state.json` from the log |
+| `resume` | Short summary to continue a run |
+| `decide --tag --focus --q --a --why` | Append a decision to `decisions.md` and log it |
+| `step <key>` | Resolve model and effort, print the filled brief, log `started` |
+| `review eligible --base <ref>` | Reviewers to run, from [Review gates](#review-gates) |
+| `hub sync` | Mirror the work item to its hub issue (GitHub, via `gh`) |
+| `cleanup check` | Check the work item is ready to archive |
+| `hook spawn` / `hook compact` | Hook entry points, see [Hooks](#hooks) |
+
+`--work <slug>` selects the work item on any command. `gh` is optional: `hub sync` and the PR check of `cleanup check` skip with a message when it is absent, and `hub sync` also when no hub is set. GitHub only.
+
+| Env var | Effect |
+|---|---|
+| `AGENTIC_OUTPUT` | Overrides the work item root (default: `output` from `.agentic.json` in the main checkout), resolved from the current directory |
+| `AGENTIC_GH` | `gh` binary to use, default `gh` |
+| `AGENTIC_RETRY_MS` | Base delay of `gh` retries on network errors, default 1000 |
+
+Exit codes: `0` ok. `1` failed check or runtime failure (validation error, missing precondition, `gh` failure, `cleanup check` gaps). `2` usage error (unknown command, bad or missing flag), and a denied spawn from `hook spawn` on Claude Code and Codex.
+
+## Hooks
+
+Two hooks run through `scripts/hook.sh`, which calls `agentic.ts hook`:
+
+- `hook spawn`: before a subagent spawn, while a work item has an open run for the current directory, checks that the brief carries `Step:`, `Work item:` (an existing, non-archived path), `Skills:`, `Progress:` (or the word `read-only`), `Agent:`, and that a `started` event exists for that agent. A brief that skips `agentic.ts step` fails this. The spawn is denied with the fix command and the expected model and effort. A brief with `Work item: none`, or no open run, passes.
+- `hook compact`: after context compaction, re-injects the resume summary of the open work item.
+
+The Claude Code, Codex and Cursor plugins ship them (`hooks/<harness>.json`). Codex asks you to review and trust plugin hooks through `/hooks`. Cursor has no post-compaction event, so `hook compact` runs at every session start. Without bun, `hook.sh` prints one line to stderr and exits 0: hooks never block.
+
+Skills-CLI installs get no hooks: wire them by hand, see [README: Hooks](../README.md#hooks).

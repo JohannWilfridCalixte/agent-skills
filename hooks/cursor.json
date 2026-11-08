@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "subagentStart": [
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT:-.}/skills/core/agentic-use-workflow/scripts/hook.sh\" spawn --harness cursor",
+        "timeout": 30,
+        "failClosed": true
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT:-.}/skills/core/agentic-use-workflow/scripts/hook.sh\" compact --harness cursor",
+        "timeout": 30
+      }
+    ]
+  }
+}

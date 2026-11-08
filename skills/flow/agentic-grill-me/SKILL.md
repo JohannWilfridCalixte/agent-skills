@@ -40,9 +40,17 @@ Every focus. Recommended answer = the first rung of this ladder that fully works
 - A known limit, or scope pushed to later → its own decision: the limit, and when to revisit.
 - Each recommendation waits for the user's yes.
 
-Log every answer as it comes: append it to `decisions.md` and log its `decision` event with its focus, per the decisions.md contract in `agentic-use-workflow` `references/state.md`.
+### Ask
 
-Done when the frontier is empty for the focus and every answer is a `D` entry with its `decision` event.
+- Real decision → one question at a time, through the harness's question tool, plain language: options and open points in full sentences, jargon glossed.
+- Confirm-only recommendations (the user can only say yes or change it) → batched, at most 5 per round, plain language, numbered so any item can be pulled out and discussed alone.
+- Next round waits for the answers.
+
+### Log
+
+Every answer, as it comes (a batch: one call per item): `bun {agentic-use-workflow}/scripts/agentic.ts decide --tag structural|minor --focus {focus} --q … --a … --why … [--origin recommended] [--supersedes Dn]`. The helper numbers the `D` entry, appends it to `decisions.md` and logs its `decision` event.
+
+Done when the frontier is empty for the focus and every answer went through `decide`.
 
 ## Handoff
 

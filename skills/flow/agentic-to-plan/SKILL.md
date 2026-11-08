@@ -10,7 +10,9 @@ Turn `spec.md` into `plan.md`: how to build it, as units `agentic-implement` and
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
-**Light branch**: only when the caller asks for it (`agentic-debug`, or `agentic-implement-feature` / `agentic-change-feature` in light mode). Read [references/light.md](references/light.md) first: steps 1 and 2 run with its additions, then it replaces steps 3–5.
+**Log**: first action `bun {agentic-use-workflow}/scripts/agentic.ts event --workflow to-plan --type started --summary "to-plan started"`; last action the same with `--type completed` (`--type failed` and the reason on failure). Handoff included.
+
+**Light branch**: only when the caller asks for it (`agentic-debug`, or `agentic-implement-feature` / `agentic-change-feature` in light mode). Read [references/light.md](references/light.md) first, before step 1: its checklist applies to every plan, light or not; steps 1 and 2 run with its additions, then it replaces steps 3–5.
 
 ## 1. Input
 
@@ -41,20 +43,24 @@ Done when it returned with an empty frontier.
 
 Run the escalation gate (`agentic-use-workflow`) on the new structural decisions, promotion included (ADRs, principles, terms). Revisit → back to `agentic-grill-tech`.
 
-Done when every new structural decision is confirmed or escalated and the promotion is committed.
+List the decision ids first: `grep -o '^## D[0-9]*' {work}/decisions.md`. Every id is confirmed, escalated or minor-and-recorded; none is skipped because it looks settled.
+
+Done when every id from that list is accounted for and the promotion is committed.
 
 ## 5. Write `plan.md`
 
-Fill [references/plan.md](references/plan.md):
+Fill [references/plan.md](references/plan.md) in two passes.
+
+**Breakdown**: tasks only: title, goal, files, depends-on, skills per [references/light.md](references/light.md) Checklist. Present the list and ask once: granularity right? dependencies right? anything to split or merge? Iterate until approved. No acceptance criteria before approval.
+
+**Acceptance**: then write each task's acceptance, citing spec AC IDs, tests first.
 
 - Every structural decision reflected, none reinterpreted. Cite `D#` and ADRs.
-- Tasks are thin vertical slices: each cuts through every layer it needs, is verifiable alone and fits one commit. Many thin tasks over few thick ones. Tests first.
-- Every task's acceptance cites spec AC IDs.
-- Every task lists the skills it needs beyond the profile ones: `agentic-clean-architecture` for business logic (domain, use cases, validation, state transitions), `agentic-write-instrumented-code` for logging or tracing, any other installed codestyle skill the task calls for.
+- Skills: the profile ones (`agentic-use-workflow` Config) arrive with every unit; list only extras beyond them: `agentic-clean-architecture` for business logic (domain, use cases, validation, state transitions), `agentic-write-instrumented-code` for logging or tracing, any other installed codestyle skill the task calls for. Never name a stack skill the profile already supplies; a repo codestyle skill, when the project has one, wins over any name here.
 
-Present the task list and ask: granularity right? dependencies right? anything to split or merge? Iterate until approved, then log an `artifact` event.
+Log an `artifact` event.
 
-Done when the user approved and every spec AC is cited by at least one task.
+Done when the user approved the breakdown, every spec AC is cited by at least one task, and the light.md checklist holds for every task.
 
 ## Handoff
 

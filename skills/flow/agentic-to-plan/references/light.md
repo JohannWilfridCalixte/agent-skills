@@ -1,4 +1,20 @@
-# Light branch
+# Plan checklist and light branch
+
+## Checklist (every plan)
+
+Every task in `plan.md` has:
+
+- **Goal**: observable outcome.
+- **Files**: paths it writes.
+- **Depends on**: task ids or none.
+- **Skills**: extras beyond the profile, or `—`.
+- **Acceptance**: criteria citing AC ids.
+
+**Slice test**: a task is a vertical slice: its tests stand alone and its files stay inside one slice (one skill folder, one domain, one app). A task spanning slices names the cross-slice contract it implements, else split it. Split also when a task mixes concerns; never split just to shrink it.
+
+**Ownership**: tasks whose Files overlap, or where one reads what another writes, are sequential (`Depends on`). Tasks with disjoint Files and no dependency run in parallel, one worktree each. Each file has one owning task.
+
+## Light branch
 
 Plans straight from `input.md`: no spec, no tech grill, no escalation gate. Steps 1 and 2 of the skill run as written (plus the Change addition below); this file replaces steps 3–5. Pick the rules:
 
@@ -13,7 +29,7 @@ Every branch writes `plan.md` per step 5, with the acceptance criteria in the pl
 Decisions were made in `diagnosis.md`: no check, no questions.
 
 - `T1` is a failing regression test at the seam named in `diagnosis.md`, citing its root cause: it goes red on this bug.
-- Approval round as in step 5.
+- Approval round as in step 5 (breakdown first).
 
 Done when the user approved `plan.md` and `T1` names the seam and the root cause.
 

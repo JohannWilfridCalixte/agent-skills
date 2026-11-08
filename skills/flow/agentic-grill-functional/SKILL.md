@@ -4,6 +4,8 @@ description: "Grill behaviours, flows, states, edge cases, errors, permissions a
 argument-hint: "[slug | topic]"
 ---
 
+Builds on `grilling` and the `agentic-use-knowledge` read pass, both loaded by `agentic-grill-me`.
+
 Call the Skill tool with "agentic-grill-me", passing focus `functional` and this skill's argument (no Skill tool → open `../agentic-grill-me/SKILL.md` and follow it).
 
 Functional focus: behaviours, flows, states, edge cases, errors, permissions, acceptance. Problem and scope belong to `agentic-grill-product`, design to `agentic-grill-tech`.

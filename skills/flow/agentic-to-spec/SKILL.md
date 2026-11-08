@@ -10,6 +10,8 @@ Turn a request into `spec.md`: what to build and for whom, never how.
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
+**Log**: first action `bun {agentic-use-workflow}/scripts/agentic.ts event --workflow to-spec --type started --summary "to-spec started"`; last action the same with `--type completed` (`--type failed` and the reason on failure). Handoff included.
+
 **Change branch**: the request alters behaviour that exists today, rather than adding a capability. It reshapes steps 2 and 3 where marked, and the template ([references/spec.md](references/spec.md)).
 
 ## 1. Capture

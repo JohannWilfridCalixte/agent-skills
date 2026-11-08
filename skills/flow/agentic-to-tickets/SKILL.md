@@ -10,6 +10,8 @@ Optional. Slice `spec.md` + `plan.md` into tickets; tickets then replace plan ta
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
+**Log**: first action `bun {agentic-use-workflow}/scripts/agentic.ts event --workflow to-tickets --type started --summary "to-tickets started"`; last action the same with `--type completed` (`--type failed` and the reason on failure). Handoff included.
+
 ## 1. Load
 
 Resume the work item by slug. No `plan.md` → stop, suggest `agentic-to-plan {slug}`. Open escalations → agentic-use-workflow references/state.md Resume step 0.

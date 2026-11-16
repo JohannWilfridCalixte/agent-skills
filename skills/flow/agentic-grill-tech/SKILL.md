@@ -4,6 +4,8 @@ description: "Grill architecture, contracts, data and migrations, failure modes,
 argument-hint: "[slug | topic]"
 ---
 
+Builds on `grilling`, `ponytail` (ultra) and the `agentic-use-knowledge` read pass; `grilling` and the read pass are loaded by `agentic-grill-me`.
+
 Call the Skill tool with "ponytail" at level `ultra` (no Skill tool → read `../ponytail/SKILL.md` and follow it at ultra). Then call the Skill tool with "agentic-grill-me", passing focus `tech` and this skill's argument (no Skill tool → open `../agentic-grill-me/SKILL.md` and follow it).
 
 Tech focus: architecture, contracts, data and migration, failure modes, security, observability, test seams. Problem and behaviours belong to `agentic-grill-product` and `agentic-grill-functional`.

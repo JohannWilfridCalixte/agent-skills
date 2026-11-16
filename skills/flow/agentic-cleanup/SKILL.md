@@ -17,6 +17,10 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 - Already in `{output}/_archive/` → say so, stop.
 - No `workspace` recorded → use the PR's head branch.
 
+## Check
+
+Per target, run from the main checkout `bun {agentic-use-workflow}/scripts/agentic.ts cleanup check --work {slug}` first. Exit 0 → nothing left, only archive. Exit 1 → it prints one `missing:` line per gap: print them all, act only on those. A gap in the workflow or PR (`workflow not completed`, `pr not merged`, `no pr url`) is a stop: report it, go on only per Merged? below. Branch, worktree and stray-file gaps are the Clean work.
+
 ## Merged?
 
 - PR merged → clean. Authoritative, covers squash merges.
@@ -28,7 +32,7 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 
 Never delete the default branch. Uncommitted changes, or commits neither on the remote, nor in the merged PR's head (`headRefOid`), nor in the default branch, in the worktree or on the branch → ask, never discard.
 
-Log `cleanup` started (`step: null`) before step 1. Each step is skipped when already done:
+Log `cleanup` started (`step: null`) before step 1. Each step is skipped when `cleanup check` did not report it:
 
 1. Main checkout on the work item's branch → switch to the default branch. Dirty → ask.
 2. Update the default branch (fast-forward pull).

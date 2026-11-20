@@ -1154,7 +1154,9 @@ const unitWorktree = (event: StoredEvent) => {
   return path === undefined || branch === undefined ? undefined : { path, branch };
 };
 
-const mergeBackBlocks = (events: readonly StoredEvent[]) => {
+const branchExists = (cwd: string, branch: string) => gitOutput(cwd, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== undefined;
+
+const mergeBackBlocks = (events: readonly StoredEvent[], cwd: string) => {
   const run = currentRun(events)?.run;
   const inRun = events.filter((event) => event.run === run);
   const pending = inRun.flatMap((event, index) => {
@@ -1163,7 +1165,7 @@ const mergeBackBlocks = (events: readonly StoredEvent[]) => {
       .slice(index + 1)
       .some((later) => later.step === 'checks' && later.type === 'completed' && later.task === event.task);
 
-    return worktree === undefined || merged ? [] : [worktree];
+    return worktree === undefined || merged || !branchExists(cwd, worktree.branch) ? [] : [worktree];
   });
   if (pending.length === 0) return ['merge-back: none'];
 
@@ -1173,7 +1175,7 @@ const mergeBackBlocks = (events: readonly StoredEvent[]) => {
   ];
 };
 
-const resumeText = (item: WorkItem, events: readonly StoredEvent[]) => {
+const resumeText = (item: WorkItem, events: readonly StoredEvent[], cwd: string) => {
   const state = deriveState(item.name, events);
   const pending = pendingUnits(item, state);
   const open = state.escalations.filter((escalation) => escalation.status === 'open');
@@ -1187,7 +1189,7 @@ const resumeText = (item: WorkItem, events: readonly StoredEvent[]) => {
     `escalations: ${escalations}`,
     `pending: ${pending.join(', ') || 'none'}`,
     ...events.slice(-3).map((event) => `event: ${event.ts} ${event.type} ${[event.step, event.task].filter(Boolean).join('/')} ${event.summary}`),
-    ...mergeBackBlocks(events),
+    ...mergeBackBlocks(events, cwd),
     `next: ${nextCommand(item, state, pending, openPlaybookRun(events))}`,
   ];
 
@@ -1215,7 +1217,7 @@ const resumeCommand: Command = {
   required: [],
   async run(context) {
     const item = await resolveWorkItem(context, { allowCreate: false });
-    writeOut(`${resumeText(item, await readEvents(item))}\n`);
+    writeOut(`${resumeText(item, await readEvents(item), context.cwd)}\n`);
   },
 };
 
@@ -2435,11 +2437,12 @@ const hookCompactCommand: Command = {
     const payload = await readHookPayload();
     if (payload === undefined) return;
 
-    const item = await findHookItem(context, hookCwd(context, payload));
+    const cwd = hookCwd(context, payload);
+    const item = await findHookItem(context, cwd);
     if (item === undefined) return;
 
     const events = await safeEvents(item);
-    const output = adapter(payload, `${resumeText(item, events)}\n${cardText(item, events)}`);
+    const output = adapter(payload, `${resumeText(item, events, cwd)}\n${cardText(item, events)}`);
     if (output === undefined) return;
 
     const run = currentRun(events);

@@ -1442,9 +1442,14 @@ describe('parallel units', () => {
     type: 'started',
     data: { worktree: { path: `/wt/${unit}`, branch: `feat/demo--${unit}` } },
   });
-  const resumeLines = () => agentic(['resume', '--work', 'demo']).out.trimEnd().split('\n');
+  const resumeLines = () => agentic(['resume', '--work', 'demo'], { cwd: repo() }).out.trimEnd().split('\n');
+  const createUnitBranches = (...units: readonly string[]) => {
+    git(repo(), ['-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base']);
+    for (const unit of units) git(repo(), ['branch', `feat/demo--${unit}`]);
+  };
 
   test('resume lists pending units in started order with merge-back commands', () => {
+    createUnitBranches('T2', 'T3');
     writeLog(name, [workspaceEvent, unitStarted('T2'), unitStarted('T3')]);
 
     const lines = resumeLines();
@@ -1462,7 +1467,18 @@ describe('parallel units', () => {
     expect(lines.at(-1)).toStartWith('next: ');
   });
 
+  test('a unit run in place (its branch never created) is not listed', () => {
+    createUnitBranches('T3');
+    writeLog(name, [workspaceEvent, unitStarted('T2'), unitStarted('T3')]);
+
+    const output = resumeLines().join('\n');
+
+    expect(output).not.toContain('feat/demo--T2');
+    expect(output).toContain('git merge --no-ff feat/demo--T3');
+  });
+
   test('a unit with a later checks completion is no longer pending', () => {
+    createUnitBranches('T2', 'T3');
     writeLog(name, [workspaceEvent, unitStarted('T2'), unitStarted('T3'), { step: 'checks', task: 'T2', type: 'completed' }]);
 
     const output = resumeLines().join('\n');

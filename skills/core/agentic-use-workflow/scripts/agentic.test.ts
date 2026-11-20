@@ -1620,6 +1620,21 @@ describe('review eligible', () => {
       ]);
     });
 
+    test('default security paths match policy code', () => {
+      write('db/policies/tenant.sql');
+      commit('work');
+
+      expect(names(eligible(['--iteration', '2']))).toEqual(['review-access-tenant-isolation']);
+    });
+
+    test('default security paths ignore docs', () => {
+      write('documentation/compliance/policies/retention.md');
+      write('docs/auth/login.md');
+      commit('work');
+
+      expect(names(eligible(['--iteration', '2']))).toEqual([]);
+    });
+
     test('security settings in the gate file override the defaults', () => {
       write('.agentic/review-gates.json', JSON.stringify({ ...gates, security: { reviewers: ['code-review'], paths: ['src/api/**'] } }));
       write('src/api/route.ts', 'changed');

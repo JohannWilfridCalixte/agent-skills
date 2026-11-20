@@ -1608,6 +1608,7 @@ interface Gates {
 
 const securityReviewerKeywords = ['security', 'access', 'tenant'];
 const defaultSecurityPaths = ['**/auth/**', '**/tenant/**', '**/tenants/**', '**/rls/**', '**/policies/**'];
+const docPath = /(^|\/)(docs?|documentation)\/|\.(md|mdx|rst|adoc|txt)$/;
 const fallbackReason = 'fallback: no review-gates.json';
 
 const gateEntries = (config: Record<string, unknown>, kind: GateKind) =>
@@ -1725,7 +1726,11 @@ const reviewEligibleCommand: Command = {
           pick(entry.name, `changes-requested in ${previous}${entry.name}.md`);
         }
       }
-      const securityChanged = firstGlobMatch(gates.security?.paths ?? defaultSecurityPaths, diffPaths(root, base));
+      const configuredPaths = gates.security?.paths;
+      const securityChanged =
+        configuredPaths === undefined
+          ? firstGlobMatch(defaultSecurityPaths, diffPaths(root, base).filter((path) => !docPath.test(path)))
+          : firstGlobMatch(configuredPaths, diffPaths(root, base));
       if (securityChanged !== undefined) {
         for (const name of securityReviewerNames(gates)) pick(name, 'security: auth/tenant paths changed');
       }

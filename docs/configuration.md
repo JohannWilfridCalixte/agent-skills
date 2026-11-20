@@ -175,7 +175,7 @@ Later iterations (`--iteration` above 1) pick, instead:
 
 | Key | Default |
 |---|---|
-| `paths` | `**/auth/**`, `**/tenant/**`, `**/tenants/**`, `**/rls/**`, `**/policies/**` |
+| `paths` | `**/auth/**`, `**/tenant/**`, `**/tenants/**`, `**/rls/**`, `**/policies/**`; docs (`docs/`, `documentation/`, `.md`, `.mdx`, `.rst`, `.adoc`, `.txt`) never match these defaults |
 | `reviewers` | The `alwaysOn` entries whose name contains `security`, `access` or `tenant` |
 
 Fallback: with no `review-gates.json`, `.agentic.json` `reviewers` is used and every entry counts as `alwaysOn`. With neither, `review eligible` exits 1.

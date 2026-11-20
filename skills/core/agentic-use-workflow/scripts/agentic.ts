@@ -1474,7 +1474,7 @@ const unitWorktreeFor = (context: Context, root: string, itemName: string, unit:
   const projectFile = readJsonFile(join(root, '.agentic.json'));
   const configured = [projectFile, userFile].map((file) => (isRecord(file) ? textOf(file.worktrees) : undefined)).find(Boolean);
   const base = resolve(root, (configured ?? defaultWorktrees).replaceAll('{repo}', basename(root)));
-  const branch = `${workspace.branch}/${unit}`;
+  const branch = `${workspace.branch}--${unit}`;
   const path = join(base, `${itemName}-${unit}`);
 
   return { path, branch, command: `git worktree add -b ${branch} ${path} ${workspace.branch}` };

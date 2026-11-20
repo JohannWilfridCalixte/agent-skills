@@ -1384,8 +1384,18 @@ describe('parallel units', () => {
 
     expect(result.code).toBe(0);
     expect(result.out).toContain(`Workspace: ${unitPath('T5')}`);
-    expect(result.out).toContain(`worktree: git worktree add -b feat/demo/T5 ${unitPath('T5')} feat/demo\nnext: `);
+    expect(result.out).toContain(`worktree: git worktree add -b feat/demo--T5 ${unitPath('T5')} feat/demo\nnext: `);
     expect(result.out).toContain('"task":"T5","agent":"impl-T5"');
+  });
+
+  test('the printed add command works while the work branch exists', () => {
+    git(repo(), ['-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base']);
+    git(repo(), ['branch', 'feat/demo']);
+    writeLog(name, [workspaceEvent]);
+
+    const command = stepUnit().out.match(/^worktree: (.+)$/m)?.[1] ?? '';
+
+    expect(Bun.spawnSync(['sh', '-c', command], { cwd: repo(), stderr: 'pipe' }).exitCode).toBe(0);
   });
 
   test('started event records the worktree and the unit implies the task', () => {
@@ -1396,7 +1406,7 @@ describe('parallel units', () => {
     expect(readLog(name).at(-1)).toMatchObject({
       type: 'started',
       task: 'T5',
-      data: { worktree: { path: unitPath('T5'), branch: 'feat/demo/T5' } },
+      data: { worktree: { path: unitPath('T5'), branch: 'feat/demo--T5' } },
     });
   });
 
@@ -1404,7 +1414,7 @@ describe('parallel units', () => {
     writeFileSync(join(repo(), '.agentic.json'), JSON.stringify({ worktrees: '../trees/{repo}' }));
     writeLog(name, [workspaceEvent]);
 
-    expect(stepUnit().out).toContain(`worktree: git worktree add -b feat/demo/T5 ${unitPath('T5', join(sandbox, 'trees', 'repo'))} feat/demo`);
+    expect(stepUnit().out).toContain(`worktree: git worktree add -b feat/demo--T5 ${unitPath('T5', join(sandbox, 'trees', 'repo'))} feat/demo`);
   });
 
   test('without a recorded workspace exits 1 and logs nothing', () => {
@@ -1430,7 +1440,7 @@ describe('parallel units', () => {
     step: 'implement',
     task: unit,
     type: 'started',
-    data: { worktree: { path: `/wt/${unit}`, branch: `feat/demo/${unit}` } },
+    data: { worktree: { path: `/wt/${unit}`, branch: `feat/demo--${unit}` } },
   });
   const resumeLines = () => agentic(['resume', '--work', 'demo']).out.trimEnd().split('\n');
 
@@ -1442,12 +1452,12 @@ describe('parallel units', () => {
 
     expect(lines.slice(start, start + 7)).toEqual([
       'merge-back:',
-      '  git merge --no-ff feat/demo/T2',
+      '  git merge --no-ff feat/demo--T2',
       '  git worktree remove /wt/T2',
-      '  git branch -d feat/demo/T2',
-      '  git merge --no-ff feat/demo/T3',
+      '  git branch -d feat/demo--T2',
+      '  git merge --no-ff feat/demo--T3',
       '  git worktree remove /wt/T3',
-      '  git branch -d feat/demo/T3',
+      '  git branch -d feat/demo--T3',
     ]);
     expect(lines.at(-1)).toStartWith('next: ');
   });
@@ -1457,8 +1467,8 @@ describe('parallel units', () => {
 
     const output = resumeLines().join('\n');
 
-    expect(output).not.toContain('feat/demo/T2');
-    expect(output).toContain('git merge --no-ff feat/demo/T3');
+    expect(output).not.toContain('feat/demo--T2');
+    expect(output).toContain('git merge --no-ff feat/demo--T3');
   });
 
   test('no worktree units prints merge-back: none', () => {

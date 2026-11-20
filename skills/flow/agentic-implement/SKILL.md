@@ -6,7 +6,7 @@ argument-hint: "<slug | path/to/plan.md | path/to/reviews/{n}-fix.md> [--overrid
 
 # Implement
 
-Turn units of work into committed, green code. You orchestrate; subagents write the code.
+Turn units of work into committed, green code. You orchestrate; sessions or subagents write the code.
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
@@ -38,7 +38,7 @@ Done when every pending unit is listed with its blocking edges (`Depends on`, ti
 
 Order by blocking edges. Sequential by default, in the one workspace; parallel only when units are independent **and** their files are disjoint.
 
-One subagent per unit, step key `implement`, agent label `impl-{unit}`. Print its brief with `agentic.ts step implement --unit {unit} --agent impl-{unit} --skills tdd`; the `started` event carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled, with, as paths:
+One session or subagent per unit, step key `implement`, agent label `impl-{unit}`. Print its brief with `agentic.ts step implement --unit {unit} --agent impl-{unit} --skills tdd`; the `started` event carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled, with, as paths:
 
 - Parallel unit: the brief's Workspace is the unit's own worktree. Run the printed `git worktree add` command before spawning. Merge back onto the work branch in task order, using the `git merge` commands `agentic.ts resume` lists, before the green gate.
 

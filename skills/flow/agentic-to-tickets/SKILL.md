@@ -42,7 +42,7 @@ Read `../to-tickets/SKILL.md` and follow it, with this brief in place of its own
   - local file → never write into another work item: copy it to `{work}/tickets/NN-slug.md` with a `Source: <child path>` line, then update the copy;
   - in another tracker than the picked one → new ticket with a `Source: <child ref>` line.
 
-Publishing to a real tracker runs as a `tickets` subagent (`agentic-use-workflow` Delegation), given the approved breakdown and the tracker choice.
+Publishing to a real tracker runs as a `tickets` step (`agentic-use-workflow` Delegation), given the approved breakdown and the tracker choice.
 
 Done when the user approved the breakdown and every ticket is published.
 

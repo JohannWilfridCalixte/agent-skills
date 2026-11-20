@@ -663,7 +663,7 @@ const startCommand: Command = {
 };
 
 const putFiles = new Set(['spec.md', 'plan.md', 'context.md', 'implementation.md', 'pr.md']);
-const putFolders = ['briefs/', 'reviews/', 'tickets/'];
+const putFolders = ['briefs/', 'reports/', 'reviews/', 'tickets/'];
 
 const isPutAllowed = (path: string) => {
   const segments = path.split('/');
@@ -2089,7 +2089,7 @@ const codexToolInputPrompt = (payload: Record<string, unknown>) =>
   toolInputPrompt(payload) ?? textOf(recordField(payload, 'tool_input').message);
 
 const spawnToolNames: Readonly<Record<string, readonly string[]>> = {
-  claude: ['Agent'],
+  claude: ['Agent', 'mcp__ccd_session__start_session'],
   codex: ['Agent', 'spawn_agent'],
   cursor: ['Agent'],
 };

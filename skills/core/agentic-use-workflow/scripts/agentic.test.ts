@@ -2031,6 +2031,8 @@ describe('put', () => {
   test('creates nested directories for allowlisted folders', () => {
     expect(put('briefs/T1.md', 'brief').code).toBe(0);
     expect(readFileSync(join(itemDir(name), 'briefs', 'T1.md'), 'utf8')).toBe('brief');
+    expect(put('reports/impl-T1.md', 'report').code).toBe(0);
+    expect(readFileSync(join(itemDir(name), 'reports', 'impl-T1.md'), 'utf8')).toBe('report');
   });
 
   test('a review report also logs completed with counts from its header', () => {
@@ -2686,6 +2688,61 @@ describe('hook spawn', () => {
     });
   });
 
+  describe('claude session start', () => {
+    const sessionStart = async (toolInput: Record<string, unknown>, prompt = briefLines()) => {
+      const base = JSON.parse(await Bun.file(join(import.meta.dir, 'fixtures', 'hook-claude-spawn-session.json')).text());
+
+      return JSON.stringify({ ...base, cwd: workspace, tool_input: { ...base.tool_input, prompt, ...toolInput } });
+    };
+
+    test('allows when brief, full model id and effort match the started event', async () => {
+      openItem();
+
+      expect(hook(await sessionStart({ model: 'claude-sonnet-5-5', effort: 'medium' }))).toEqual({ code: 0, out: '', err: '' });
+    });
+
+    test('denies a different model or effort, printing the expected values', async () => {
+      openItem();
+      const model = hook(await sessionStart({ model: 'claude-opus-5-5', effort: 'medium' }));
+      const effort = hook(await sessionStart({ model: 'claude-sonnet-5-5', effort: 'high' }));
+
+      expect(model.code).toBe(2);
+      expect(JSON.parse(model.out).hookSpecificOutput.permissionDecision).toBe('deny');
+      expect(model.err).toContain('model sonnet (got claude-opus-5-5)');
+      expect(effort.code).toBe(2);
+      expect(effort.err).toContain('effort medium (got high)');
+    });
+
+    test('denies a brief missing its checked lines', async () => {
+      openItem();
+      const result = hook(await sessionStart({ model: 'claude-sonnet-5-5', effort: 'medium' }, briefLines(['Skills', 'Load skills'])));
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('Skills:');
+      expect(result.err).toContain('Load skills:');
+    });
+
+    test('a review session obeys the eligible list', async () => {
+      openItem([
+        { workflow: 'implement', type: 'note', step: 'review', data: { reviewers: ['code-review'] } },
+        { workflow: 'implement', type: 'started', step: 'review.review-i18n', agent: 'review.review-i18n-1', model: 'sonnet', effort: 'medium', data: { skills: ['tdd', 'house-style'] } },
+      ]);
+      const brief = briefLines().replace('Step: implement', 'Step: review.review-i18n').replace('Agent: impl-T9', 'Agent: review.review-i18n-1');
+      const result = hook(await sessionStart({ model: 'claude-sonnet-5-5', effort: 'medium' }, brief));
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('review-i18n in the latest review eligible list');
+    });
+
+    test('other harnesses ignore the session tool', async () => {
+      openItem();
+      const input = await sessionStart({}, briefLines(['Skills']));
+
+      expect(hook(input, ['--harness', 'codex']).code).toBe(0);
+      expect(hook(input, ['--harness', 'cursor']).code).toBe(0);
+    });
+  });
+
   test('Work item: none allows silently', () => {
     openItem();
 
@@ -3195,6 +3252,16 @@ describe('hook fixtures (doc-derived stdin shapes)', () => {
     const spawnInput = (await fixture('hook-claude-spawn.json')).tool_input as Record<string, unknown>;
     expect(spawnInput.model).toBe('sonnet');
     expect(spawnInput.effort).toBe('low');
+  });
+
+  test('claude session-start fixture: complete brief allows, missing Skills denies', async () => {
+    const base = await fixture('hook-claude-spawn-session.json');
+    const withBrief = (prompt: string) => ({ ...base, cwd: workspace, tool_input: { ...(base.tool_input as object), prompt } });
+
+    expect(run('spawn', 'claude', withBrief(brief()))).toEqual({ code: 0, out: '', err: '' });
+    const denied = run('spawn', 'claude', withBrief(brief(true)));
+    expect(denied.code).toBe(2);
+    expect(JSON.parse(denied.out).hookSpecificOutput.permissionDecisionReason).toContain('Skills:');
   });
 
   test('claude spawn fixture: complete brief allows, missing Skills denies; unknown keys ignored', async () => {

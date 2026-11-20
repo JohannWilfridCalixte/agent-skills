@@ -13,6 +13,7 @@
 - `hook spawn` on Claude Code also checks the `Agent` tool's model, effort and `Load skills:` against the `started` event.
 - Run model: playbook steps attach with `--workflow`, child runs, cwd-based work-item activation, unconfirmed decisions, compaction card, automatic quiet hub sync after milestones.
 - Step keys `write`, `plan`; an unknown step key exits 1.
+- Sessions: in the Claude desktop app, long steps (`implement`, `review.*`, `plan`, `write`, `tickets`) run as separate app sessions (`mcp__ccd_session__start_session`), reporting through `put reports/{agent}.md`; else subagents as before. `hook spawn` checks session starts like `Agent` spawns (`hooks/claude.json` matcher widened). `hook subagent-stop` does not cover sessions.
 
 ## 4.0.0 - 2026-11-08
 

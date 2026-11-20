@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Agent|mcp__ccd_session__start_session",
         "hooks": [
           {
             "type": "command",

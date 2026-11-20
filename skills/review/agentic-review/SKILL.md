@@ -24,7 +24,7 @@ Done when every reviewer is reachable or recorded skipped, and the diff, spec so
 
 Iteration `n` starts at 1, or after the latest `reviews/{n}-*.md` on resume. `n` > 1 → pass `--iteration n` to `review eligible`.
 
-One subagent per reachable reviewer, all in parallel, step key `review.<reviewer>`, agent label `review.<reviewer>-{n}`, resolved model and effort. Brief per agentic-use-workflow `references/delegation.md` (`Skills:` copied verbatim):
+One session or subagent per reachable reviewer, all in parallel, step key `review.<reviewer>`, agent label `review.<reviewer>-{n}`, resolved model and effort. Brief per agentic-use-workflow `references/delegation.md` (`Skills:` copied verbatim):
 
 - `Load skills:` `<reviewer>`, then the codestyle union. Goal: follow `<reviewer>` on this diff.
 - `Read:` diff command, commit list, spec sources, principles and ADR paths, this run's reviewer list, previous iteration's review and fix list when present (keep carried ids, judge disputed findings). PR mode adds the PR number and URL.

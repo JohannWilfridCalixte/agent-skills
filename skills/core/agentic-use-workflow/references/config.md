@@ -44,7 +44,7 @@ Project wins (`agentic.ts step` applies this merge). `steps` merges per harness 
 | `knowledge.root` | string | `docs` | Knowledge base folder (agentic-use-knowledge), relative to the repo root |
 | `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: codestyle skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
-| `reviewers` | string[] | see below | Fallback only, used when `.agentic/review-gates.json` is absent (`review eligible` decides otherwise). Skill names; one subagent per entry, step key `review.<name>` |
+| `reviewers` | string[] | see below | Fallback only, used when `.agentic/review-gates.json` is absent (`review eligible` decides otherwise). Skill names; one session or subagent per entry, step key `review.<name>` |
 | `verify` | string | none | Green-gate command, run by `agentic.ts gate` via `sh -c` at HEAD in the cwd checkout. Absent → `gate` exits 1 |
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
@@ -79,14 +79,14 @@ Capability classes, not model ids: `frontier` (strongest reasoning model), `code
 | Step key | Where | Default |
 |---|---|---|
 | `grill` | main session | frontier / high |
-| `implement` | subagent, one per unit (fix lists included) | code / medium |
-| `tickets` | subagent | code / medium |
-| `write` | subagent, delegated spec and knowledge drafts | code / medium |
-| `plan` | subagent, plan breakdown | frontier / high |
+| `implement` | session or subagent, one per unit (fix lists included) | code / medium |
+| `tickets` | session or subagent | code / medium |
+| `write` | session or subagent, delegated spec and knowledge drafts | code / medium |
+| `plan` | session or subagent, plan breakdown | frontier / high |
 | `explore`, `context.*` | subagent, read-only | code / medium |
 | `review` | parent of `review.<reviewer>`; `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
-| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | subagent | frontier / high |
-| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | subagent | frontier / high |
+| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | session or subagent | frontier / high |
+| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | session or subagent | frontier / high |
 | `audit` | every agent `security-audit` launches under `agentic-security-audit` | frontier / high |
 
 Projects override the example reviewers' rows via `.agentic/review-gates.json` or `.agentic.json` `steps`.

@@ -117,7 +117,7 @@ done
 
 ### Hooks
 
-Three hooks back the workflow: `hook spawn` blocks a subagent spawn whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, and `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named. Details: [docs/configuration.md](docs/configuration.md#hooks).
+Three hooks back the workflow: `hook spawn` blocks a subagent spawn or session start whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, and `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named. Details: [docs/configuration.md](docs/configuration.md#hooks).
 
 - **Plugins** (Claude Code, Cursor, Codex) ship them. Codex: review and trust the plugin hooks with `/hooks`.
 - **skills CLI installs** get no hooks. Wire them by hand, adjusting the path if the skills landed elsewhere than `.agents/skills`.
@@ -129,7 +129,7 @@ Claude Code, `.claude/settings.json`:
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Agent|mcp__ccd_session__start_session",
         "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh spawn --harness claude", "timeout": 30 }]
       }
     ],
@@ -283,7 +283,7 @@ If it isn't straightforward, light mode says why and offers full mode; it never 
 | You're asked | Runs autonomously |
 |---|---|
 | Start: workspace, mode, tickets, untracked-file copy (only what you haven't already answered) | Context gathering by read-only subagents |
-| Grill questions (product, functional, tech), each with a recommended answer | `implement`: one subagent and one conventional commit per unit, with a green gate (build, lint, typecheck, tests) after each |
+| Grill questions (product, functional, tech), each with a recommended answer | `implement`: one session or subagent and one conventional commit per unit, with a green gate (build, lint, typecheck, tests) after each |
 | Spec and plan approval (full mode) | `review`: every reviewer, dedupe, fix list, re-review |
 | Escalation gate: confirm / escalate / revisit each structural decision | `babysit-pr`: push, open the PR, poll CI and comments, fix |
 | Interrupts after the last gate: a limit hit, a design-level PR comment, an unfixable red tree, a new escalation, a PR closed unmerged | `cleanup` after merge |
@@ -433,10 +433,10 @@ ADRs are refined in place, each change a `History` row; `Superseded` only when a
 
 - **Implement.**
   - Work is split into units: the fix list first, then tickets, then plan tasks.
-  - Each unit gets one subagent following matt's `implement`, and one conventional commit.
+  - Each unit gets one session or subagent following matt's `implement`, and one conventional commit.
   - A green gate (build, lint, typecheck, tests) runs after each unit. A red unit is retried `implement.retries` times, then you're asked.
 - **Review.**
-  - One report-only subagent runs per `reviewers` entry, on the branch diff, and writes `reviews/{n}-{name}.md`.
+  - One report-only session or subagent runs per `reviewers` entry, on the branch diff, and writes `reviews/{n}-{name}.md`.
   - Findings are deduped into a fix list, which goes to `agentic-implement`; then every reviewer re-runs.
   - Severities are `blocker`, `major`, `minor` and `nit`. Only blocker and major loop; minor and nit are reported only.
   - Needs-user findings are asked in one question (done / accepted).
@@ -537,7 +537,7 @@ Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 
 ### Swap reviewers
 
-`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`. With `.agentic/review-gates.json`, `reviewers` is only a fallback: see [Review gates](docs/configuration.md#review-gates).
+`reviewers` is a list of model-invoked skill names. Any available review skill works: vendored, installed with `npx skills add <source> --skill <name>`, or your own. Add the names you want and drop the ones you don't. Each one runs report-only in its own session or subagent on the branch diff and writes `reviews/{n}-{name}.md`. Tune its model with `steps.<harness>.review.<name>`. With `.agentic/review-gates.json`, `reviewers` is only a fallback: see [Review gates](docs/configuration.md#review-gates).
 
 ### Swap codestyle
 
@@ -581,8 +581,8 @@ Agentic flow skills are all model-invoked, and each one can be used standalone.
 | `agentic-to-spec` | capture → context → grill product + functional → gate → matt's `to-spec` → `spec.md` |
 | `agentic-to-plan` | tech context → grill tech → gate → promote to knowledge → `plan.md` ([plan.md contract](skills/flow/agentic-to-plan/references/plan.md)). The light branch (debug, and light mode) has no grill or gate. Without `diagnosis.md`: straightforward check plus one exchange of blocking questions, no approval. With `diagnosis.md`: T1 is a failing regression test |
 | `agentic-to-tickets` | Matt's `to-tickets` on spec + plan, local (`tickets/NN-slug.md`) or in a real tracker. When the input has child items (an audit parent), they are reused as tickets, and local ones are copied into the work item |
-| `agentic-implement` | One subagent per ticket, task or fix list, following matt's `implement`, with one commit each and a green gate between |
-| `agentic-review` | One subagent per `reviewers` entry, report-only, with a fix loop through `agentic-implement`. PR mode: report or post. Args: `[<slug> \| <PR number/url> \| <base ref>] [--only <reviewer,reviewer>]` |
+| `agentic-implement` | One session or subagent per ticket, task or fix list, following matt's `implement`, with one commit each and a green gate between |
+| `agentic-review` | One session or subagent per `reviewers` entry, report-only, with a fix loop through `agentic-implement`. PR mode: report or post. Args: `[<slug> \| <PR number/url> \| <base ref>] [--only <reviewer,reviewer>]` |
 | `agentic-babysit-pr` | Push, open the PR, watch CI and comments, and fix through implement → review until merged. Never merges |
 | `agentic-cleanup` | After merge: remove the worktree and branches, update the default branch, archive the work item. Args: `[<slug> \| --all]` |
 

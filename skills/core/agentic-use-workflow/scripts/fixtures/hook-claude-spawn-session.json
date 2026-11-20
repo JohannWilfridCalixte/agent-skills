@@ -1,0 +1,26 @@
+{
+  "_source": "captured 2026-11-15, Claude Code 2.1.325, PreToolUse envelope of hook-claude-spawn.json; tool_input per the Claude desktop app start_session schema 2026-11-20, sanitised",
+  "session_id": "sess-0001",
+  "transcript_path": "/home/dev/.claude/projects/demo/sess-0001.jsonl",
+  "cwd": "/repo",
+  "scratchpad_dir": "/tmp/scratchpad",
+  "prompt_id": "prompt-0001",
+  "permission_mode": "auto",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "mcp__ccd_session__start_session",
+  "tool_input": {
+    "prompt": "Work item: none\n\nTask: list the files in `scripts/fixtures`. Return the file list and the total count.",
+    "background": "Counting fixture files for the hook tests; read-only, no changes expected in this checkout.",
+    "context": "fresh",
+    "initiation": "user_asked",
+    "title": "Count fixture files",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "use_worktree": false,
+    "wake_when_done": true
+  },
+  "tool_use_id": "toolu_0002"
+}

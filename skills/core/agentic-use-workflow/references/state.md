@@ -15,6 +15,7 @@
 ├── plan.md           # tasks consumed by agentic-implement and agentic-to-tickets
 ├── tickets/NN-slug.md  # local tracker, written by agentic-to-tickets
 ├── implementation.md
+├── reports/{agent}.md  # a session's full report (delegation.md Sessions)
 ├── reviews/
 │   ├── {n}-{reviewer}.md  # one per reviewer per review iteration n
 │   ├── {n}-fix.md         # fix list fed to agentic-implement

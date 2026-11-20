@@ -644,6 +644,19 @@ describe('state derivation', () => {
     expect(state.units).toEqual({ T1: 'done', T2: 'in_progress' });
   });
 
+  test('units: a completed unit counts done once its PR merges, even without checks', () => {
+    const state = deriveState([
+      { type: 'started', workflow: 'implement-feature' },
+      { type: 'started', step: 'implement', task: 'T1', agent: 'impl-T1' },
+      { type: 'completed', step: 'implement', task: 'T1', agent: 'impl-T1' },
+      { type: 'started', step: 'implement', task: 'T2', agent: 'impl-T2' },
+      { type: 'completed', workflow: 'babysit-pr', step: 'merge', summary: 'merged PR 7' },
+      { type: 'started', step: 'implement', task: 'T3', agent: 'impl-T3' },
+      { type: 'completed', step: 'implement', task: 'T3', agent: 'impl-T3' },
+    ]);
+    expect(state.units).toEqual({ T1: 'done', T2: 'in_progress', T3: 'in_progress' });
+  });
+
   test('choices keep the latest value per key; workspace/title/artifacts/hub/updated', () => {
     const workspace = { kind: 'worktree', branch: 'feat/x', base: 'main', path: '/p' };
     const state = deriveState([

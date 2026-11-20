@@ -452,17 +452,30 @@ const deriveSteps = (events: readonly StoredEvent[]) => {
   return Object.assign({}, ...passes.values());
 };
 
+const isPrMerged = (event: StoredEvent) =>
+  event.workflow === 'babysit-pr' && event.type === 'completed' && (event.step === 'merge' || isWorkflowLevel(event));
+
 const deriveUnits = (events: readonly StoredEvent[]) => {
   const units: Record<string, string> = {};
+  const awaitingMerge = new Set<string>();
   for (const event of events) {
     const choice = event.type === 'decision' ? event.data.choice : undefined;
     if (isRecord(choice) && typeof choice.key === 'string' && choice.key.startsWith('unit.') && choice.value === 'skip') {
       units[choice.key.slice('unit.'.length)] = 'skipped';
       continue;
     }
+    // A merged PR passed CI, so its completed units are done even when no gate logged their checks.
+    if (isPrMerged(event)) {
+      for (const task of awaitingMerge) if (units[task] === 'in_progress') units[task] = 'done';
+      awaitingMerge.clear();
+    }
     if (event.task === undefined) continue;
 
-    if (event.type === 'started' && event.step === 'implement') units[event.task] = 'in_progress';
+    if (event.type === 'started' && event.step === 'implement') {
+      units[event.task] = 'in_progress';
+      awaitingMerge.delete(event.task);
+    }
+    if (event.type === 'completed' && event.step === 'implement') awaitingMerge.add(event.task);
     if (event.type === 'completed' && event.step === 'checks') units[event.task] = 'done';
     if (event.type === 'failed' && event.step === 'implement') {
       if (event.data.interrupted === true) delete units[event.task];
@@ -1481,9 +1494,6 @@ const unitWorktreeFor = (context: Context, root: string, itemName: string, unit:
 
   return { path, branch, command: `git worktree add -b ${branch} ${path} ${workspace.branch}` };
 };
-
-const isPrMerged = (event: StoredEvent) =>
-  event.workflow === 'babysit-pr' && event.type === 'completed' && (event.step === 'merge' || isWorkflowLevel(event));
 
 const hasInOpenRun = (events: readonly StoredEvent[], matches: (event: StoredEvent) => boolean) => {
   const openRuns = new Set(workflowStarts(events).filter((start) => !isClosedRun(events, start.run)).map((start) => start.run));

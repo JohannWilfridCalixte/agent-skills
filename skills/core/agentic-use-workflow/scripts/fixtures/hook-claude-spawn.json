@@ -1,8 +1,23 @@
 {
-  "_source": "https://code.claude.com/docs/en/hooks, doc-derived 2026-11-08, not captured",
-  "session_id": "sess-0001-fake", "transcript_path": "/home/dev/.claude/projects/demo/sess-0001-fake.jsonl", "cwd": "/home/dev/demo", "permission_mode": "default",
+  "_source": "captured 2026-11-15, Claude Code 2.1.325, headless nested session, sanitised",
+  "session_id": "sess-0001",
+  "transcript_path": "/home/dev/.claude/projects/demo/sess-0001.jsonl",
+  "cwd": "/repo",
+  "scratchpad_dir": "/tmp/scratchpad",
+  "prompt_id": "prompt-0001",
+  "permission_mode": "auto",
+  "effort": {
+    "level": "high"
+  },
   "hook_event_name": "PreToolUse",
   "tool_name": "Agent",
-  "tool_input": { "prompt": "Step: implement", "description": "Implement unit", "subagent_type": "general-purpose", "model": "sonnet" },
-  "tool_use_id": "toolu_fake0001"
+  "tool_input": {
+    "description": "Count fixture files",
+    "prompt": "Work item: none\n\nTask: list the files in `scripts/fixtures` (relative to the working directory /repo). Return the file list and the total count.\n\nRules: read-only, change nothing. Use `ls -A` (not a recursive search) unless the directory has subdirectories, in which case also say how many files are in each. Never read or grep `.env`. Reply with the count on the first line, then the list.",
+    "subagent_type": "general-purpose",
+    "model": "sonnet",
+    "effort": "low",
+    "run_in_background": false
+  },
+  "tool_use_id": "toolu_0001"
 }

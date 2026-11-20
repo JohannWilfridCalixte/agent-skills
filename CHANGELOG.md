@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- `agentic-implement` needs a `verify` command in `.agentic.json`: the baseline and every check run through `agentic.ts gate`. `step implement` refuses without a green baseline in the run, plus a `survey` note when a hub is set.
+
+### Added
+
+- Helper commands: `put` (work-item files from any worktree), `gate` (runs `verify`, logs `checks`), `merge` (squash-merge only with a clean review of the PR head, mergeable PR and CI proof; `local-ci` marker contract when Actions never started).
+- `hook subagent-stop` (Claude Code, shipped in `hooks/claude.json`): a subagent that stops without loading a skill its brief named is sent back once.
+- `hook spawn` on Claude Code also checks the `Agent` tool's model, effort and `Load skills:` against the `started` event.
+- Run model: playbook steps attach with `--workflow`, child runs, cwd-based work-item activation, unconfirmed decisions, compaction card, automatic quiet hub sync after milestones.
+- Step keys `write`, `plan`; an unknown step key exits 1.
+
 ## 4.0.0 - 2026-11-08
 
 ### Breaking

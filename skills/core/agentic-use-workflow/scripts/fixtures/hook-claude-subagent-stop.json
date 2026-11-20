@@ -1,0 +1,19 @@
+{
+  "_source": "captured 2026-11-15, Claude Code 2.1.325, headless nested session, sanitised",
+  "session_id": "sess-0001",
+  "transcript_path": "/home/dev/.claude/projects/demo/sess-0001.jsonl",
+  "cwd": "/repo",
+  "scratchpad_dir": "/tmp/scratchpad",
+  "prompt_id": "prompt-0001",
+  "permission_mode": "auto",
+  "agent_id": "agent-0001",
+  "agent_type": "general-purpose",
+  "effort": {
+    "level": "low"
+  },
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/home/dev/.claude/projects/demo/sess-0001/subagents/agent-agent-0001.jsonl",
+  "background_tasks": [],
+  "session_crons": []
+}

@@ -117,7 +117,7 @@ done
 
 ### Hooks
 
-Two hooks back the workflow: `hook spawn` blocks a subagent spawn whose brief wasn't produced by `agentic.ts step`, and `hook compact` re-injects the resume summary after context compaction. Details: [docs/configuration.md](docs/configuration.md#hooks).
+Three hooks back the workflow: `hook spawn` blocks a subagent spawn whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, and `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named. Details: [docs/configuration.md](docs/configuration.md#hooks).
 
 - **Plugins** (Claude Code, Cursor, Codex) ship them. Codex: review and trust the plugin hooks with `/hooks`.
 - **skills CLI installs** get no hooks. Wire them by hand, adjusting the path if the skills landed elsewhere than `.agents/skills`.
@@ -138,12 +138,17 @@ Claude Code, `.claude/settings.json`:
         "matcher": "compact",
         "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh compact --harness claude", "timeout": 30 }]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh subagent-stop --harness claude", "timeout": 30 }]
+      }
     ]
   }
 }
 ```
 
-Codex, `.codex/hooks.json`: same shape, with `--harness codex`.
+Codex, `.codex/hooks.json`: same shape without `SubagentStop`, with `--harness codex`.
 
 Cursor, `.cursor/hooks.json`:
 

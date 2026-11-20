@@ -32,9 +32,9 @@ Spawn `context.code`, `context.docs`, `context.runtime` in parallel per `agentic
 - **context.docs**: loads `agentic-use-knowledge` (read mode): product docs, glossary, related ADRs and RFCs.
 - **context.runtime**: usage, errors, feature flags, analytics, through available tools only; none → skip.
 
-Each cites its sources and lands as one section of `context.md`. Summarize in ≤5 lines and ask "anything wrong or missing?". Corrections → re-run only the affected subagent.
+Each cites its sources and lands as one section of `context.md`. The ≤5-line summary with the `context.md` path opens the first grill question. Corrections → re-run only the affected subagent.
 
-Done when every subagent that ran has a cited section and the user confirmed the summary.
+Done when every subagent that ran has a cited section and the summary opened the first grill question.
 
 ## 3. Grill
 
@@ -52,6 +52,7 @@ Done when every structural decision is confirmed or escalated.
 
 Read `../to-spec/SKILL.md` and follow it, with these overrides:
 
+- **Delegation**: a delegated draft spawns via `agentic.ts step write`.
 - **Source**: `input.md`, `context.md`, `decisions.md`. This skill's step 2 (Context) replaces its exploration; test seams belong to `agentic-grill-tech`.
 - **Template**: its template with the delta in [references/spec.md](references/spec.md).
 - **Destination**: provided: write `{work}/spec.md`, in place of the tracker and its triage label.
@@ -63,7 +64,7 @@ Done when every user story is covered by at least one acceptance criterion and e
 
 ## 6. Promote
 
-The gate promoted the decisions; now the spec's knowledge. Call the Skill tool with "agentic-use-knowledge" (write mode): the spec's product behaviour → `{knowledge.root}/product/`, terms the gate left out → glossary. Same workspace and commit rule as the gate's promotion (`agentic-use-workflow`).
+The gate promoted the decisions; now the spec's knowledge. Call the Skill tool with "agentic-use-knowledge" (write mode), delegated via `agentic.ts step write`: the spec's product behaviour → `{knowledge.root}/product/`, terms the gate left out → glossary. Same workspace and commit rule as the gate's promotion (`agentic-use-workflow`).
 
 Done when the spec's product behaviour and every new term are in `{knowledge.root}`, indexed and committed.
 

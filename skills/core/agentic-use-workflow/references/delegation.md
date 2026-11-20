@@ -3,8 +3,8 @@
 ## Spawn
 
 1. Run `bun {agentic-use-workflow}/scripts/agentic.ts step <key> [--task t] [--unit id] [--agent label] [--skills a,b]`. It prints the model, effort and the filled brief ([brief-template.md](brief-template.md)) and logs `started` before any spawn.
-2. Spawn a fresh-context subagent (never a fork) with exactly that model and effort and the brief, replacing each `{{x}}`. It loads skills and reads files itself; the prompt carries names and paths.
-3. Keep every line `hook spawn` checks, else the hook blocks the spawn: `Step:`, `Work item:` (existing, non-archived), `Skills:`, `Progress:` (or `read-only`), `Agent:` with its `started` event. No work item: `Work item: none`.
+2. Spawn a fresh-context subagent (never a fork), passing model and effort exactly as printed; the brief goes inline with its `Load skills:` line, replacing each `{{x}}`. A prompt pointing to a brief file is denied. It loads skills and reads files itself; the prompt carries names and paths.
+3. Keep every line `hook spawn` checks, else the hook blocks the spawn: `Step:`, `Work item:` (existing, non-archived), `Load skills:`, `Skills:`, `Progress:` (or `read-only`), `Agent:` with its `started` event. Claude Code also compares the `Agent` tool's `model` (alias-normalised) and `effort` and the `Load skills:` set (order aside) with that `started` event; any difference is denied and the deny prints the expected values. No work item: `Work item: none`.
 
 ## Rules
 
@@ -28,7 +28,7 @@ Built-in explore agents often pick their own model or inherit the session's. Use
 ### Claude Code
 
 - Spawn: Agent tool. Read-only steps: built-in `Explore` with the `model` param when honored, else a general-purpose agent with a read-only brief, or a user agent named `Explore` (replaces the built-in) pinned to the model.
-- Model: per-invocation `model` param (`opus`, `sonnet`, `haiku` or a full model id).
+- Model: Agent takes `opus`, `sonnet`, `haiku`; the helper maps configured ids.
 - Effort: per-invocation `effort` param, `low | medium | high | xhigh | max` depending on the model. Older versions: only the `effort` frontmatter of a subagent definition.
 - `CLAUDE_CODE_EFFORT_LEVEL` overrides everything: if set, log it as the effort used.
 

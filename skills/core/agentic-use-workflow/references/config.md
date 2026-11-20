@@ -45,6 +45,7 @@ Project wins (`agentic.ts step` applies this merge). `steps` merges per harness 
 | `profiles` | `{name, detect?, skills}[]` | built-ins below | Added to the built-ins; same `name` overrides one. `detect`: files/globs at project root. `skills`: codestyle skill names |
 | `selectedProfiles` | string[] | `[]` | Profile names in use. Empty → every profile whose `detect` matches |
 | `reviewers` | string[] | see below | Fallback only, used when `.agentic/review-gates.json` is absent (`review eligible` decides otherwise). Skill names; one subagent per entry, step key `review.<name>` |
+| `verify` | string | none | Green-gate command, run by `agentic.ts gate` via `sh -c` at HEAD in the cwd checkout. Absent → `gate` exits 1 |
 | `steps` | `{harness: {stepKey: {model?, effort?}}}` | `{}` | Harness keys: `cursor`, `claude`, `codex` |
 | `limits` | `{limitKey: number}` | see below | Flat dotted keys |
 
@@ -80,6 +81,8 @@ Capability classes, not model ids: `frontier` (strongest reasoning model), `code
 | `grill` | main session | frontier / high |
 | `implement` | subagent, one per unit (fix lists included) | code / medium |
 | `tickets` | subagent | code / medium |
+| `write` | subagent, delegated spec and knowledge drafts | code / medium |
+| `plan` | subagent, plan breakdown | frontier / high |
 | `explore`, `context.*` | subagent, read-only | code / medium |
 | `review` | parent of `review.<reviewer>`; `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
 | `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | subagent | frontier / high |
@@ -106,7 +109,7 @@ For each of `model` and `effort` separately, first hit wins:
 1. `steps.{harness}.{key}`
 2. `steps.{harness}.{parent}` — key up to the first `.` (`review` for `review.ub-mode`); `context.*` → `explore`
 3. Built-in default above: the key's row, else its parent's (`review.ub-mode` → `review`; `context.*` → `explore`)
-4. Harness default
+4. No row at any level → exit 1 listing valid keys
 
 Example (cursor, config above): `review.code-review` → model `composer-2.5` (from `review`), effort `medium` (built-in `review`). `review.claude-security-review` → model `claude-opus-5-5`, effort `high` (both explicit). `implement` → model `composer-2.5`, effort `medium` (built-in).
 

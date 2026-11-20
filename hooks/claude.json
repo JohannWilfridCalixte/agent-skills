@@ -23,6 +23,17 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" subagent-stop --harness claude",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

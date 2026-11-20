@@ -51,7 +51,7 @@ Done when every id from that list is accounted for and the promotion is committe
 
 Fill [references/plan.md](references/plan.md) in two passes.
 
-**Breakdown**: tasks only: title, goal, files, depends-on, skills per [references/light.md](references/light.md) Checklist. Present the list and ask once: granularity right? dependencies right? anything to split or merge? Iterate until approved. No acceptance criteria before approval.
+**Breakdown** (delegated via `agentic.ts step plan`): tasks only: title, goal, files, depends-on, skills per [references/light.md](references/light.md) Checklist. Present the list and ask once: granularity right? dependencies right? anything to split or merge? Iterate until approved. No acceptance criteria before approval.
 
 **Acceptance**: then write each task's acceptance, citing spec AC IDs, tests first.
 

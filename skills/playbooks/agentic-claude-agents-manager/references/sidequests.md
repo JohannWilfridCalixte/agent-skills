@@ -11,7 +11,7 @@ A unit hit a project-global problem outside its scope: SKILL.md step 4.
 1. `manager unit add <sq id> --title … --kind sidequest --for <raiser> --input <problem + context>`.
 2. `SendMessage` the raising unit: pause, end your turn with `Unit <id>: blocked` — paused for <sq id>. Then `manager unit set <raiser> --state paused --paused-by <sq id>`.
 3. List other live units likely affected (same files or area); ask the owner which also pause; same two moves for each.
-4. `manager status`: its `start <sq id>` line → [launch.md](launch.md) Launch one unit.
+4. `manager status`: its `start <sq id>` line, first under the parallel cap → [launch.md](launch.md) Launch one unit.
 
 Its PR merges ([merges.md](merges.md)) → `resume` lines bring the paused units back.
 

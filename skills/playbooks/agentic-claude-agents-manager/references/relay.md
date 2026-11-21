@@ -18,9 +18,9 @@ Done when every question is answered or put to the owner.
 
 ## Answer
 
-Owner's answer → `manager question answer Q<n> --answer … --by user`. The owner states a standing rule in their own words ("always", "from now on") → `manager rule add` with those words; the manager derives no rule itself. Every answer, manager's or owner's: `SendMessage` to the unit's `local_…` id, one line `Q<n>: <answer>` per question, the owner's words quoted for approvals.
+Owner's answer → `manager question answer Q<n> --answer … --by user`. The owner states a standing rule in their own words ("always", "from now on") → `manager rule add` with those words; the manager derives no rule itself. Every answer, manager's or owner's: `SendMessage` to the unit's `local_…` id, one line `Q<n>: <answer>` per question, the owner's words quoted for approvals; a `paused` unit's answers are held (SKILL.md Kept states).
 
-Done when the unit got every answer and `manager status` shows it `running` (SKILL.md Hand-off).
+Done when the unit got every answer and `manager status` shows it `running` (SKILL.md Hand-off), or it is `paused` with its answers held.
 
 ## Blocked
 

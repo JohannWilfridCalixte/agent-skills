@@ -10,9 +10,11 @@ Done when a heartbeat job exists if and only if a unit is `running`.
 
 ## Beat
 
-Per `running` unit, a progress **marker**: transcript message count (`list_events` header) `/` `lastActivityAt` (`get_session`) `/` branch head (`git log -1 --format=%h <branch>`). Usage = highest `percentUsed` of the `get_usage` plan windows; plan `not_applicable` or `unavailable` → omit `--usage` and tell the owner once. Run `manager beat --seen <id>=<marker>… --usage <pct>`, one `--seen` per running unit (an `<id> unseen` line names one left out: beat it too). Each unit's context % (`get_usage` with its session; unavailable → `-`) goes beside it in the status shown to the owner.
+First, per unit with a session, not `done` or `failed`, whose `get_session` shows `isRunning` false: its transcript (`list_events`) ends on its own final message with a status line (`question`, `sidequest`, `blocked`, `pr-ready`, `done`) not yet handled (unit still `running`, or its question has no `Q<n>`) → handle it as its wake note (SKILL.md step 4). An idle unit's progress is that status line, not its message count.
 
-Done when every rung and `usage` line this `beat` printed is acted on.
+Then per `running` unit, a progress **marker**: transcript message count (`list_events` header) `/` `lastActivityAt` (`get_session`) `/` branch head (`git log -1 --format=%h <branch>`). Usage = highest `percentUsed` of the `get_usage` plan windows; plan `not_applicable` or `unavailable` → omit `--usage` and tell the owner once. Run `manager beat --seen <id>=<marker>… --usage <pct>`, one `--seen` per running unit (an `<id> unseen` line names one left out: beat it too). Each unit's context % (`get_usage` with its session; unavailable → `-`) goes beside it in the status shown to the owner.
+
+Done when every idle unit's status line is handled and every rung and `usage` line this `beat` printed is acted on.
 
 ## Rungs
 

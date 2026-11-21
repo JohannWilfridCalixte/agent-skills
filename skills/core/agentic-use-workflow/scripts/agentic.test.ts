@@ -4296,6 +4296,15 @@ describe('manager status', () => {
       expect(out).not.toContain('start q2');
     });
 
+    test('a queued sidequest starts ahead of earlier queued units', () => {
+      writeProjectConfig({ limits: { 'manager.parallel': 2 } });
+      startedLedger([...active(1), unitAdd('b'), unitAdd('sq', { kind: 'sidequest' })]);
+      const out = status();
+
+      expect(out).toContain('start sq');
+      expect(out).not.toContain('start b');
+    });
+
     test('the project parallel limit is honoured', () => {
       writeProjectConfig({ limits: { 'manager.parallel': 1 } });
       startedLedger([...active(1), ...queued(1)]);

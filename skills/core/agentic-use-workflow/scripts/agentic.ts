@@ -2951,8 +2951,10 @@ const stackedDepsReady = (state: ManagerState, unit: ManagerUnit) =>
 
 const startableUnits = (state: ManagerState, parallel: number) => {
   const started: string[] = [];
-  for (const [id, unit] of orderedUnits(state)) {
-    if (unit.state !== 'queued' || !stackedDepsReady(state, unit)) continue;
+  const queued = orderedUnits(state).filter(([, unit]) => unit.state === 'queued');
+  const sidequestsFirst = [...queued.filter(([, unit]) => unit.kind === 'sidequest'), ...queued.filter(([, unit]) => unit.kind !== 'sidequest')];
+  for (const [id, unit] of sidequestsFirst) {
+    if (!stackedDepsReady(state, unit)) continue;
     if (activeCount(state) + started.length >= parallel) break;
     started.push(id);
   }

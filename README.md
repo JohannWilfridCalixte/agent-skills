@@ -530,6 +530,7 @@ Maintenance (check, update, add, remove): [Vendoring script](#vendoring-script).
 | [0005](docs/tech/adr/0005-ponytail-in-grills.md) | Ponytail in grills |
 | [0006](docs/tech/adr/0006-cross-harness-steps.md) | Cross-harness steps (deprecated in v4) |
 | [0007](docs/tech/adr/0007-helper-cli.md) | Helper CLI and hooks (v4) |
+| [0008](docs/tech/adr/0008-agents-manager.md) | Agents manager (Claude desktop only) |
 
 Index: [docs/tech/adr/README.md](docs/tech/adr/README.md).
 

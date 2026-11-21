@@ -18,19 +18,19 @@ Done when every question is answered or put to the owner.
 
 ## Answer
 
-Owner's answer → `manager question answer Q<n> --answer … --by user`. The owner states a standing rule in their own words ("always", "from now on") → `manager rule add` with those words; the manager derives no rule itself. Every answer, manager's or owner's: `SendMessage` to the unit's `local_…` id, one line `Q<n>: <answer>` per question, the owner's words quoted for approvals. Then `unit set --state running`.
+Owner's answer → `manager question answer Q<n> --answer … --by user`. The owner states a standing rule in their own words ("always", "from now on") → `manager rule add` with those words; the manager derives no rule itself. Every answer, manager's or owner's: `SendMessage` to the unit's `local_…` id, one line `Q<n>: <answer>` per question, the owner's words quoted for approvals.
 
-Done when the unit got every answer and `manager status` shows it `running`.
+Done when the unit got every answer and `manager status` shows it `running` (SKILL.md Hand-off).
 
 ## Blocked
 
-`manager unit set <id> --state waiting`. Unblock from the ledger (an answer, a merged dep, a sidequest), else ask the owner; holding on a `wait` dep → its `release` line unblocks it ([merges.md](merges.md) After merge). Unblock message sent → `unit set --state running`.
+`manager unit set <id> --state waiting`. Unblock from the ledger (an answer, a merged dep, a sidequest), else ask the owner; holding on a `wait` dep → its `release` line unblocks it ([merges.md](merges.md) After merge).
 
-Done when the unit is `waiting` on a recorded cause, or got its unblock and is `running`.
+Done when the unit is `waiting` on a recorded cause, or got its unblock and is `running` (SKILL.md Hand-off).
 
 ## Done
 
-Verify its claims (SKILL.md step 4). They hold → `manager unit set <id> --state done --summary …`. Failed beyond recovery → owner, then `--state failed`. Unit with a merged PR → merges.md Merge from `unit set --state merged`, then Teardown.
+Unit sent a merge → merges.md Verify, then Teardown. Else verify its claims (SKILL.md step 4). They hold → `manager unit set <id> --state done --summary …`. Failed beyond recovery → owner, then `--state failed`.
 
 Done when the unit is `done` or `failed` with its summary, or handed to merges.md.
 

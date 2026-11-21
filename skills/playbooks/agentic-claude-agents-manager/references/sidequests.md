@@ -18,9 +18,9 @@ Done when the sidequest unit is `running` and every unit the owner chose is `pau
 
 ## No
 
-`manager backlog add --title … --from <unit> --context …`. Offer a tracker ticket: yes → create it in the project's tracker, `manager backlog set B<n> --ticket <url>`. `SendMessage` the unit: continue with its stated workaround; `unit set --state running`.
+`manager backlog add --title … --from <unit> --context …`. Offer a tracker ticket: yes → create it in the project's tracker, `manager backlog set B<n> --ticket <url>`. `SendMessage` the unit: continue with its stated workaround.
 
-Done when `B<n>` is open, the ticket answer is recorded and the unit is `running` with its continue message.
+Done when `B<n>` is open, the ticket answer is recorded and the unit is `running` with its continue message (SKILL.md Hand-off).
 
 ## Re-offer
 

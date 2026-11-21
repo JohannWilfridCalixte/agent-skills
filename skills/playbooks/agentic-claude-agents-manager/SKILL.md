@@ -12,7 +12,7 @@ Playbook. This session is the **manager**: it starts work **units** as app sessi
 ## Hard limits
 
 1. **Code moves through units.** A fix, merge or rebase is a message to the owning unit, or a new unit. The manager edits no file in the repo or a unit's tree and runs no git write.
-2. **Unit state is read, never driven.** Reads: `agentic.ts resume --work <slug>` / `state --work <slug>`, `list_events`, `get_session`, `mcp__ccd_pr__get_status`; changes go by message. An agentic skill invoked on a unit's slug makes the manager its entry skill and fails the unit's open runs.
+2. **Unit state is read, never driven.** Reads: `agentic.ts resume --work <slug>` / `state --work <slug>`, `list_events`, `get_session`, `mcp__ccd_pr__get_status`, `gh pr view <url> --json …`; changes go by message. An agentic skill invoked on a unit's slug makes the manager its entry skill and fails the unit's open runs.
 
 ## Authority
 
@@ -32,7 +32,7 @@ Done when `manager start` exited 0 and the units to add are known.
 
 ## 2. Launch table
 
-Show the **launch table** and get the owner's confirmation, then `manager unit add` each unit: [references/launch.md](references/launch.md) (kinds, presets, dependencies, model cap, later edits).
+`manager unit add` each unit, deps first, then show the **launch table** and get the owner's confirmation: [references/launch.md](references/launch.md) (kinds, presets, dependencies, model cap, edits).
 
 Done when the owner confirmed the table and `manager status` lists every confirmed unit.
 
@@ -44,7 +44,9 @@ Done when every unit with a `start` line is `running` with session, path and bra
 
 ## 4. Wake loop
 
-Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**, once. `release`, `re-offer` and `answered` print once: act in this wake. A line already put to the owner (`merge-yes`, `usage`, `question`) waits for the answer, and the answer stands until the line's value changes (PR head, usage %). `start` → only when a launch can run now; refused or paused queue → skip it.
+Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**, once. `release`, `re-offer` and `answered` print once: act in this wake. A line already put to the owner (`merge-yes`, `usage`, `question`) waits for the answer; the answer stands for that PR head, and for `usage` until a status prints no `usage` line and it comes back. `start` in a turn that cannot launch → launch.md Launch refused; under a paused queue → skip it.
+
+**Hand-off**: a message that gives a unit work (answer, unblock, what its PR misses, release, resume, merge, rebase, cleanup) → `manager unit set <id> --state running` in the same wake, so the heartbeat watches that turn.
 
 | Note status / attention line | Go to |
 |---|---|

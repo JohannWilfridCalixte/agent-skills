@@ -27,6 +27,6 @@ No progress and the last event a tool call awaiting approval → [relay.md](rela
 
 ## Usage
 
-`usage <N>%` line (beat or status) → owner, once per value (SKILL.md step 4): continue / pause queue / downgrade models. Downgrade → `set_session_model` (applies from the unit's next turn) and `unit set --model`. Pause queue → skip `start` lines until the owner lifts it.
+`usage <N>%` line (beat or status) → owner, once (SKILL.md step 4): continue / pause queue / downgrade models. Downgrade → `set_session_model` (applies from the unit's next turn) and `unit set --model`. Pause queue → skip `start` lines until the owner lifts it.
 
 Done when the owner's choice is applied.

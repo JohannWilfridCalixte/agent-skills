@@ -3972,6 +3972,7 @@ describe('manager brief', () => {
     `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
     `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
     `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
+    `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
     'Merge a PR only after a manager message relays the owner\'s yes for that PR.',

@@ -6,7 +6,7 @@ argument-hint: "[<slug> | <PR number/url>]"
 
 # Babysit PR
 
-Get the PR to merge-ready, keep it there until it merges, then clean up when standalone (under a playbook, `agentic-use-workflow` `references/playbook.md` runs cleanup). Never merge.
+Get the PR to merge-ready, keep it there until it merges, then clean up when standalone (under a playbook, `agentic-use-workflow` `references/playbook.md` runs cleanup). Merge only through `agentic.ts merge`.
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
@@ -36,7 +36,7 @@ Repeat until the PR is merged or closed. Rounds that push fixes are capped by `l
 1. Wait for CI, new reviewer activity, and the PR state. Poll with backoff. Once merge-ready, back off further (minutes, then tens of minutes).
 2. Triage everything new:
    - **CI failure**: read the logs. Real failure → fix. Likely flake → re-run once, then treat as real.
-   - **Bot comment**: valid → fix; not valid → reply with the reason. Resolve either way.
+   - **Bot comment**: valid → fix; not valid → reply with the reason. Resolve either way. Deployment-status bot comments (e.g. Vercel preview tables) need no reply or resolve.
    - **Human comment**: clear request → fix. Debatable, design-level or disagreement → ask the user, with a recommendation; log the answer as a `choice`, key `pr.{round}.{thread}`, then fix or reply per the answer.
    - **Conflict with base**: resolve if mechanical, following the repo's merge or rebase convention; otherwise ask the user, log the answer as a `choice`, key `pr.{round}.conflict`.
 3. Fix, when step 2 found any:
@@ -49,9 +49,11 @@ Every commit pushed after the PR opened went through step 3's review; nothing is
 
 CI green and no unresolved actionable thread → merge-ready: report once, log it as a `note` event, keep watching. The report: PR link, pending approvals, tickets, artifacts, remaining minors, open escalations, plus any lines the caller passed (e.g. the root cause from `agentic-debug`).
 
+Then run `bun {agentic-use-workflow}/scripts/agentic.ts merge` from the PR's checkout; refused → stop, report the failed condition, ask.
+
 ## Stop
 
-- **Merged or closed** → log `babysit-pr` completed. Under a playbook → return. Standalone → Call the Skill tool with "agentic-cleanup" for the slug (it asks before cleaning a PR closed without merge).
+- **Merged or closed** → log `babysit-pr` completed. Merged → list what the owner still does by hand (e.g. production migrations while deploys are blocked). Under a playbook → return to the playbook loop. Standalone → Call the Skill tool with "agentic-cleanup" for the slug (it asks before cleaning a PR closed without merge).
 - Red tree you can't fix, or fix rounds exhausted → stop and ask, with what is left and a recommendation.
 - Every stop or report (merge-ready, red tree, session ending) opens with the output of `bun {agentic-use-workflow}/scripts/agentic.ts resume`, run from the main checkout, as its first line.
 - Session ending before the merge → also give `agentic-cleanup {slug}` for once it is merged.

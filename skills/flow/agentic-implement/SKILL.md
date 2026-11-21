@@ -6,7 +6,7 @@ argument-hint: "<slug | path/to/plan.md | path/to/reviews/{n}-fix.md> [--overrid
 
 # Implement
 
-Turn units of work into committed, green code. You orchestrate; subagents write the code.
+Turn units of work into committed, green code. You orchestrate; sessions or subagents write the code.
 
 Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKILL.md and follow it) unless already loaded.
 
@@ -16,7 +16,8 @@ Call the Skill tool with "agentic-use-workflow" (no Skill tool → open its SKIL
 - No workspace → ask where to build and set it up per `agentic-use-workflow` Workspace. Everything below runs in `workspace.path`.
 - Units `in_progress` in `state.json` `units` → recover each per [references/interrupted.md](references/interrupted.md) before the baseline.
 - Uncommitted edits outside every interrupted unit's files → show them and ask. Never reset them.
-- Baseline = the checks of the repo's verify recipe named in AGENTS/CLAUDE.md, else scripts/Makefile/CI, run in order. Skip a check needing infra this session lacks (database, docker, browser) and state each skip. Red → stop and report.
+- Hub set (coordination in use) → after the project's survey of open work, log `agentic.ts event --type note --step survey`. `step implement` refuses without it.
+- Baseline = run `agentic.ts gate --baseline` before the first unit (`step implement` refuses without a green one; fix-list units exempt). The baseline and every later check go through `gate`, which runs the `verify` command configured in `.agentic.json`; checks are never logged by hand. No `verify` → `gate` exits 1: ask the user for the command (the verify recipe named in AGENTS/CLAUDE.md, else scripts/Makefile/CI) and add it. Red the unit can't fix → stop and report.
 
 Done when the workspace exists, no unit is `in_progress`, the tree holds no unexplained edits, and the baseline is green.
 
@@ -25,7 +26,7 @@ Done when the workspace exists, no unit is `in_progress`, the tree holds no unex
 First match wins:
 
 - **Fix list**: a `reviews/{n}-fix.md` path from the caller → group its findings by disjoint files; one unit per group, id `fix-{n}.{k}`.
-- **Tickets**: `state.json` `tickets` non-empty → one unit per ticket (`tickets/NN-slug.md` or tracker key).
+- **Tickets**: `state.json` `tickets` non-empty → a ticket that lists plan tasks: those tasks are the units, each under that ticket; a ticket without plan tasks is one unit (`tickets/NN-slug.md` or tracker key).
 - **Plan tasks**: `plan.md` `T1..Tn`.
 - None → stop: the work item needs `agentic-to-plan` first.
 
@@ -37,7 +38,7 @@ Done when every pending unit is listed with its blocking edges (`Depends on`, ti
 
 Order by blocking edges. Sequential by default, in the one workspace; parallel only when units are independent **and** their files are disjoint.
 
-One subagent per unit, step key `implement`, agent label `impl-{unit}`. Print its brief with `agentic.ts step implement --unit {unit} --agent impl-{unit} --skills tdd`; the `started` event carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled, with, as paths:
+One session or subagent per unit, step key `implement`, agent label `impl-{unit}`. Print its brief with `agentic.ts step implement --unit {unit} --agent impl-{unit} --skills tdd`; the `started` event carries `data.files` = the unit's files. Brief per `agentic-use-workflow` delegation, every line filled, with, as paths:
 
 - Parallel unit: the brief's Workspace is the unit's own worktree. Run the printed `git worktree add` command before spawning. Merge back onto the work branch in task order, using the `git merge` commands `agentic.ts resume` lists, before the green gate.
 
@@ -51,10 +52,10 @@ One subagent per unit, step key `implement`, agent label `impl-{unit}`. Print it
 
 ## 4. Green gate
 
-After each unit, or each parallel batch once merged, run the baseline checks yourself. Gate once per commit SHA: a SHA already gated green is not re-gated.
+After each unit, or each parallel batch once merged, run `agentic.ts gate --task {ids}` in the background; read only its output, never the log. It logs the `checks` events; a SHA already gated green is not re-run.
 
-- Green → log the gate with the SHA, next unit.
-- Red → failure output back to the same subagent (resume it, or brief a fresh one with the unit and the output). Its repair is a follow-up commit citing the unit.
+- Green → next unit.
+- Red → output (≤10 lines + log path) back to the same subagent (resume it, or brief a fresh one with the unit and the output). Its repair is a follow-up commit citing the unit.
 - Still red after `limits.implement.retries` → log the subagent `failed`, then stop and ask: suggested direction, skip the unit, or abort. Log the answer as a `choice`, key `unit.{task}` (abort is never reused: resuming asks again).
 
 Done when every unit is committed or `skipped` and the last gate is green.

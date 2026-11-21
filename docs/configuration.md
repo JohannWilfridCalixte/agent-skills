@@ -50,9 +50,10 @@ The project file wins. `steps` merges per harness and step key, and `limits` mer
 | `commitWork` | `false` | `false` keeps `output` out of git (gitignore it) |
 | `worktrees` | `../{repo}-worktrees` | Root for worktrees, relative to the main checkout. `{repo}` is that checkout's folder name |
 | `knowledge.root` | `docs` | Knowledge base folder (ADRs, principles, glossary, product, RFCs), relative to the repo root. Read and written by `agentic-use-knowledge` |
-| `reviewers` | see [Reviewers](#reviewers) | Fallback only, used when `.agentic/review-gates.json` is absent (see [Review gates](#review-gates)). Skill names; one review subagent runs per entry, step key `review.<name>` |
+| `reviewers` | see [Reviewers](#reviewers) | Fallback only, used when `.agentic/review-gates.json` is absent (see [Review gates](#review-gates)). Skill names; one review session or subagent runs per entry, step key `review.<name>` |
 | `profiles` | built-ins | `{name, detect?, skills}[]`, added to the built-ins. Stack → codestyle skills. `detect` is a list of files or globs at the project root |
 | `selectedProfiles` | `[]` | Profiles in use. When empty, every profile whose `detect` matches is used |
+| `verify` | none | Your project's green-gate command (e.g. `bun test`), run by `agentic.ts gate` via `sh -c`. Required by `agentic-implement`: without it `gate` exits 1 |
 | `steps` | `{}` | Model and effort per step, per harness (`cursor`, `claude`, `codex`) |
 | `limits` | see [Limits](#limits) | Loop caps, as flat dotted keys |
 
@@ -92,12 +93,14 @@ Built-in defaults are capability classes, not model ids: `frontier` (the stronge
 |---|---|---|
 | `grill` | your session | frontier / high |
 | `context.code`, `context.docs`, `context.runtime` | read-only subagent (parent `explore`) | as `explore` |
-| `tickets` | subagent | code / medium |
-| `implement` | one subagent per unit, including every review and babysit fix | code / medium |
-| `review` | parent of `review.<reviewer>`, one subagent per reviewer. `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
-| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | subagent | frontier / high |
-| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | subagent | frontier / high |
+| `tickets` | session or subagent | code / medium |
+| `implement` | one session or subagent per unit, including every review and babysit fix | code / medium |
+| `review` | parent of `review.<reviewer>`, one session or subagent per reviewer. `ub-mode` and doc-style reviewers (example reviewers, replace with your project's: `api-contract`, `seeds-devx`, `migrations-data`, `i18n`, `design-system`) inherit it | code / medium |
+| `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | session or subagent | frontier / high |
+| `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | session or subagent | frontier / high |
 | `audit` | every agent that `security-audit` launches under `agentic-security-audit` (reconnaissance, hunters, critics, verifiers) | frontier / high |
+
+In the Claude desktop app, which offers a session tool, long steps (`implement`, `tickets`, `plan`, `write`, `review.*`) run as separate app sessions instead of subagents, with the same brief, model and effort; a step whose model or effort is above your session's still runs as a subagent. Details: `agentic-use-workflow` [references/delegation.md](../skills/core/agentic-use-workflow/references/delegation.md#sessions).
 
 `grill` runs in your own session, so its value is only a recommendation. You get a warning if your session runs a different model. Projects override the example reviewers' rows through `steps` or `.agentic/review-gates.json`.
 
@@ -174,7 +177,7 @@ Later iterations (`--iteration` above 1) pick, instead:
 
 | Key | Default |
 |---|---|
-| `paths` | `**/auth/**`, `**/tenant/**`, `**/tenants/**`, `**/rls/**`, `**/policies/**` |
+| `paths` | `**/auth/**`, `**/tenant/**`, `**/tenants/**`, `**/rls/**`, `**/policies/**`; docs (`docs/`, `documentation/`, `.md`, `.mdx`, `.rst`, `.adoc`, `.txt`) never match these defaults |
 | `reviewers` | The `alwaysOn` entries whose name contains `security`, `access` or `tenant` |
 
 Fallback: with no `review-gates.json`, `.agentic.json` `reviewers` is used and every entry counts as `alwaysOn`. With neither, `review eligible` exits 1.
@@ -194,11 +197,14 @@ bun <agentic-use-workflow dir>/scripts/agentic.ts <command>
 | `state` | Re-derive `state.json` from the log |
 | `resume` | Short summary to continue a run |
 | `decide --tag --focus --q --a --why` | Append a decision to `decisions.md` and log it |
+| `put <path>` | Write stdin to an allowlisted work-item file from any worktree, log `artifact` |
 | `step <key>` | Resolve model and effort, print the filled brief, log `started` |
+| `gate --task T1,T2` / `gate --baseline` | Run the `verify` command at HEAD, log `checks` |
+| `merge` | Squash-merge the PR once review, mergeability and CI proof hold for its head |
 | `review eligible --base <ref>` | Reviewers to run, from [Review gates](#review-gates) |
 | `hub sync` | Mirror the work item to its hub issue (GitHub, via `gh`) |
 | `cleanup check` | Check the work item is ready to archive |
-| `hook spawn` / `hook compact` | Hook entry points, see [Hooks](#hooks) |
+| `hook spawn` / `hook compact` / `hook subagent-stop` | Hook entry points, see [Hooks](#hooks) |
 
 `--work <slug>` selects the work item on any command. `gh` is optional: `hub sync` and the PR check of `cleanup check` skip with a message when it is absent, and `hub sync` also when no hub is set. GitHub only.
 
@@ -212,10 +218,11 @@ Exit codes: `0` ok. `1` failed check or runtime failure (validation error, missi
 
 ## Hooks
 
-Two hooks run through `scripts/hook.sh`, which calls `agentic.ts hook`:
+Three hooks run through `scripts/hook.sh`, which calls `agentic.ts hook`:
 
-- `hook spawn`: before a subagent spawn, while a work item has an open run for the current directory, checks that the brief carries `Step:`, `Work item:` (an existing, non-archived path), `Skills:`, `Progress:` (or the word `read-only`), `Agent:`, and that a `started` event exists for that agent. A brief that skips `agentic.ts step` fails this. The spawn is denied with the fix command and the expected model and effort. A brief with `Work item: none`, or no open run, passes.
+- `hook spawn`: before a subagent spawn or session start, while a work item has an open run for the current directory, checks that the brief carries `Step:`, `Work item:` (an existing, non-archived path), `Skills:`, `Progress:` (or the word `read-only`), `Agent:`, and that a `started` event exists for that agent. A brief that skips `agentic.ts step` fails this. The spawn is denied with the fix command and the expected model and effort. A brief with `Work item: none`, or no open run, passes.
 - `hook compact`: after context compaction, re-injects the resume summary of the open work item.
+- `hook subagent-stop` (Claude Code only): when a subagent stops, reads its transcript; a skill named in its `started` event but never loaded (Skill call or `SKILL.md` read) blocks the stop once, then logs a `note`.
 
 The Claude Code, Codex and Cursor plugins ship them (`hooks/<harness>.json`). Codex asks you to review and trust plugin hooks through `/hooks`. Cursor has no post-compaction event, so `hook compact` runs at every session start. Without bun, `hook.sh` prints one line to stderr and exits 0: hooks never block.
 

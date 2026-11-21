@@ -48,7 +48,7 @@ Every focus. Recommended answer = the first rung of this ladder that fully works
 
 ### Log
 
-Every answer, as it comes (a batch: one call per item): `bun {agentic-use-workflow}/scripts/agentic.ts decide --tag structural|minor --focus {focus} --q … --a … --why … [--origin recommended] [--supersedes Dn]`. The helper numbers the `D` entry, appends it to `decisions.md` and logs its `decision` event.
+Every answer, as it comes (a batch: one call per item): `bun {agentic-use-workflow}/scripts/agentic.ts decide --tag structural|minor --focus {focus} --step grill --q … --a … --why … [--origin recommended] [--supersedes Dn]`. The helper numbers the `D` entry, appends it to `decisions.md` and logs its `decision` event.
 
 Done when the frontier is empty for the focus and every answer went through `decide`.
 

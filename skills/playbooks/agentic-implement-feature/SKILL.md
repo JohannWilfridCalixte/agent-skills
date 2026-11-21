@@ -44,3 +44,5 @@ Done when `plan.md` is approved (full) or written (light) and, if chosen, the ti
 ## 3. Build (autonomous)
 
 Run the autonomous tail (agentic-use-workflow `references/playbook.md`); no merge-ready extras.
+
+PR merged and a ticket remains → implement the next ticket, no owner prompt; workflow `completed` and cleanup after the last ticket.

@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { appendFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const harnesses = ['claude', 'cursor', 'codex'];
@@ -92,6 +92,24 @@ const gitOutput = (cwd: string, args: readonly string[]) => {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
 
   return result.status === 0 ? result.stdout : undefined;
+};
+
+const patchIdSince = (cwd: string, base: string | undefined) => {
+  if (base === undefined) return undefined;
+  const remoteBase = `origin/${base}`;
+  const ref = gitOutput(cwd, ['rev-parse', '--verify', '--quiet', remoteBase]) === undefined ? base : remoteBase;
+  const mergeBase = gitOutput(cwd, ['merge-base', ref, 'HEAD'])?.trim();
+  if (mergeBase === undefined) return undefined;
+  const result = spawnSync('sh', ['-c', 'git diff "$1" HEAD | git patch-id --verbatim', 'sh', mergeBase], { cwd, encoding: 'utf8' });
+
+  return result.status === 0 ? result.stdout.split(' ')[0]?.trim() || undefined : undefined;
+};
+
+const linkedWorktrees = (cwd: string) => {
+  const listing = gitOutput(cwd, ['worktree', 'list', '--porcelain']);
+  const paths = (listing?.split('\n') ?? []).filter((line) => line.startsWith('worktree ')).map((line) => line.slice('worktree '.length));
+
+  return paths.slice(1);
 };
 
 const mainCheckout = (cwd: string) => {
@@ -315,8 +333,16 @@ const validateEvent = (input: EventInput, inputErrors: readonly string[] = []) =
   return { event };
 };
 
+interface Appended {
+  readonly item: WorkItem;
+  readonly event: StoredEvent;
+}
+
+const appended: Appended[] = [];
+
 const appendEvent = async (item: WorkItem, event: object) => {
   const line = JSON.stringify(event);
+  appended.push({ item, event: parseStoredEvent(line, 0) });
   await mkdir(item.dir, { recursive: true });
   await appendFile(join(item.dir, 'events.jsonl'), `${line}\n`);
 
@@ -338,8 +364,32 @@ const parseDataFlag = (raw: string | undefined) => {
 
 const failValidation = (errors: readonly string[]) => new CliError(1, errors.map((error) => `invalid ${error}`).join('\n'));
 
-const currentRun = (events: readonly StoredEvent[]) =>
-  events.findLast((event) => isWorkflowLevel(event) && event.type === 'started' && !isCleanup(event));
+const workflowStarts = (events: readonly StoredEvent[]) =>
+  events.filter((event) => isWorkflowLevel(event) && event.type === 'started' && !isCleanup(event));
+
+const isClosedRun = (events: readonly StoredEvent[], run: string) =>
+  events.some((event) => isWorkflowLevel(event) && !isCleanup(event) && event.run === run && ['completed', 'failed'].includes(event.type));
+
+const cleanupStarts = (events: readonly StoredEvent[]) =>
+  events.filter((event) => isWorkflowLevel(event) && event.type === 'started' && isCleanup(event));
+
+const isClosedCleanup = (events: readonly StoredEvent[], run: string) =>
+  events.some((event) => isWorkflowLevel(event) && isCleanup(event) && event.run === run && ['completed', 'failed'].includes(event.type));
+
+const latestRun = (starts: readonly StoredEvent[], isClosed: (run: string) => boolean) =>
+  starts.findLast((event) => !isClosed(event.run)) ?? starts.at(-1);
+
+const currentRun = (events: readonly StoredEvent[], workflow?: string): StoredEvent | undefined => {
+  if (workflow === 'cleanup') {
+    const cleanup = latestRun(cleanupStarts(events), (run) => isClosedCleanup(events, run));
+    if (cleanup !== undefined) return cleanup;
+  }
+
+  const starts = workflowStarts(events).filter((event) => workflow === undefined || event.workflow === workflow);
+  if (starts.length === 0 && workflow !== undefined) return currentRun(events);
+
+  return latestRun(starts, (run) => isClosedRun(events, run));
+};
 
 const mintRun = (events: readonly StoredEvent[]) => {
   const used = new Set(events.map((event) => event.run));
@@ -364,6 +414,7 @@ interface WorkState {
   readonly steps: Record<string, string>;
   readonly units: Record<string, string>;
   readonly choices: Record<string, unknown>;
+  readonly unconfirmed: readonly string[];
   readonly pr: { url: unknown; round: unknown };
   readonly updated: string | null;
 }
@@ -401,17 +452,30 @@ const deriveSteps = (events: readonly StoredEvent[]) => {
   return Object.assign({}, ...passes.values());
 };
 
+const isPrMerged = (event: StoredEvent) =>
+  event.workflow === 'babysit-pr' && event.type === 'completed' && (event.step === 'merge' || isWorkflowLevel(event));
+
 const deriveUnits = (events: readonly StoredEvent[]) => {
   const units: Record<string, string> = {};
+  const awaitingMerge = new Set<string>();
   for (const event of events) {
     const choice = event.type === 'decision' ? event.data.choice : undefined;
     if (isRecord(choice) && typeof choice.key === 'string' && choice.key.startsWith('unit.') && choice.value === 'skip') {
       units[choice.key.slice('unit.'.length)] = 'skipped';
       continue;
     }
-    if (event.workflow !== 'implement' || event.task === undefined) continue;
+    // A merged PR passed CI, so its completed units are done even when no gate logged their checks.
+    if (isPrMerged(event)) {
+      for (const task of awaitingMerge) if (units[task] === 'in_progress') units[task] = 'done';
+      awaitingMerge.clear();
+    }
+    if (event.task === undefined) continue;
 
-    if (event.type === 'started' && event.step === 'implement') units[event.task] = 'in_progress';
+    if (event.type === 'started' && event.step === 'implement') {
+      units[event.task] = 'in_progress';
+      awaitingMerge.delete(event.task);
+    }
+    if (event.type === 'completed' && event.step === 'implement') awaitingMerge.add(event.task);
     if (event.type === 'completed' && event.step === 'checks') units[event.task] = 'done';
     if (event.type === 'failed' && event.step === 'implement') {
       if (event.data.interrupted === true) delete units[event.task];
@@ -438,17 +502,24 @@ const deriveEscalations = (events: readonly StoredEvent[]) => {
   return [...byId.values()];
 };
 
+const openPlaybookRun = (events: readonly StoredEvent[]) =>
+  workflowStarts(events).findLast((event) => playbooks.includes(event.workflow) && !isClosedRun(events, event.run));
+
+const isStaleBlock = (events: readonly StoredEvent[], failedIndex: number) =>
+  events.slice(failedIndex + 1).some((event) => isWorkflowLevel(event) && !isCleanup(event) && event.type === 'completed');
+
 const deriveStatus = (events: readonly StoredEvent[], escalations: WorkState['escalations']) => {
   const archived = events.some((event) => isCleanup(event) && event.type === 'completed' && (isWorkflowLevel(event) || event.step === 'cleanup'));
   if (archived) return 'archived';
   if (escalations.some((escalation) => escalation.status === 'open')) return 'awaiting_decision';
 
-  const latestFailed = events.findLast((event) => event.type === 'failed');
-  if (latestFailed?.data.blocked === true) return 'blocked';
+  const latestFailedIndex = events.findLastIndex((event) => event.type === 'failed');
+  if (events[latestFailedIndex]?.data.blocked === true && !isStaleBlock(events, latestFailedIndex)) return 'blocked';
 
   const latest = events.findLast((event) => isWorkflowLevel(event) && !isCleanup(event));
   if (latest?.type === 'failed') return 'failed';
-  if (latest?.type === 'completed' && (latest.workflow === 'babysit-pr' || playbooks.includes(latest.workflow))) return 'done';
+  const finishes = latest?.workflow === 'babysit-pr' || playbooks.includes(latest?.workflow ?? '');
+  if (latest?.type === 'completed' && finishes && openPlaybookRun(events) === undefined) return 'done';
 
   return 'in_progress';
 };
@@ -457,6 +528,18 @@ const recordField = (source: Record<string, unknown>, key: string) => {
   const value = source[key];
 
   return isRecord(value) ? value : {};
+};
+
+const deriveUnconfirmed = (events: readonly StoredEvent[]) => {
+  const unconfirmed = new Set<string>();
+  for (const { type, data } of events) {
+    if (type === 'decision' && data.unconfirmed === true && typeof data.id === 'string') unconfirmed.add(data.id);
+    if (type !== 'gate') continue;
+    if (typeof data.decision === 'string') unconfirmed.delete(data.decision);
+    if (Array.isArray(data.decisions)) for (const id of data.decisions) unconfirmed.delete(String(id));
+  }
+
+  return [...unconfirmed];
 };
 
 const deriveState = (work: string, events: readonly StoredEvent[]) => {
@@ -515,6 +598,7 @@ const deriveState = (work: string, events: readonly StoredEvent[]) => {
     steps: deriveSteps(events),
     units: deriveUnits(events),
     choices,
+    unconfirmed: deriveUnconfirmed(events),
     pr,
     updated: events.at(-1)?.ts ?? null,
   };
@@ -528,6 +612,22 @@ const writeState = async (item: WorkItem) => {
   await writeFile(join(item.dir, 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
 
   return state;
+};
+
+const warnInLinkedWorktree = (cwd: string) => {
+  const toplevel = gitOutput(cwd, ['rev-parse', '--show-toplevel'])?.trim();
+  if (toplevel === undefined || realPathOrSelf(toplevel) === realPathOrSelf(mainCheckout(cwd))) return;
+
+  process.stderr.write('warning: linked worktree; log work-item files with `put <path>` (stdin), not by writing them here\n');
+};
+
+const guardedStarts = ['implement', 'review', 'babysit-pr'];
+
+const warnOpenPlaybook = (item: WorkItem, events: readonly StoredEvent[], workflow: string | undefined) => {
+  const playbook = openPlaybookRun(events);
+  if (playbook === undefined || !guardedStarts.includes(workflow ?? '')) return;
+
+  process.stderr.write(`warning: playbook run ${playbook.run} is open; continue with /agentic-${playbook.workflow} ${item.name}\n`);
 };
 
 const startCommand: Command = {
@@ -550,13 +650,351 @@ const startCommand: Command = {
       workflow,
       type: 'started',
       summary: flagText(context, 'summary') ?? `${workflow} started`,
-      data: title === undefined ? undefined : { title },
+      data: { ...(title === undefined ? {} : { title }), cwd: realPathOrSelf(context.cwd) },
     });
     if (result.event === undefined) throw failValidation(result.errors);
 
     await appendEvent(item, result.event);
     await writeState(item);
+    warnInLinkedWorktree(context.cwd);
+    warnOpenPlaybook(item, events, workflow);
     writeOut(`run ${result.event.run}\n`);
+  },
+};
+
+const putFiles = new Set(['spec.md', 'plan.md', 'context.md', 'implementation.md', 'pr.md']);
+const putFolders = ['briefs/', 'reports/', 'reviews/', 'tickets/'];
+
+const isPutAllowed = (path: string) => {
+  const segments = path.split('/');
+  if (isAbsolute(path) || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) return false;
+
+  return putFiles.has(path) || putFolders.some((folder) => path.startsWith(folder));
+};
+
+const reviewCounts = (report: string) => {
+  const header = report.split('\n', 1)[0] ?? '';
+  const count = (severity: string) => Number(new RegExp(`\\b${severity}s?\\s*[:=]?\\s*(\\d+)`).exec(header)?.[1] ?? Number.NaN);
+  const counts = { blocker: count('blocker'), major: count('major'), minor: count('minor'), nit: count('nit') };
+
+  return Object.values(counts).some(Number.isNaN) ? undefined : counts;
+};
+
+const putCommand: Command = {
+  name: 'put',
+  usage: 'put <relative path> [--work <slug>]   (content on stdin)',
+  arguments: 1,
+  flags: [],
+  required: [],
+  async run(context) {
+    const [path] = context.positionals;
+    if (path === undefined || !isPutAllowed(path)) {
+      throw new CliError(1, `put: "${path}" is not an allowlisted work-item path (${[...putFiles, ...putFolders.map((folder) => `${folder}**`)].join(', ')})`, false);
+    }
+
+    const item = await resolveWorkItem(context, { allowCreate: false });
+    const events = await readEvents(item);
+    const run = currentRun(events);
+    const content = await Bun.stdin.text();
+    if (content === '') throw new CliError(2, 'put: no content on stdin');
+
+    const base = {
+      ts: nowTimestamp(),
+      work: item.name,
+      run: run?.run,
+      harness: run?.harness,
+      workflow: run?.workflow,
+    };
+    const artifact = validateEvent({ ...base, type: 'artifact', summary: `put ${path}`, data: { name: path.replace(/\.md$/, ''), path } });
+    if (artifact.event === undefined) throw failValidation(artifact.errors);
+
+    const target = join(item.dir, path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, content);
+    await appendEvent(item, artifact.event);
+
+    const review = /^reviews\/(\d+)-(.+)\.md$/.exec(path);
+    const counts = reviewCounts(content);
+    if (review !== null && review[2] !== 'fix' && counts !== undefined) {
+      const completed = validateEvent({
+        ...base,
+        type: 'completed',
+        step: `review.${review[2]}`,
+        iteration: review[1],
+        summary: `${review[2]} review ${review[1]} reported`,
+        data: { counts },
+      });
+      if (completed.event === undefined) throw failValidation(completed.errors);
+      await appendEvent(item, completed.event);
+    }
+
+    await writeState(item);
+    writeOut(`put ${path}\n`);
+  },
+};
+
+const gateRedLines = 8;
+
+const gateTasks = (context: Context) => {
+  const tasks = (flagText(context, 'task') ?? '').split(',').map((task) => task.trim()).filter(Boolean);
+  const baseline = context.values.baseline === true;
+  if (baseline === (tasks.length > 0)) throw new CliError(2, 'gate: pass exactly one of --task T1,T2 or --baseline');
+
+  return baseline ? [undefined] : tasks;
+};
+
+const gateVerifyCommand = (checkout: string) => {
+  const config = readJsonFile(join(checkout, '.agentic.json'));
+  const verify = isRecord(config) ? textOf(config.verify) : undefined;
+  if (verify === undefined || verify === '') throw new CliError(1, `gate: no "verify" command in ${join(checkout, '.agentic.json')}`, false);
+
+  return verify;
+};
+
+const gateCheckout = (cwd: string) => {
+  const checkout = gitOutput(cwd, ['rev-parse', '--show-toplevel'])?.trim();
+  const sha = gitOutput(cwd, ['rev-parse', 'HEAD'])?.trim();
+  if (checkout === undefined || sha === undefined) throw new CliError(1, 'gate: not inside a git checkout with a commit', false);
+  if ((gitOutput(checkout, ['status', '--porcelain']) ?? '').trim() !== '') {
+    throw new CliError(1, 'gate: dirty tree; commit or stash first so the log matches HEAD', false);
+  }
+
+  return { checkout, sha };
+};
+
+const hasGateLog = (event: StoredEvent) => typeof event.data.log === 'string' && existsSync(event.data.log);
+
+const greenGateFor = (events: readonly StoredEvent[], sha: string) =>
+  events.findLast((event) => event.step === 'checks' && event.type === 'completed' && event.data.sha === sha && hasGateLog(event));
+
+const runVerify = async (verify: string, checkout: string, logPath: string) => {
+  const result = spawnSync('sh', ['-c', `(${verify}\n) 2>&1`], { cwd: checkout, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  await mkdir(dirname(logPath), { recursive: true });
+  await writeFile(logPath, result.stdout);
+
+  return { passed: result.status === 0, exitCode: result.status, output: result.stdout };
+};
+
+const gateCommand: Command = {
+  name: 'gate',
+  usage: 'gate --task <T1,T2> | --baseline [--work <slug>]   (runs .agentic.json verify at HEAD; blocks, background it)',
+  arguments: 0,
+  flags: ['task'],
+  switches: ['baseline'],
+  required: [],
+  async run(context) {
+    const tasks = gateTasks(context);
+    const item = await resolveWorkItem(context, { allowCreate: false });
+    const { checkout, sha } = gateCheckout(context.cwd);
+    const verify = gateVerifyCommand(checkout);
+    const events = await readEvents(item);
+    const logPath = join(item.dir, 'gates', `${sha}.log`);
+
+    const reusedGate = greenGateFor(events, sha);
+    const outcome = reusedGate === undefined ? await runVerify(verify, checkout, logPath) : { passed: true, exitCode: 0, output: '' };
+
+    const run = currentRun(events);
+    for (const task of tasks) {
+      const result = validateEvent({
+        ts: nowTimestamp(),
+        work: item.name,
+        run: run?.run,
+        harness: run?.harness,
+        workflow: 'implement',
+        step: 'checks',
+        type: outcome.passed ? 'completed' : 'failed',
+        task,
+        summary: `verify ${outcome.passed ? 'green' : 'red'} at ${sha.slice(0, 7)}${task === undefined ? ' (baseline)' : ` for ${task}`}`,
+        data: {
+          sha,
+          log: reusedGate === undefined ? logPath : reusedGate.data.log,
+          ...(reusedGate === undefined ? {} : { reused: reusedGate.ts }),
+          ...(task === undefined ? { baseline: true } : {}),
+          ...(outcome.passed ? {} : { reason: `verify exited ${outcome.exitCode}` }),
+        },
+      });
+      if (result.event === undefined) throw failValidation(result.errors);
+      await appendEvent(item, result.event);
+    }
+    await writeState(item);
+
+    if (!outcome.passed) {
+      const tail = outcome.output.trimEnd().split('\n').slice(-gateRedLines);
+      writeOut(`${[`gate red: verify exited ${outcome.exitCode}`, ...tail, `log: ${logPath}`].join('\n')}\n`);
+      throw new CliError(1, 'gate red', false);
+    }
+    writeOut(`gate green at ${sha.slice(0, 7)}\n`);
+  },
+};
+
+const reviewLifecycle = ['started', 'completed', 'failed'];
+
+const isReviewLifecycle = (event: StoredEvent) =>
+  reviewLifecycle.includes(event.type) && ((event.step === null && event.workflow === 'review') || event.step === 'review');
+
+const lastIterationBlocking = (events: readonly StoredEvent[], run: string) => {
+  const reports = events.filter((event) => event.run === run && event.step?.startsWith('review.') && isRecord(event.data.counts));
+  const lastIteration = Math.max(0, ...reports.map((event) => event.iteration ?? 0));
+
+  return reports
+    .filter((event) => (event.iteration ?? 0) === lastIteration)
+    .reduce((total, event) => {
+      const counts = recordField(event.data, 'counts');
+      return total + Number(counts.blocker ?? 0) + Number(counts.major ?? 0);
+    }, 0);
+};
+
+const latestCompletedReview = (events: readonly StoredEvent[]) => {
+  const latest = events.filter((event) => event.data?.recordedAt === undefined).findLast(isReviewLifecycle);
+
+  return latest !== undefined && latest.type === 'completed' && lastIterationBlocking(events, latest.run) === 0 ? latest : undefined;
+};
+
+interface ReviewVerdict {
+  readonly clean: boolean;
+  readonly reason: string;
+}
+
+const reviewVerdict = (events: readonly StoredEvent[], head: string, cwd: string, base: string | undefined): ReviewVerdict => {
+  const notClean = { clean: false, reason: `review not clean for head ${head}` };
+  const review = latestCompletedReview(events);
+  if (review === undefined) return notClean;
+  if (review.data.head === head) return { clean: true, reason: '' };
+
+  const reviewedPatch = textOf(review.data.patchId);
+  if (reviewedPatch === undefined) return notClean;
+  if (gitOutput(cwd, ['rev-parse', 'HEAD'])?.trim() !== head) return { clean: false, reason: 'checkout not at PR head' };
+
+  return patchIdSince(cwd, base) === reviewedPatch ? { clean: true, reason: '' } : notClean;
+};
+
+interface PrCheck {
+  readonly name: string;
+  readonly green: boolean;
+  readonly workflowName: string;
+  readonly detailsUrl: string;
+}
+
+const greenConclusions = ['SUCCESS', 'NEUTRAL', 'SKIPPED'];
+
+const toPrCheck = (check: unknown): PrCheck => {
+  const entry = isRecord(check) ? check : {};
+  const outcome = textOf(entry.conclusion) || textOf(entry.state) || '';
+
+  return {
+    name: textOf(entry.name) ?? textOf(entry.context) ?? 'check',
+    green: greenConclusions.includes(outcome),
+    workflowName: textOf(entry.workflowName) ?? '',
+    detailsUrl: textOf(entry.detailsUrl) ?? '',
+  };
+};
+
+const ciMarkerHolds = (cwd: string, head: string) => {
+  const commonDir = gitOutput(cwd, ['rev-parse', '--git-common-dir'])?.trim();
+  if (commonDir === undefined) return false;
+
+  const marker = join(resolve(cwd, commonDir), 'agentic', 'ci-pass', head);
+
+  return existsSync(marker) && readFileSync(marker, 'utf8').trim() === head;
+};
+
+const ghJson = async (gh: Gh, args: readonly string[]): Promise<Record<string, unknown>> => {
+  const parsed: unknown = JSON.parse(await gh.call(args));
+
+  return isRecord(parsed) ? parsed : {};
+};
+
+interface ActionsRun {
+  readonly id: string;
+  readonly name: string;
+}
+
+const actionsOnHead = async (gh: Gh, head: string) => {
+  const runs = (await ghJson(gh, ['api', `repos/{owner}/{repo}/actions/runs?head_sha=${head}`])).workflow_runs;
+  const unstarted: ActionsRun[] = [];
+
+  for (const run of Array.isArray(runs) ? runs : []) {
+    const entry = isRecord(run) ? run : {};
+    const id = String(entry.id);
+    const jobs = (await ghJson(gh, ['api', `repos/{owner}/{repo}/actions/runs/${id}/jobs`])).jobs;
+    const started = (Array.isArray(jobs) ? jobs : []).some((job) => isRecord(job) && Array.isArray(job.steps) && job.steps.length > 0);
+    if (started) return { started: true, unstarted: [] };
+    unstarted.push({ id, name: textOf(entry.name) ?? '' });
+  }
+
+  return { started: false, unstarted };
+};
+
+const belongsToRun = (check: PrCheck, run: ActionsRun) =>
+  (check.workflowName !== '' && check.workflowName === run.name) || check.detailsUrl.includes(`/actions/runs/${run.id}`);
+
+const notGreenNames = (checks: readonly PrCheck[]) => checks.filter((check) => !check.green).map((check) => check.name);
+
+const ciProof = (actions: { readonly started: boolean; readonly unstarted: readonly ActionsRun[] }, checks: readonly PrCheck[], cwd: string, head: string) => {
+  if (actions.started) {
+    const notGreen = notGreenNames(checks);
+
+    return notGreen.length === 0 ? 'github-checks' : `checks not green: ${notGreen.join(', ')}`;
+  }
+  if (!ciMarkerHolds(cwd, head)) return `no CI proof for head ${head}`;
+
+  const notGreen = notGreenNames(checks.filter((check) => !actions.unstarted.some((run) => belongsToRun(check, run))));
+
+  return notGreen.length === 0 ? 'local-ci' : `checks not green: ${notGreen.join(', ')}`;
+};
+
+const mergeRefusal = (review: ReviewVerdict, view: Record<string, unknown>) => {
+  if (!review.clean) return review.reason;
+  if (view.mergeable === 'CONFLICTING') return 'conflict';
+  if (view.mergeable !== 'MERGEABLE') return `not mergeable: ${textOf(view.mergeable) ?? 'unknown'}`;
+
+  return undefined;
+};
+
+const mergeCommand: Command = {
+  name: 'merge',
+  usage: 'merge [--work <slug>]   (squash-merges the PR when review is clean, no conflict, CI proof for head; else exit 1)',
+  arguments: 0,
+  flags: [],
+  required: [],
+  async run(context) {
+    const item = await resolveWorkItem(context, { allowCreate: false });
+    const events = await readEvents(item);
+    const state = deriveState(item.name, events);
+    const prNumber = /\/pull\/(\d+)/.exec(textOf(state.pr.url) ?? '')?.[1];
+    if (prNumber === undefined) throw new CliError(1, 'merge: no pr url in state', false);
+
+    const gh = createGh(context.env);
+    const parsed: unknown = JSON.parse(await gh.call(['pr', 'view', prNumber, '--json', 'mergeable,headRefOid,statusCheckRollup']));
+    const view = isRecord(parsed) ? parsed : {};
+    const head = textOf(view.headRefOid) ?? '';
+
+    const review = reviewVerdict(events, head, context.cwd, textOf(state.workspace?.base));
+    const refusal = mergeRefusal(review, view);
+    if (refusal !== undefined) throw new CliError(1, `merge: ${refusal}`, false);
+
+    const checks = (Array.isArray(view.statusCheckRollup) ? view.statusCheckRollup : []).map(toPrCheck);
+    const proof = ciProof(await actionsOnHead(gh, head), checks, context.cwd, head);
+    if (proof !== 'github-checks' && proof !== 'local-ci') throw new CliError(1, `merge: ${proof}`, false);
+
+    await gh.call(['pr', 'merge', prNumber, '--squash', '--match-head-commit', head]);
+
+    const run = currentRun(events) ?? events.findLast(isReviewLifecycle);
+    const result = validateEvent({
+      ts: nowTimestamp(),
+      work: item.name,
+      run: run?.run,
+      harness: run?.harness,
+      workflow: 'babysit-pr',
+      step: 'merge',
+      type: 'completed',
+      summary: `merged PR ${prNumber} at ${head.slice(0, 7)} (${proof})`,
+      data: { pr: Number(prNumber), head, proof },
+    });
+    if (result.event === undefined) throw failValidation(result.errors);
+    await appendEvent(item, result.event);
+    await writeState(item);
+    writeOut(`merged PR ${prNumber} at ${head.slice(0, 7)} (${proof})\n`);
   },
 };
 
@@ -569,15 +1007,40 @@ const eventCommand: Command = {
   required: ['type'],
   async run(context) {
     const item = await resolveWorkItem(context, { allowCreate: false });
-    const run = currentRun(await readEvents(item));
+    const events = await readEvents(item);
+    const run = currentRun(events, flagText(context, 'workflow'));
+    const mintsRun = flagText(context, 'type') === 'started' && flagText(context, 'step') === undefined;
     const dataFlag = parseDataFlag(flagText(context, 'data'));
+    const step = flagText(context, 'step');
+    const backdated = flagText(context, 'ts') !== undefined;
+    const completesReview =
+      flagText(context, 'type') === 'completed' && (step === 'review' || (step === undefined && (flagText(context, 'workflow') ?? run?.workflow) === 'review'));
+    const closesReview = completesReview && !backdated;
+    const reviewedHead = closesReview ? gitOutput(context.cwd, ['rev-parse', 'HEAD'])?.trim() : undefined;
+    const reviewedPatch = closesReview ? patchIdSince(context.cwd, textOf(deriveState(item.name, events).workspace?.base)) : undefined;
+    if (closesReview && reviewedPatch === undefined) {
+      await appendEvent(item, {
+        ts: nowTimestamp(),
+        work: item.name,
+        run: run?.run ?? null,
+        harness: run?.harness ?? 'claude',
+        workflow: run?.workflow ?? 'review',
+        step,
+        type: 'note',
+        summary: 'review closed without patch-id (not computable): a rebase will need a re-review',
+        data: {},
+      });
+    }
+    const { head: _head, patchId: _patchId, ...dataWithoutHead } = dataFlag.data ?? {};
+    const stamped = { ...dataFlag.data, head: reviewedHead, ...(reviewedPatch === undefined ? {} : { patchId: reviewedPatch }) };
+    const data = reviewedHead !== undefined ? stamped : completesReview && backdated ? { ...dataWithoutHead, recordedAt: nowTimestamp() } : dataFlag.data;
 
     const result = validateEvent(
       {
         ts: flagText(context, 'ts') ?? nowTimestamp(),
         work: item.name,
-        run: flagText(context, 'run') ?? run?.run,
-        harness: flagText(context, 'harness') ?? run?.harness,
+        run: flagText(context, 'run') ?? (mintsRun ? mintRun(events) : run?.run),
+        harness: flagText(context, 'harness') ?? (run ?? currentRun(events))?.harness,
         workflow: flagText(context, 'workflow') ?? run?.workflow,
         step: flagText(context, 'step'),
         type: flagText(context, 'type'),
@@ -588,7 +1051,7 @@ const eventCommand: Command = {
         effort: flagText(context, 'effort'),
         summary: flagText(context, 'summary'),
         ref: flagText(context, 'ref'),
-        data: dataFlag.data,
+        data: mintsRun ? { cwd: realPathOrSelf(context.cwd), ...data } : data,
       },
       dataFlag.errors,
     );
@@ -645,7 +1108,7 @@ const pendingUnits = (item: WorkItem, state: WorkState) => {
   return ids.filter((id) => state.units[id] !== 'done' && state.units[id] !== 'skipped');
 };
 
-const openStep = (events: readonly StoredEvent[]) => {
+const openSteps = (events: readonly StoredEvent[]) => {
   const open = new Map<string, StoredEvent>();
   for (const event of events) {
     if (event.step === null) continue;
@@ -655,8 +1118,12 @@ const openStep = (events: readonly StoredEvent[]) => {
     if (event.type === 'completed' || event.type === 'failed') open.delete(key);
   }
 
-  return [...open.values()].at(-1);
+  return [...open.values()];
 };
+
+const openStep = (events: readonly StoredEvent[]) => openSteps(events).at(-1);
+
+const hasOpenGrill = (events: readonly StoredEvent[]) => openSteps(events).some(({ step }) => step?.startsWith('grill'));
 
 const describeStep = (event: StoredEvent | undefined) => {
   if (event === undefined) return 'none';
@@ -666,7 +1133,13 @@ const describeStep = (event: StoredEvent | undefined) => {
   return [event.step, unit, `started: ${event.summary}`].filter(Boolean).join(' ');
 };
 
-const nextCommand = (item: WorkItem, state: WorkState, pending: readonly string[]) => {
+const nextTicket = (state: WorkState) => {
+  const next = Object.entries(state.tickets.tasks).find(([task]) => state.units[task] !== 'done' && state.units[task] !== 'skipped');
+
+  return next === undefined ? '' : `, next ticket ${String(next[1])} (${next[0]})`;
+};
+
+const nextCommand = (item: WorkItem, state: WorkState, pending: readonly string[], playbook: StoredEvent | undefined) => {
   const skill = (name: string) => `/agentic-${name} ${item.name}`;
   const resumeSkill = skill(state.phase === null || state.phase === 'implement' ? 'implement' : state.phase);
   const openEscalation = state.escalations.find((escalation) => escalation.status === 'open');
@@ -679,6 +1152,7 @@ const nextCommand = (item: WorkItem, state: WorkState, pending: readonly string[
   }
   if (state.status === 'done') return skill('cleanup');
   if (state.status === 'failed' || state.status === 'blocked') return `fix the cause, then ${resumeSkill}`;
+  if (playbook !== undefined) return `${skill(playbook.workflow)}${nextTicket(state)}`;
   if (pending.length > 0) return skill('implement');
   if (Object.keys(state.units).length > 0 && state.phases.review === undefined) return skill('review');
 
@@ -693,7 +1167,9 @@ const unitWorktree = (event: StoredEvent) => {
   return path === undefined || branch === undefined ? undefined : { path, branch };
 };
 
-const mergeBackBlocks = (events: readonly StoredEvent[]) => {
+const branchExists = (cwd: string, branch: string) => gitOutput(cwd, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]) !== undefined;
+
+const mergeBackBlocks = (events: readonly StoredEvent[], cwd: string) => {
   const run = currentRun(events)?.run;
   const inRun = events.filter((event) => event.run === run);
   const pending = inRun.flatMap((event, index) => {
@@ -702,7 +1178,7 @@ const mergeBackBlocks = (events: readonly StoredEvent[]) => {
       .slice(index + 1)
       .some((later) => later.step === 'checks' && later.type === 'completed' && later.task === event.task);
 
-    return worktree === undefined || merged ? [] : [worktree];
+    return worktree === undefined || merged || !branchExists(cwd, worktree.branch) ? [] : [worktree];
   });
   if (pending.length === 0) return ['merge-back: none'];
 
@@ -712,7 +1188,7 @@ const mergeBackBlocks = (events: readonly StoredEvent[]) => {
   ];
 };
 
-const resumeText = (item: WorkItem, events: readonly StoredEvent[]) => {
+const resumeText = (item: WorkItem, events: readonly StoredEvent[], cwd: string) => {
   const state = deriveState(item.name, events);
   const pending = pendingUnits(item, state);
   const open = state.escalations.filter((escalation) => escalation.status === 'open');
@@ -726,11 +1202,24 @@ const resumeText = (item: WorkItem, events: readonly StoredEvent[]) => {
     `escalations: ${escalations}`,
     `pending: ${pending.join(', ') || 'none'}`,
     ...events.slice(-3).map((event) => `event: ${event.ts} ${event.type} ${[event.step, event.task].filter(Boolean).join('/')} ${event.summary}`),
-    ...mergeBackBlocks(events),
-    `next: ${nextCommand(item, state, pending)}`,
+    ...mergeBackBlocks(events, cwd),
+    `next: ${nextCommand(item, state, pending, openPlaybookRun(events))}`,
   ];
 
   return lines.map(resumeLine).join('\n');
+};
+
+const cardText = (item: WorkItem, events: readonly StoredEvent[]) => {
+  const state = deriveState(item.name, events);
+  const next = nextCommand(item, state, pendingUnits(item, state), openPlaybookRun(events));
+
+  return [
+    `call: ${next}`,
+    'log only through the helper (`step` before every spawn, `gate` for checks, `put` for files)',
+    'pass model and effort exactly as printed',
+    'survey note (hub set) and baseline gate before implement',
+    `unconfirmed: ${state.unconfirmed.join(', ') || 'none'}`,
+  ].join('\n');
 };
 
 const resumeCommand: Command = {
@@ -741,7 +1230,7 @@ const resumeCommand: Command = {
   required: [],
   async run(context) {
     const item = await resolveWorkItem(context, { allowCreate: false });
-    writeOut(`${resumeText(item, await readEvents(item))}\n`);
+    writeOut(`${resumeText(item, await readEvents(item), context.cwd)}\n`);
   },
 };
 
@@ -790,6 +1279,7 @@ const decideCommand: Command = {
     }
 
     const openGrill = openStep(events);
+    const step = flagText(context, 'step') ?? (openGrill?.workflow.startsWith('grill-') ? openGrill.step ?? undefined : undefined);
     const result = validateEvent(
       {
         ts: nowTimestamp(),
@@ -797,10 +1287,18 @@ const decideCommand: Command = {
         run: run?.run,
         harness: run?.harness,
         workflow: run?.workflow,
-        step: flagText(context, 'step') ?? (openGrill?.workflow.startsWith('grill-') ? openGrill.step ?? undefined : undefined),
+        step,
         type: 'decision',
         summary: `${id}: ${question.slice(0, maxSummaryQuestion)}`,
-        data: { id, question, answer, tag, focus, ...optionalField('supersedes', supersedes) },
+        data: {
+          id,
+          question,
+          answer,
+          tag,
+          focus,
+          ...optionalField('supersedes', supersedes),
+          ...(tag === 'structural' && !step?.startsWith('grill') && !hasOpenGrill(events) ? { unconfirmed: true } : {}),
+        },
       },
       errors,
     );
@@ -846,6 +1344,8 @@ const builtinSteps: Readonly<Record<string, Builtin>> = {
   implement: codeMedium,
   explore: { ...codeMedium, routing: 'explore' },
   tickets: codeMedium,
+  write: codeMedium,
+  plan: frontierHigh,
   review: codeMedium,
   'review.code-review': frontierHigh,
   'review.claude-security-review': frontierHigh,
@@ -942,12 +1442,19 @@ const resolveTier = (config: StepConfig, harness: string, key: string) => {
   const own = config.steps[harness]?.[key];
   const parent = config.steps[harness]?.[parentKey(key)];
   const builtin = builtinFor(key);
+  if (!own && !parent && !builtin) {
+    const validKeys = [...new Set([...Object.keys(builtinSteps), ...Object.keys(config.steps[harness] ?? {})])].sort();
+    throw new CliError(1, `unknown step key "${key}": valid keys ${validKeys.join(', ')}`);
+  }
   const model = textOf(own?.model) ?? textOf(parent?.model) ?? (builtin && builtinModel(harness, builtin)) ?? 'default';
   const effort = textOf(own?.effort) ?? textOf(parent?.effort) ?? builtin?.effort ?? 'default';
   if (oneMillionModel.test(model)) throw new CliError(1, `model "${model}": 1M is an orchestrator session setting, not a step model`);
 
   return { model, effort };
 };
+
+const claudeAlias = (harness: string, model: string) =>
+  harness === 'claude' ? (/^claude-(opus|sonnet|haiku)-/.exec(model)?.[1] ?? model) : model;
 
 const spawnHint = (harness: string, model: string, effort: string) => {
   if (harness === 'cursor') return `Task model=${model}[effort=${effort}]`;
@@ -982,10 +1489,30 @@ const unitWorktreeFor = (context: Context, root: string, itemName: string, unit:
   const projectFile = readJsonFile(join(root, '.agentic.json'));
   const configured = [projectFile, userFile].map((file) => (isRecord(file) ? textOf(file.worktrees) : undefined)).find(Boolean);
   const base = resolve(root, (configured ?? defaultWorktrees).replaceAll('{repo}', basename(root)));
-  const branch = `${workspace.branch}/${unit}`;
+  const branch = `${workspace.branch}--${unit}`;
   const path = join(base, `${itemName}-${unit}`);
 
   return { path, branch, command: `git worktree add -b ${branch} ${path} ${workspace.branch}` };
+};
+
+const hasInOpenRun = (events: readonly StoredEvent[], matches: (event: StoredEvent) => boolean) => {
+  const openRuns = new Set(workflowStarts(events).filter((start) => !isClosedRun(events, start.run)).map((start) => start.run));
+  const sinceLastMerge = events.slice(events.findLastIndex(isPrMerged) + 1);
+
+  return sinceLastMerge.some((event) => matches(event) && openRuns.has(event.run));
+};
+
+const requireImplementPreconditions = (item: WorkItem, events: readonly StoredEvent[], unit: string | undefined) => {
+  if (unit?.startsWith('fix-')) return;
+  const { hub } = deriveState(item.name, events);
+  if (hub !== null && !hasInOpenRun(events, (event) => event.step === 'survey' && event.type === 'note')) {
+    throw new CliError(1, "step implement: no survey logged in this run; run the project's survey of open work, then `event --type note --step survey`");
+  }
+  const greenBaseline = (event: StoredEvent) =>
+    event.step === 'checks' && event.type === 'completed' && event.data.baseline === true && hasGateLog(event);
+  if (!hasInOpenRun(events, greenBaseline)) {
+    throw new CliError(1, 'step implement: no green baseline in this run; run `gate --baseline` first');
+  }
 };
 
 const stepCommand: Command = {
@@ -999,14 +1526,17 @@ const stepCommand: Command = {
     if (!stepKeyShape.test(key)) throw new CliError(1, `invalid step key "${key}": expected ${stepKeyShape.source}`);
 
     const item = await resolveWorkItem(context, { allowCreate: false });
-    const run = currentRun(await readEvents(item));
+    const events = await readEvents(item);
+    const run = currentRun(events);
     const harness = flagText(context, 'harness') ?? run?.harness ?? 'claude';
     if (!harnesses.includes(harness)) throw new CliError(1, `invalid harness "${harness}": expected ${harnesses.join('|')}`);
 
     const root = mainCheckout(context.cwd);
     const config = loadStepConfig(context, root);
     const { model, effort } = resolveTier(config, harness, key);
+    const spawnModel = claudeAlias(harness, model);
     const unit = flagText(context, 'unit');
+    if (key === 'implement') requireImplementPreconditions(item, events, unit);
     const task = flagText(context, 'task') ?? unit;
     const agent = flagText(context, 'agent') ?? (key === 'implement' ? `impl-${task ?? key}` : `${key}-1`);
     const extraSkills = (flagText(context, 'skills') ?? '').split(',').map((skill) => skill.trim()).filter(Boolean);
@@ -1030,7 +1560,7 @@ const stepCommand: Command = {
       model,
       effort,
       summary: `step ${key} brief for ${agent}`,
-      ...(unitTree && { data: { worktree: { path: unitTree.path, branch: unitTree.branch } } }),
+      data: { skills, ...(unitTree && { worktree: { path: unitTree.path, branch: unitTree.branch } }) },
     });
     if (result.event === undefined) throw failValidation(result.errors);
 
@@ -1046,7 +1576,7 @@ const stepCommand: Command = {
         workflow: result.event.workflow,
         task: task ?? '',
         agent,
-        model,
+        model: spawnModel,
         effort,
         skills: skills.join(', '),
         workspace: unitTree?.path ?? workspace ?? gitOutput(context.cwd, ['rev-parse', '--show-toplevel'])?.trim() ?? context.cwd,
@@ -1057,7 +1587,7 @@ const stepCommand: Command = {
     await appendEvent(item, result.event);
     await writeState(item);
     const worktreeLine = unitTree ? `worktree: ${unitTree.command}\n` : '';
-    writeOut(`${brief}${worktreeLine}next: ${spawnHint(harness, model, effort)}\n`);
+    writeOut(`${brief}${worktreeLine}next: ${spawnHint(harness, spawnModel, effort)}\n`);
   },
 };
 
@@ -1078,6 +1608,7 @@ interface Gates {
 
 const securityReviewerKeywords = ['security', 'access', 'tenant'];
 const defaultSecurityPaths = ['**/auth/**', '**/tenant/**', '**/tenants/**', '**/rls/**', '**/policies/**'];
+const docPath = /(^|\/)(docs?|documentation)\/|\.(md|mdx|rst|adoc|txt)$/;
 const fallbackReason = 'fallback: no review-gates.json';
 
 const gateEntries = (config: Record<string, unknown>, kind: GateKind) =>
@@ -1137,6 +1668,24 @@ const workspaceRoot = async (context: Context) => {
   return recorded ?? gitOutput(context.cwd, ['rev-parse', '--show-toplevel'])?.trim() ?? context.cwd;
 };
 
+const logEligibleReviewers = async (item: WorkItem, reviewers: readonly string[], reason: string | undefined, widen: boolean) => {
+  const run = currentRun(await readEvents(item));
+  const result = validateEvent({
+    ts: nowTimestamp(),
+    work: item.name,
+    run: run?.run,
+    harness: run?.harness,
+    workflow: run?.workflow,
+    step: 'review',
+    type: 'note',
+    summary: widen ? `review eligible --all: ${reason}` : 'review eligible',
+    data: reason === undefined ? { reviewers } : { reason, reviewers },
+  });
+  if (result.event === undefined) throw failValidation(result.errors);
+  await appendEvent(item, result.event);
+  await writeState(item);
+};
+
 const reviewEligibleCommand: Command = {
   name: 'review eligible',
   usage: 'review eligible --base <ref> [--iteration n] [--all --reason <text>] [--only a,b] [--work <slug>]',
@@ -1177,7 +1726,11 @@ const reviewEligibleCommand: Command = {
           pick(entry.name, `changes-requested in ${previous}${entry.name}.md`);
         }
       }
-      const securityChanged = firstGlobMatch(gates.security?.paths ?? defaultSecurityPaths, diffPaths(root, base));
+      const configuredPaths = gates.security?.paths;
+      const securityChanged =
+        configuredPaths === undefined
+          ? firstGlobMatch(defaultSecurityPaths, diffPaths(root, base).filter((path) => !docPath.test(path)))
+          : firstGlobMatch(configuredPaths, diffPaths(root, base));
       if (securityChanged !== undefined) {
         for (const name of securityReviewerNames(gates)) pick(name, 'security: auth/tenant paths changed');
       }
@@ -1197,28 +1750,12 @@ const reviewEligibleCommand: Command = {
     }
     for (const name of only) pick(name, 'onDemand: --only');
 
-    if (widen) {
-      const item = await resolveWorkItem(context, { allowCreate: false });
-      const run = currentRun(await readEvents(item));
-      const result = validateEvent({
-        ts: nowTimestamp(),
-        work: item.name,
-        run: run?.run,
-        harness: run?.harness,
-        workflow: run?.workflow,
-        step: 'review',
-        type: 'note',
-        summary: `review eligible --all: ${reason}`,
-        data: { reason },
-      });
-      if (result.event === undefined) throw failValidation(result.errors);
-      await appendEvent(item, result.event);
-      await writeState(item);
-    }
-
     const reviewers = gates.entries
       .filter((entry, index, all) => picked.has(entry.name) && all.findIndex((other) => other.name === entry.name) === index)
       .map((entry) => ({ name: entry.name, reason: picked.get(entry.name) }));
+
+    const item = await resolveWorkItem(context, { allowCreate: false }).catch(() => undefined);
+    if (item !== undefined) await logEligibleReviewers(item, reviewers.map((reviewer) => reviewer.name), reason, widen);
     writeOut(`${JSON.stringify({ reviewers })}\n`);
   },
 };
@@ -1367,6 +1904,35 @@ const upsertComment = async (gh: Gh, commentsPath: string, marker: string, body:
   return existing === undefined ? 'created' : 'updated';
 };
 
+const syncHub = async (item: WorkItem, context: Context, quiet = false) => {
+  const { hub } = await writeState(item);
+  if (hub === null) {
+    if (!quiet) writeOut('skipped: no hub (log a choice decision with key hub or an artifact event with data.hub)\n');
+
+    return;
+  }
+  if (!ghAvailable(context.env)) {
+    if (!quiet) writeOut('skipped: gh not found (hub sync is GitHub-only)\n');
+
+    return;
+  }
+
+  const gh = createGh(context.env);
+  const repo = (await gh.call(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'])).trim();
+  const login = (await gh.call(['api', 'user', '-q', '.login'])).trim();
+
+  const present = mirroredFiles.filter((file) => existsSync(join(item.dir, file)));
+  const mirrors = [...(await Promise.all(present.map((file) => fileMirror(item, file)))), await runMirror(item, context, login)];
+  const denied = findDenied(mirrors);
+  if (denied !== undefined) throw new CliError(1, denied);
+
+  const commentsPath = `repos/${repo}/issues/${hub}/comments`;
+  for (const part of mirrors.flatMap(renderParts)) {
+    const action = await upsertComment(gh, commentsPath, part.marker, part.body, repo);
+    if (!quiet) writeOut(`${action} ${part.marker} (${part.body.length} chars)\n`);
+  }
+};
+
 const hubSyncCommand: Command = {
   name: 'hub sync',
   usage: 'hub sync [--run <id>] [--model <name>] [--work <slug>]',
@@ -1374,34 +1940,47 @@ const hubSyncCommand: Command = {
   flags: ['run', 'model'],
   required: [],
   async run(context) {
-    const item = await resolveWorkItem(context, { allowCreate: false });
-    const { hub } = await writeState(item);
-    if (hub === null) {
-      writeOut('skipped: no hub (log a choice decision with key hub or an artifact event with data.hub)\n');
-
-      return;
-    }
-    if (!ghAvailable(context.env)) {
-      writeOut('skipped: gh not found (hub sync is GitHub-only)\n');
-
-      return;
-    }
-
-    const gh = createGh(context.env);
-    const repo = (await gh.call(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'])).trim();
-    const login = (await gh.call(['api', 'user', '-q', '.login'])).trim();
-
-    const present = mirroredFiles.filter((file) => existsSync(join(item.dir, file)));
-    const mirrors = [...(await Promise.all(present.map((file) => fileMirror(item, file)))), await runMirror(item, context, login)];
-    const denied = findDenied(mirrors);
-    if (denied !== undefined) throw new CliError(1, denied);
-
-    const commentsPath = `repos/${repo}/issues/${hub}/comments`;
-    for (const part of mirrors.flatMap(renderParts)) {
-      const action = await upsertComment(gh, commentsPath, part.marker, part.body, repo);
-      writeOut(`${action} ${part.marker} (${part.body.length} chars)\n`);
-    }
+    await syncHub(await resolveWorkItem(context, { allowCreate: false }), context);
   },
+};
+
+const milestoneTypes = ['completed', 'failed', 'artifact', 'gate', 'escalation', 'decision'];
+const isMilestone = (event: StoredEvent) => milestoneTypes.includes(event.type) || (isWorkflowLevel(event) && event.type === 'started');
+const isFinalMilestone = (event: StoredEvent) => isWorkflowLevel(event) && (event.type === 'completed' || event.type === 'failed');
+
+const hubSyncFailedMessage = 'hub sync failed: retry `hub sync`, then tell the user';
+
+const logHubSyncFailure = async (item: WorkItem, last: StoredEvent, reason: string) => {
+  const result = validateEvent({
+    ts: nowTimestamp(),
+    work: item.name,
+    run: last.run,
+    harness: last.harness,
+    workflow: last.workflow,
+    step: 'hub',
+    type: 'note',
+    summary: 'hub sync failed',
+    data: { reason },
+  });
+  if (result.event === undefined) throw failValidation(result.errors);
+  await appendEvent(item, result.event);
+};
+
+const syncHubAfterMilestones = async (context: Context) => {
+  const milestones = appended.filter(({ event }) => isMilestone(event));
+  appended.length = 0;
+  const last = milestones.at(-1);
+  if (last === undefined) return;
+
+  const { item } = last;
+  try {
+    await syncHub(item, { ...context, values: {}, positionals: [] }, true);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    await logHubSyncFailure(item, last.event, reason);
+    appended.length = 0;
+    if (milestones.some(({ event }) => isFinalMilestone(event))) throw new CliError(1, hubSyncFailedMessage, false);
+  }
 };
 
 const strayPattern = /\.(run|tmp)$/;
@@ -1458,6 +2037,13 @@ const strayGaps = async (item: WorkItem) => {
     .map((entry) => `stray file: ${entry}`);
 };
 
+const outsideArtifactGaps = (item: WorkItem, events: readonly StoredEvent[]) =>
+  events
+    .filter((event) => event.type === 'artifact')
+    .map((event) => textOf(event.data.path))
+    .filter((path): path is string => path !== undefined && !isInside(resolve(item.dir, path), item.dir))
+    .map((path) => `artifact outside the work item: ${path}`);
+
 const cleanupCheckCommand: Command = {
   name: 'cleanup check',
   usage: 'cleanup check [--work <slug>]',
@@ -1479,6 +2065,7 @@ const cleanupCheckCommand: Command = {
       ...branchGaps(state, root),
       ...worktreeGaps(state, root),
       ...(await strayGaps(item)),
+      ...outsideArtifactGaps(item, events),
     ];
     if (gaps.length === 0) {
       writeOut('ready: all cleanup preconditions hold\n');
@@ -1502,7 +2089,7 @@ const codexToolInputPrompt = (payload: Record<string, unknown>) =>
   toolInputPrompt(payload) ?? textOf(recordField(payload, 'tool_input').message);
 
 const spawnToolNames: Readonly<Record<string, readonly string[]>> = {
-  claude: ['Agent'],
+  claude: ['Agent', 'mcp__ccd_session__start_session'],
   codex: ['Agent', 'spawn_agent'],
   cursor: ['Agent'],
 };
@@ -1539,16 +2126,8 @@ const readHookPayload = async () => {
   }
 };
 
-const isOpenRun = (events: readonly StoredEvent[]) => {
-  const started = events.findLastIndex((event) => isWorkflowLevel(event) && event.type === 'started' && !isCleanup(event));
-  if (started < 0) return false;
-
-  const run = events[started]?.run;
-
-  return !events
-    .slice(started + 1)
-    .some((event) => isWorkflowLevel(event) && !isCleanup(event) && event.run === run && ['completed', 'failed'].includes(event.type));
-};
+const isOpenRun = (events: readonly StoredEvent[]) =>
+  workflowStarts(events).some((event) => !isClosedRun(events, event.run));
 
 const safeEvents = async (item: WorkItem) => {
   try {
@@ -1558,28 +2137,68 @@ const safeEvents = async (item: WorkItem) => {
   }
 };
 
-const findHookItem = async (context: Context, cwd: string) => {
+const isInside = (path: string, root: string) => {
+  const from = relative(root, path);
+
+  return from === '' || (from !== '..' && !from.startsWith(`..${sep}`) && !isAbsolute(from));
+};
+
+const recordedCwds = (events: readonly StoredEvent[]) =>
+  workflowStarts(events)
+    .filter((event) => !isClosedRun(events, event.run))
+    .map((event) => textOf(event.data?.cwd))
+    .filter((cwd) => cwd !== undefined);
+
+const specificity = (here: string, main: string, linked: readonly string[], path: string | undefined, events: readonly StoredEvent[]) => {
+  if (path === undefined && here === main) return main.length;
+
+  const roots = [path, ...recordedCwds(events)].filter((root) => root !== undefined).map(realPathOrSelf);
+  const matching = roots.filter((root) => isInside(here, root) && (root !== main || !linked.some((worktree) => isInside(here, worktree))));
+
+  return matching.length === 0 ? undefined : Math.max(...matching.map((root) => root.length));
+};
+
+const latestStarted = (events: readonly StoredEvent[]) => workflowStarts(events).at(-1)?.ts ?? '';
+
+const isArchivedPath = (path: string) => path.split(/[\\/]/).includes('_archive');
+
+const namedItemDir = (root: string, workItem: string | undefined) => {
+  if (workItem === undefined || !existsSync(workItem) || isArchivedPath(workItem)) return undefined;
+
+  return resolve(dirname(workItem)) === resolve(root) ? resolve(workItem) : undefined;
+};
+
+const findHookItem = async (context: Context, cwd: string, workItem?: string) => {
   if (flagText(context, 'work') !== undefined) return resolveWorkItem(context, { allowCreate: false });
 
   const root = outputRoot(context);
   const here = realPathOrSelf(cwd);
   const main = realPathOrSelf(mainCheckout(context.cwd));
+  const linked = linkedWorktrees(context.cwd).map(realPathOrSelf);
+  const candidates = [];
 
   for (const name of await listItemNames(root)) {
     const item = { name, dir: join(root, name) };
     const events = await safeEvents(item);
     if (!isOpenRun(events)) continue;
 
-    const path = textOf(deriveState(name, events).workspace?.path);
-    if (realPathOrSelf(path ?? main) === here) return item;
+    const rank = specificity(here, main, linked, textOf(deriveState(name, events).workspace?.path), events);
+    if (rank !== undefined) candidates.push({ item, rank, started: latestStarted(events) });
   }
 
-  return undefined;
+  const named = namedItemDir(root, workItem);
+  candidates.sort(
+    (first, second) =>
+      Number(second.item.dir === named) - Number(first.item.dir === named) ||
+      second.rank - first.rank ||
+      second.started.localeCompare(first.started),
+  );
+
+  return candidates.at(0)?.item;
 };
 
 const briefLine = (brief: string, label: string) => new RegExp(`^[ \\t]*${label}:[ \\t]*(.*?)[ \\t]*$`, 'm').exec(brief)?.[1];
 
-const isArchivedPath = (path: string) => path.split(/[\\/]/).includes('_archive');
 
 const checkBrief = (brief: string, events: readonly StoredEvent[]) => {
   const missing: string[] = [];
@@ -1600,6 +2219,43 @@ const checkBrief = (brief: string, events: readonly StoredEvent[]) => {
   return { missing, step, agent, workItem };
 };
 
+const skillList = (text: string | undefined) => (text ?? '').split(',').map((skill) => skill.trim()).filter(Boolean);
+
+const sameSet = (left: readonly string[], right: readonly string[]) =>
+  new Set(left).size === new Set(right).size && left.every((entry) => right.includes(entry));
+
+const startedFor = (events: readonly StoredEvent[], agent: string | undefined) =>
+  events.filter((event) => event.type === 'started' && event.agent === agent).at(-1);
+
+const expectedSpawn = (started: StoredEvent) => ({
+  model: started.model === undefined ? undefined : claudeAlias('claude', started.model),
+  effort: started.effort,
+  skills: Array.isArray(started.data.skills) ? stringsOf(started.data.skills) : undefined,
+});
+
+const checkClaudeSpawn = (payload: Record<string, unknown>, brief: string, started: StoredEvent | undefined) => {
+  const issues: string[] = [];
+  const loadSkills = briefLine(brief, 'Load skills');
+  if (loadSkills === undefined) issues.push('Load skills: (inline line, not a pointer to a brief file)');
+  if (started === undefined) return { issues, expected: '' };
+
+  const toolInput = recordField(payload, 'tool_input');
+  const { model, effort, skills } = expectedSpawn(started);
+  const gotModel = textOf(toolInput.model);
+  const gotEffort = textOf(toolInput.effort);
+  if (model !== undefined && (gotModel === undefined ? undefined : claudeAlias('claude', gotModel)) !== model) {
+    issues.push(`model ${model} (got ${gotModel ?? 'none'})`);
+  }
+  if (effort !== undefined && gotEffort !== effort) issues.push(`effort ${effort} (got ${gotEffort ?? 'none'})`);
+  if (loadSkills !== undefined && skills !== undefined && !sameSet(skillList(loadSkills), skills)) {
+    issues.push(`Load skills: ${skills.join(', ')} (got ${loadSkills})`);
+  }
+
+  const parts = [model && `model ${model}`, effort && `effort ${effort}`, skills && `Load skills: ${skills.join(', ')}`];
+
+  return { issues, expected: `\nexpected: ${parts.filter(Boolean).join(', ')}` };
+};
+
 const expectedTier = (context: Context, harness: string, step: string | undefined) => {
   if (step === undefined || !stepKeyShape.test(step)) return '';
 
@@ -1611,6 +2267,21 @@ const expectedTier = (context: Context, harness: string, step: string | undefine
   } catch {
     return '';
   }
+};
+
+const reviewerOf = (step: string | undefined) => (step?.startsWith('review.') ? step.slice('review.'.length) : undefined);
+
+const checkReviewerListed = (step: string | undefined, events: readonly StoredEvent[]) => {
+  const reviewer = reviewerOf(step);
+  if (reviewer === undefined) return [];
+
+  const run = currentRun(events)?.run;
+  const list = events.findLast((event) => event.type === 'note' && event.step === 'review' && event.run === run && Array.isArray(event.data.reviewers));
+  if (list === undefined) return ['a logged reviewer list (run review eligible first)'];
+
+  const reviewers = stringsOf(list.data.reviewers);
+
+  return reviewers.includes(reviewer) ? [] : [`${reviewer} in the latest review eligible list (${reviewers.join(', ')}); widen with review eligible --only ${reviewer}`];
 };
 
 const traceBlocked = async (workItem: string | undefined, entry: { harness: string; fallbackWorkflow: string; missing: readonly string[]; agent?: string }) => {
@@ -1648,12 +2319,15 @@ const hookSpawnCommand: Command = {
     const tool = textOf(payload.tool_name);
     if (tool !== undefined && !spawnToolNames[harness]?.includes(tool)) return;
 
-    const item = await findHookItem(context, hookCwd(context, payload));
     const brief = adapter.prompt(payload);
+    const item = await findHookItem(context, hookCwd(context, payload), brief === undefined ? undefined : briefLine(brief, 'Work item'));
     if (item === undefined || brief === undefined || /^[ \t]*Work item:[ \t]*none\b/m.test(brief)) return;
 
     const events = await safeEvents(item);
-    const { missing, step, agent, workItem } = checkBrief(brief, events);
+    const checked = checkBrief(brief, events);
+    const { step, agent, workItem } = checked;
+    const spawn = harness === 'claude' ? checkClaudeSpawn(payload, brief, startedFor(events, agent)) : { issues: [], expected: '' };
+    const missing = [...checked.missing, ...spawn.issues, ...checkReviewerListed(step, events)];
     if (missing.length === 0) return;
 
     await traceBlocked(workItem, { harness, fallbackWorkflow: currentRun(events)?.workflow ?? 'implement', missing, agent });
@@ -1661,10 +2335,86 @@ const hookSpawnCommand: Command = {
     const fix = `bun ${join(import.meta.dir, 'agentic.ts')} step ${step || '<step>'} --unit <task> --agent ${agent || '<label>'} --work ${item.name}`;
     const message = [
       `spawn blocked, brief is missing: ${missing.join(', ')} (Progress: may be replaced by the word read-only)`,
-      `fix: run \`${fix}\` and paste its output as the prompt${expectedTier(context, harness, step)}`,
+      `fix: run \`${fix}\` and paste its output as the prompt, with the printed model and effort${spawn.expected || expectedTier(context, harness, step)}`,
     ].join('\n');
 
     adapter.deny(message);
+  },
+};
+
+const transcriptLines = (text: string) =>
+  text.split('\n').flatMap((line) => {
+    try {
+      const parsed: unknown = JSON.parse(line);
+
+      return isRecord(parsed) ? [parsed] : [];
+    } catch {
+      return [];
+    }
+  });
+
+const firstPrompt = (entries: readonly Record<string, unknown>[]) => {
+  const content = entries.find((entry) => entry.type === 'user')?.message;
+  const body = isRecord(content) ? content.content : undefined;
+  if (typeof body === 'string') return body;
+
+  return Array.isArray(body) ? body.map((block) => (isRecord(block) ? textOf(block.text) : undefined) ?? '').join('\n') : undefined;
+};
+
+const toolUses = (entries: readonly Record<string, unknown>[]) =>
+  entries
+    .flatMap((entry) => {
+      const content = recordField(entry, 'message').content;
+
+      return Array.isArray(content) ? content : [];
+    })
+    .filter((block) => isRecord(block) && block.type === 'tool_use')
+    .map((block) => ({ name: textOf(block.name), input: recordField(block, 'input') }));
+
+const loadedSkill = (skill: string, uses: ReturnType<typeof toolUses>) =>
+  uses.some(
+    (use) =>
+      (use.name === 'Skill' && textOf(use.input.skill) === skill) ||
+      (use.name === 'Read' && (textOf(use.input.file_path) ?? '').endsWith(`${skill}/SKILL.md`)),
+  );
+
+const hookSubagentStopCommand: Command = {
+  name: 'hook subagent-stop',
+  usage: 'hook subagent-stop [--harness claude] [--work <slug>]   (reads the SubagentStop payload on stdin; blocks once when an expected skill was not loaded)',
+  arguments: 0,
+  flags: ['harness'],
+  required: [],
+  async run(context) {
+    try {
+      const payload = await readHookPayload();
+      if (payload === undefined) return;
+
+      const item = await findHookItem(context, hookCwd(context, payload));
+      if (item === undefined) return;
+
+      const events = await safeEvents(item);
+      const run = currentRun(events);
+      const note = (summary: string, data: Record<string, unknown>) =>
+        appendEvent(item, { ts: nowTimestamp(), work: item.name, run: run?.run ?? null, harness: 'claude', workflow: run?.workflow ?? 'implement', step: 'hook', type: 'note', summary, data });
+
+      const transcriptPath = textOf(payload.agent_transcript_path);
+      if (transcriptPath === undefined) return await note('subagent-stop: no transcript path in payload', {});
+
+      const entries = transcriptLines(await Bun.file(transcriptPath).text());
+      const agent = briefLine(firstPrompt(entries) ?? '', 'Agent')?.split('·')[0]?.trim();
+      const started = startedFor(events, agent);
+      if (agent === undefined || started === undefined) return;
+
+      const uses = toolUses(entries);
+      const missing = (expectedSpawn(started).skills ?? []).filter((skill) => !loadedSkill(skill, uses));
+      if (missing.length === 0) return;
+
+      if (payload.stop_hook_active === true) return await note(`subagent-stop: ${agent} still missing skills ${missing.join(', ')}`, { agent, missing });
+
+      writeOut(`${JSON.stringify({ decision: 'block', reason: `Load the skills missing from your work before stopping: ${missing.join(', ')}. Call the Skill tool for each, then finish.` })}\n`);
+    } catch {
+      return;
+    }
   },
 };
 
@@ -1702,16 +2452,35 @@ const hookCompactCommand: Command = {
     const payload = await readHookPayload();
     if (payload === undefined) return;
 
-    const item = await findHookItem(context, hookCwd(context, payload));
+    const cwd = hookCwd(context, payload);
+    const item = await findHookItem(context, cwd);
     if (item === undefined) return;
 
-    const output = adapter(payload, resumeText(item, await safeEvents(item)));
-    if (output !== undefined) writeOut(`${output}\n`);
+    const events = await safeEvents(item);
+    const output = adapter(payload, `${resumeText(item, events, cwd)}\n${cardText(item, events)}`);
+    if (output === undefined) return;
+
+    const run = currentRun(events);
+    await appendEvent(item, {
+      ts: nowTimestamp(),
+      work: item.name,
+      run: run?.run ?? null,
+      harness,
+      workflow: run?.workflow ?? 'implement',
+      step: 'hook',
+      type: 'note',
+      summary: 'compact: resume injected',
+      data: { hook: 'compact' },
+    });
+    writeOut(`${output}\n`);
   },
 };
 
 const commands: readonly Command[] = [
   startCommand,
+  putCommand,
+  gateCommand,
+  mergeCommand,
   eventCommand,
   stateCommand,
   resumeCommand,
@@ -1722,6 +2491,7 @@ const commands: readonly Command[] = [
   cleanupCheckCommand,
   hookSpawnCommand,
   hookCompactCommand,
+  hookSubagentStopCommand,
 ];
 
 const usageText = () =>
@@ -1771,7 +2541,10 @@ const dispatch = async (argv: readonly string[]) => {
     if (values[flag] === undefined) throw new CliError(2, `missing required flag --${flag}`);
   }
 
-  await command.run({ positionals, values, cwd: process.cwd(), env: process.env });
+  const context = { positionals, values, cwd: process.cwd(), env: process.env };
+  const failure = await command.run(context).then(() => undefined, (err: unknown) => ({ err }));
+  if (command.name !== 'hub sync') await syncHubAfterMilestones(context);
+  if (failure !== undefined) throw failure.err;
 };
 
 const main = async (argv: readonly string[]) => {

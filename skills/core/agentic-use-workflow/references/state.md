@@ -15,6 +15,7 @@
 ├── plan.md           # tasks consumed by agentic-implement and agentic-to-tickets
 ├── tickets/NN-slug.md  # local tracker, written by agentic-to-tickets
 ├── implementation.md
+├── reports/{agent}.md  # a session's full report (delegation.md Sessions)
 ├── reviews/
 │   ├── {n}-{reviewer}.md  # one per reviewer per review iteration n
 │   ├── {n}-fix.md         # fix list fed to agentic-implement
@@ -76,12 +77,13 @@ One JSON object per line, appended, never edited. Orchestrator appends via `agen
 
 | Type | `data` |
 |---|---|
-| `started` (subagent) | `{goal, files?}` |
-| `started` (`step: null`) | optional `{title}` |
+| `started` (subagent) | `{goal, files?, skills?, worktree?}` — `skills`: the `Load skills:` list `step` printed; the Claude spawn hook compares the brief to it; `worktree`: `{path, branch}` of a unit |
+| `started` (`step: null`) | `{title?, cwd}` — `cwd` the realpath of the session's directory; `hook compact` matches payload cwd inside `cwd` or `workspace.path` |
 | `progress` | optional `{files?, commit?, tests?}` |
 | `completed` (subagent) | `{files?, commits?, tests?, counts?}` — `counts`: `{blocker, major, minor, nit}` for reviewers |
 | `failed` | `{reason}`, plus `blocked: true` when the user must act (limit hit, red tree), or `interrupted: true` when a resume closes work cut off with its session |
-| `decision` | `{id, question, answer, tag, focus}`, as in decisions.md. Workspace: `{workspace: {kind, branch, base, path}}`. Choice (any non-grill answer): `{choice: {key, value}}`. Undotted key = up-front answer, reused on resume (`tickets`, `tracker`, `branch`). Dotted key = one occurrence (a unit, a round, a thread, a pass), read only by the skill that asked (`interrupted.{run}.{unit}`, `unit.{task}`, `review.{n}`, `review.output`, `needs-user.{id}`, `pr.{round}.{thread}`, `pr.{round}.conflict`, `disclosure.{destination}`, `seam.{run}`, `profile.run-{N}`, `destination.run-{N}`) |
+| `decision` | `{id, question, answer, tag, focus}`, as in decisions.md; `decide` adds `unconfirmed: true` to a `structural` one unless its own step starts with `grill` (`--step grill`), or a grill step is open (a `started` with `step` matching `grill*` and no later `completed` / `failed` of its own). Question-round skills pass `--step grill` to `decide`. Workspace: `{workspace: {kind, branch, base, path}}`. Choice (any non-grill answer): `{choice: {key, value}}`. Undotted key = up-front answer, reused on resume (`tickets`, `tracker`, `branch`). Dotted key = one occurrence (a unit, a round, a thread, a pass), read only by the skill that asked (`interrupted.{run}.{unit}`, `unit.{task}`, `review.{n}`, `review.output`, `needs-user.{id}`, `pr.{round}.{thread}`, `pr.{round}.conflict`, `disclosure.{destination}`, `seam.{run}`, `profile.run-{N}`, `destination.run-{N}`) |
+| `note` | `step: review`: `{reviewers: [names], reason?}`, one per `review eligible` call; the spawn hook allows a `review.<name>` spawn only when `<name>` is in the run's latest list. `step: hook`: `{hook: compact}` (compact resume injected); spawn-blocked notes `{agent}` |
 | `gate` | Per decision: `{decision, outcome}` — `outcome` `confirm`, `escalate`, `revisit`. Gate passed: `{passed: true, decisions: [ids]}` (ids reviewed, empty when none). Override: `{override: true, escalations: [ids]}` |
 | `escalation` | `{id, status, ref}` — `id` the decision (`D4`), `status` `open` or `resolved`, `ref` its ADR or RFC |
 | `artifact` | `{name, path}` for a file, and/or one merged shape: `{tickets: {parent, tasks}}`, `{issues: {parent, children}}` (agentic-security-audit; never units), `{pr: {url, round}}` (agentic-babysit-pr, alone), `{hub: <issue number>}` (optional: GitHub hub issue number; read by `hub sync`). Legacy fallback: `decision` choice key `hub` with a numeric value, still read by the helper |
@@ -92,7 +94,7 @@ Enough to follow the work from outside without opening the session: every unit o
 
 | Who | Logs |
 |---|---|
-| Orchestrator | New 4-hex `run` per skill invocation. Workflow `started` / `completed`; each step `started` / `completed` (interactive ones and playbook steps too); each subagent dispatch (`started`, with goal and files, before spawning it) and return (`completed` with its result, or `failed`, as soon as it returns); every green gate (`step: checks`, `task` = the unit, one line per unit of a parallel batch; pass or fail + what broke); every review iteration (counts per reviewer, fix groups); every PR round (what changed: CI status, new comments, fixes pushed); decisions, gates, escalations, artifacts |
+| Orchestrator | New 4-hex `run` per skill invocation: every skill's `started` (no step) mints its own run; playbook step events pass `--workflow {playbook}`. Workflow `started` / `completed`; each step `started` / `completed` (interactive ones and playbook steps too); each subagent dispatch (`started`, with goal and files, before spawning it) and return (`completed` with its result, or `failed`, as soon as it returns); every green gate (`step: checks`, `task` = the unit, one line per unit of a parallel batch; pass or fail + what broke); every review iteration (counts per reviewer, fix groups); every PR round (what changed: CI status, new comments, fixes pushed); decisions, gates, escalations, artifacts |
 | Writing subagent | `progress` at each milestone of its own work, e.g. implement: tests written (failing as expected) → implementation done → checks green → committed `abc123`. Fix-list unit: finding understood → fixed (or disputed) → checks green → committed |
 
 Subagents append only `progress` lines, with their `agent` label, as one shell append (`>> events.jsonl`) per line; `state.json` and every other event type are the orchestrator's. Read-only subagents write nothing; the orchestrator logs their start and result.
@@ -107,6 +109,10 @@ A task, read from the log:
 {"ts":"…T14:10:20Z","workflow":"implement","step":"implement","task":"T2","type":"completed","agent":"impl-T2","model":"composer-2.5","effort":"medium","summary":"T2 done: 2 files, 3 tests, commit f14b28c", …}
 {"ts":"…T14:11:40Z","workflow":"implement","step":"checks","task":"T2","type":"completed","summary":"Green gate after T2: build, lint, typecheck, 214 tests pass", …}
 ```
+
+`agentic.ts gate` writes the `checks` lines: `workflow: implement`, `step: checks`, `type` `completed` or `failed` (`data.reason` = `verify exited N`), `data {sha, log}`, one per task. A baseline gate is one `checks` line with no `task` and `data.baseline: true`; it marks no unit done. A SHA already green is not re-run: only a `checks completed` whose `data.log` names an existing file counts (hand-logged lines don't); the reuse line carries `data.reused` (ts of the reused event) and its `log`. `step implement` needs a survey note (only when a hub is set) and a baseline (same log-file rule) newer than the latest `babysit-pr` merge `completed` line: a new PR needs both again.
+
+`agentic.ts merge` writes one `completed` line: `workflow: babysit-pr`, `step: merge`, `data {pr, head, proof}`. `proof` = `github-checks` (some Actions job on the head ran a step: every check on the head green) or `local-ci` (Actions never started: jobs of every workflow run on the head, `actions/runs?head_sha` then `runs/{id}/jobs`, all have no step, or no run; marker `<git-common-dir>/agentic/ci-pass/{sha}` holds the head sha, written by the project's own local CI run (e.g. a pre-push hook) after a green run on a clean tree; the helper only reads it). For `local-ci`, every check on the head outside the unstarted Actions runs (non-Actions check runs, status contexts) must also be green, neutral or skipped. `merge` also needs the latest review lifecycle line `completed` with `data.head` = the PR head sha, or `data.patchId` equal to the local checkout's patch-id and the checkout's HEAD = the PR head (else refuses `checkout not at PR head`). `agentic.ts event --type completed` on step `review` or workflow-level `review` records `data.head` (`git rev-parse HEAD` in cwd) and `data.patchId` (`git diff $(git merge-base <base> HEAD) HEAD | git patch-id --stable`; base = `workspace.base`, as `origin/<base>` when it exists) itself, so run it from the reviewed checkout. With explicit `--ts` (backdated or repair) a review `completed` line never carries `data.head` or `data.patchId` (stripped even when passed in `--data`) and records `data.recordedAt` (real now, UTC); `merge` ignores review lines that have `recordedAt` (history, not a review of the PR head). A rebase without content change keeps the patch-id; a renumber, conflict fix or new code changes it, so re-review. Automatic hub sync after milestones prints nothing on stdout. Refusals log nothing.
 
 `state.json` ignores `progress` lines.
 
@@ -127,6 +133,7 @@ A task, read from the log:
   "steps": {},
   "units": { "T1": "done", "T2": "in_progress" },
   "choices": { "tickets": "no" },
+  "unconfirmed": ["D3"],
   "pr": { "url": null, "round": 0 },
   "hub": null,
   "updated": "2026-10-26T13:52:00Z"
@@ -146,14 +153,15 @@ Derived by `agentic.ts state` (also run by `start`, `event`, `decide`) from the 
 | `tickets`, `issues`, `pr` | Merged from `artifact` data |
 | `hub` | Optional. Latest `artifact` `data.hub` (GitHub issue number), else numeric `choice` `hub`, else `null` (project has no hub) |
 | `steps` | Per playbook step (events whose `workflow` is a playbook, `step` not null) of the current pass, i.e. after that playbook's latest workflow-level `completed`: `in_progress` on `started`, `done` on `completed`, `failed` on `failed`. Cleanup events (`step = cleanup` or `data.skill = cleanup`) never open a pass: ignored here |
-| `units` | Latest status per `task` of `implement` events: plan tasks, tickets, fix groups. `in_progress` on the subagent `started`; `done` on a green gate (`step: checks`, `completed`) naming it; `failed` on a `failed` with `step: implement` (subagent failed, or stopped after `limits.implement.retries`); `skipped` on a `choice` `unit.{task}` = `skip`; pending again on an `interrupted` `failed`. Red gates don't change it. Absent → pending |
+| `units` | Latest status per `task` of `implement` events: plan tasks, tickets, fix groups. `in_progress` on the subagent `started`; `done` on a green gate (`step: checks`, `completed`) naming it, or on a PR merge (`babysit-pr` `completed`) after its subagent `completed`; `failed` on a `failed` with `step: implement` (subagent failed, or stopped after `limits.implement.retries`); `skipped` on a `choice` `unit.{task}` = `skip`; pending again on an `interrupted` `failed`. Red gates don't change it. Absent → pending |
 | `choices` | Latest `value` per `data.choice.key` |
-| `status` | `archived` once `cleanup` completes (`cleanup check` also needs the PR merged and branch + worktree gone); else `awaiting_decision` if any escalation `open`; else `blocked` if latest `failed` has `data.blocked`; else from the latest workflow-level event (`step: null`, cleanup events excluded as above), so a new pass after `completed` reads as not done: `failed` → `failed`; `completed` of `babysit-pr` or a playbook (`implement-feature`, `change-feature`, `debug`, `pr-review`, `security-audit`) → `done`; anything else → `in_progress` |
+| `unconfirmed` | Ids of `decision` events with `data.unconfirmed`, minus ids a `gate` event names (`{decision}` or `{passed: true, decisions}`) |
+| `status` | `archived` once `cleanup` completes (`cleanup check` also needs the PR merged and branch + worktree gone); else `awaiting_decision` if any escalation `open`; else `blocked` if latest `failed` has `data.blocked` and no workflow-level `completed` came after it; else from the latest workflow-level event (`step: null`, cleanup events excluded as above), so a new pass after `completed` reads as not done: `failed` → `failed`; `completed` of `babysit-pr` or a playbook (`implement-feature`, `change-feature`, `debug`, `pr-review`, `security-audit`) → `done` only when no playbook run is open (started, no workflow-level `completed` or `failed` for its run); anything else → `in_progress`. While a playbook run is open, `resume` names `next: /agentic-{playbook} {slug}` plus the first ticket with a unit not done, and `start` of `implement`, `review` or `babysit-pr` warns on stderr |
 | `updated` | `ts` of the last event |
 
 ## Resume
 
-Resume = run `agentic.ts resume` for the state summary (the compact hook injects the same output). Any agentic skill given a slug resumes its work item, from any harness: `/agentic-<skill> <slug>` (Claude Code, Cursor) or `$agentic-<skill> <slug>` (Codex). Same machine only: `{output}` is gitignored in the main checkout and `workspace.path` is absolute.
+Resume = run `agentic.ts resume` for the state summary (`resume` stays ≤15 lines). The compact hook injects that output plus a card of ≤6 fixed lines, compact-only: the next skill call, helper-only logging, model and effort as printed, survey note and baseline gate before implement, `unconfirmed: <ids>` (`none` when empty). Any agentic skill given a slug resumes its work item, from any harness: `/agentic-<skill> <slug>` (Claude Code, Cursor) or `$agentic-<skill> <slug>` (Codex). Same machine only: `{output}` is gitignored in the main checkout and `workspace.path` is absolute.
 
 Before logging the new run's `started`, in order:
 

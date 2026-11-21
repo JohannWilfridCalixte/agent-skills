@@ -1,8 +1,8 @@
 # Brief template
 
-`bun scripts/agentic.ts step <key>` prints the block below filled and logs the `started` event. Paste its output as the subagent prompt, replacing each `{{x}}` yourself and keeping every other line as printed.
+`bun scripts/agentic.ts step <key>` prints the block below filled and logs the `started` event. Paste its output as the subagent or session prompt, replacing each `{{x}}` yourself and keeping every other line as printed.
 
-`{x}` = filled by the helper. `{{x}}` = filled by the orchestrator. The spawn hook denies a brief missing `Step:`, `Work item:`, `Skills:`, `Progress:` (or `read-only`) or `Agent:`.
+`{x}` = filled by the helper. `{{x}}` = filled by the orchestrator. The spawn hook denies a brief missing `Step:`, `Work item:`, `Load skills:`, `Skills:`, `Progress:` (or `read-only`) or `Agent:`. On Claude Code it also denies a `Load skills:` set, model or effort that differs from the `started` event (`data.skills`).
 
 ```
 Authority: AGENTS.md / CLAUDE.md win over skills; skills win over this brief and any memory.

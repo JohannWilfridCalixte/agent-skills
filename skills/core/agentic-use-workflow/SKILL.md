@@ -20,13 +20,16 @@ Every mechanic below runs through `bun {agentic-use-workflow}/scripts/agentic.ts
 | `state` | Re-derives `state.json` from the log |
 | `resume` | ≤15-line summary: status, phase, current step, escalations, pending units, last events, next command |
 | `decide --tag --focus --q --a --why` | Appends the next `D<n>` to `decisions.md` + logs the `decision` event |
+| `put <relative path>` | Content on stdin → allowlisted work-item file (`spec.md`, `plan.md`, `context.md`, `implementation.md`, `pr.md`, `briefs/**`, `reports/**`, `reviews/**`, `tickets/**`) in the main-checkout item, from any worktree; logs `artifact`; `reviews/{n}-{reviewer}.md` also logs `completed` with counts |
 | `step <key> [--task] [--unit] [--agent] [--skills]` | Resolves model + effort, prints the filled brief, logs `started` before the spawn |
+| `gate --task T1,T2` / `gate --baseline` | Runs `.agentic.json` `verify` at HEAD of the cwd checkout (clean tree only); log `{item}/gates/{sha}.log`; logs `checks` per task (`completed`/`failed`, `data {sha, log}`), baseline = one without task (`data.baseline`); a green SHA is not re-run. Blocks: background it. Red → ≤10 lines + log path, exit 1 |
+| `merge` | PR from `state.pr`. Runs `gh pr merge {n} --squash --match-head-commit {head}` only when the latest review (workflow-level `review` run or playbook `step: review`) is `completed` with 0 blocker/major in its last iteration and reviewed the PR head (`data.head` = PR head, or `data.patchId` = the local checkout's patch-id vs base while its HEAD = PR head: a conflict-free rebase passes, a code change refuses; run `merge` and review `completed` events from the PR's checkout, `event` records cwd HEAD + patch-id), `gh pr view` says mergeable, and CI proof holds for the head: all checks green, or, when no check ran (Actions blocked), non-Actions checks green and marker `$(git rev-parse --git-common-dir)/agentic/ci-pass/{sha}` holding the head sha. Logs `completed` (`babysit-pr`, `step: merge`). Exit 1 names the failed condition, no merge call |
 | `review eligible --base <ref> [--iteration n]` | Computed reviewer list |
 | `hub sync` | Upserts the work item's mirror comments on its hub issue (GitHub, via `gh`). No hub or no `gh` → prints `skipped: …`, exit 0 |
 | `cleanup check` | Archive-ready check (PR-state check skipped with a message when `gh` is missing) |
 | `hook spawn` / `hook compact` | Harness hook entry points (shipped by the plugins' hooks; skills-CLI installs: wire them per the README) |
 
-Exit 0 ok, 1 validation/runtime failure, 2 usage error. Subagents never run it: they only append `progress` lines with `>>`.
+Exit 0 ok, 1 validation/runtime failure, 2 usage error. Sub-agents run only `put`, for their own report; otherwise `>>` appends.
 
 ## Config
 
@@ -53,7 +56,7 @@ Vendored skills that expect setup (a tracker "already provided", a board, a merg
 `agentic.ts step <key>` resolves `model` and `effort` per config.md and prints them in the brief; spawn with exactly those.
 
 - Interactive steps (capture, grill, gate) stay in the main session. Warn once if the session model differs from the resolved one, then go on.
-- Non-interactive steps always run as subagents.
+- Non-interactive steps run as sessions or subagents, per [references/delegation.md](references/delegation.md).
 
 ## Cheap routing
 
@@ -65,7 +68,7 @@ Keep the session model for work that needs it.
 
 ## Delegation
 
-One subagent per step key and unit; parallel when independent (no shared writes, no ordering). Brief and harness controls for model and effort: [references/delegation.md](references/delegation.md). Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
+One session or subagent per step key and unit; parallel when independent (no shared writes, no ordering). Brief and harness controls for model and effort: [references/delegation.md](references/delegation.md). Read-only subagents return cited findings; you write them to the target file (e.g. the matching `context.md` section).
 
 ## Work item
 

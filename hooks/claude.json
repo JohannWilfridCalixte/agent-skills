@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Agent|mcp__ccd_session__start_session",
         "hooks": [
           {
             "type": "command",
@@ -19,6 +19,17 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" compact --harness claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" subagent-stop --harness claude",
             "timeout": 30
           }
         ]

@@ -1,6 +1,11 @@
 {
-  "_source": "https://code.claude.com/docs/en/hooks, doc-derived 2026-11-08, not captured",
-  "session_id": "sess-0001-fake", "transcript_path": "/home/dev/.claude/projects/demo/sess-0001-fake.jsonl", "cwd": "/home/dev/demo", "permission_mode": "default",
+  "_source": "captured 2026-11-15, Claude Code 2.1.325, headless nested session, sanitised",
+  "session_id": "sess-0001",
+  "transcript_path": "/home/dev/.claude/projects/demo/sess-0001.jsonl",
+  "cwd": "/repo",
+  "scratchpad_dir": "/tmp/scratchpad",
+  "prompt_id": "prompt-0001",
   "hook_event_name": "SessionStart",
-  "source": "compact"
+  "source": "compact",
+  "model": "claude-opus-5-5"
 }

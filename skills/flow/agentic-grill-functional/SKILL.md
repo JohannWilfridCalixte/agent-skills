@@ -6,10 +6,10 @@ argument-hint: "[slug | topic]"
 
 Builds on `grilling` and the `agentic-use-knowledge` read pass, both loaded by `agentic-grill-me`.
 
-Call the Skill tool with "agentic-grill-me", passing focus `functional` and this skill's argument (no Skill tool → open `../agentic-grill-me/SKILL.md` and follow it).
+Call the Skill tool with "agentic-grill-me" unless already loaded, passing focus `functional` and this skill's argument (no Skill tool → open `../agentic-grill-me/SKILL.md` and follow it).
 
 Functional focus: behaviours, flows, states, edge cases, errors, permissions, acceptance. Problem and scope belong to `agentic-grill-product`, design to `agentic-grill-tech`.
 
-- Each behaviour lands as a Given / When / Then the user confirmed: these become the spec's acceptance criteria. Each never-cut item the feature touches gets its own.
+- Each behaviour lands as a Given / When / Then the user confirmed: these become the spec's acceptance criteria. Each never-cut item the feature touches gets its own. Spec approval confirms the criteria in bulk when each cites a decision id; otherwise Given / When / Then batches of at most 5.
 - Changing existing behaviour → grill the delta from the current behaviour, including what it breaks: data destroyed or exposed, flows that stop working.
 - Reuse existing flows and UX patterns: the house pattern beats a new one.

@@ -4449,14 +4449,72 @@ describe('manager hooks', () => {
       return out.slice(out.indexOf('Manager unit:'));
     };
 
-    test('no ledger allows', () => {
-      expect(spawn('Manager unit: a\nWork item: none\n\nanything')).toEqual(silent);
+    test('no ledger with a Manager unit line denies naming the brief command', () => {
+      const result = spawn('Manager unit: a\nWork item: none\n\nanything');
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('manager brief a');
     });
 
-    test('a prompt without a Manager unit line keeps today behaviour', () => {
+    test('no ledger keeps a prompt without the line unchanged', () => {
+      expect(spawn('Work item: none\n\nTask: look around')).toEqual(silent);
+    });
+
+    test('from the manager cwd a prompt without the line denies naming both forms', () => {
+      ledgerWithUnit();
+      const result = spawn('Work item: none\n\nTask: look around');
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('Manager unit: <id>');
+      expect(result.err).toContain('Manager unit: none');
+      expect(result.err).toContain('manager brief');
+    });
+
+    test('from the manager cwd Manager unit: none skips the manager check', () => {
       ledgerWithUnit();
 
-      expect(spawn('Work item: none\n\nTask: look around')).toEqual(silent);
+      expect(spawn('Manager unit: none\nWork item: none\n\nTask: look around')).toEqual(silent);
+    });
+
+    test('an Agent spawn from the manager cwd without the line is unchanged', () => {
+      ledgerWithUnit();
+
+      expect(runHook('spawn', { cwd: sandbox, tool_name: 'Agent', tool_input: { prompt: 'Task: look around' } })).toEqual(silent);
+    });
+
+    test('from another cwd a prompt without the line is unchanged', () => {
+      ledgerWithUnit();
+
+      expect(runHook('spawn', { ...JSON.parse(startSessionPayload('Task: x')), cwd: unitPath() })).toEqual(silent);
+    });
+
+    test('Manager unit: none still runs the work-item checks', () => {
+      const workspace = join(sandbox, 'ws');
+      mkdirSync(workspace);
+      writeLog('20261108-demo', [{ workflow: 'implement', type: 'started', data: { workspace: { path: workspace, branch: 'b' } } }]);
+      const brief = `Manager unit: none\nStep: implement\nWork item: ${itemDir('20261108-demo')}`;
+      const result = runHook('spawn', { ...JSON.parse(startSessionPayload(brief)), cwd: workspace });
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('spawn blocked');
+    });
+
+    test('a corrupt ledger line is skipped and the brief still checks', () => {
+      ledgerWithUnit();
+      const prompt = promptOf();
+      appendFileSync(join(managerDir(), 'events.jsonl'), '{"ts":"2026-11-21T11:00:00Z","type":"unit-s');
+
+      expect(spawn(prompt)).toEqual(silent);
+      expect(spawn('Manager unit: ghost\nWork item: none').code).toBe(2);
+    });
+
+    test('an unreadable ledger denies a Manager unit brief', () => {
+      ledgerWithUnit();
+      const prompt = promptOf();
+      rmSync(join(managerDir(), 'events.jsonl'));
+      mkdirSync(join(managerDir(), 'events.jsonl'));
+
+      expect(spawn(prompt).code).toBe(2);
     });
 
     test('the printed brief with matching model and effort allows', () => {
@@ -4602,6 +4660,18 @@ describe('manager hooks', () => {
       expect(runHook('compact', compactPayload(other))).toEqual(silent);
     });
 
+    test('a corrupt ledger still injects the work-item resume', () => {
+      const workspace = join(sandbox, 'ws');
+      mkdirSync(workspace);
+      writeLog('20261108-demo', [{ type: 'started', data: { workspace: { path: workspace, branch: 'b' } } }]);
+      startedLedger();
+      appendFileSync(join(managerDir(), 'events.jsonl'), 'not json\n');
+      const result = runHook('compact', compactPayload(workspace));
+
+      expect(result.code).toBe(0);
+      expect(contextOf(result.out)).toContain('work: 20261108-demo');
+    });
+
     test('no ledger keeps the work-item resume only', () => {
       const workspace = join(sandbox, 'ws');
       mkdirSync(workspace);
@@ -4641,10 +4711,83 @@ describe('manager hooks', () => {
       expect(runHook('ask', askPayload(nested)).code).toBe(2);
     });
 
-    test('denies for a paused unit', () => {
-      ledgerWithUnit({ state: 'paused' });
+    test.each(['running', 'waiting', 'pr', 'paused'])('denies a %s unit', (state) => {
+      ledgerWithUnit({ state });
 
       expect(runHook('ask', askPayload(unitPath())).code).toBe(2);
+    });
+
+    test('a corrupt ledger line is skipped: the unit is still denied', () => {
+      ledgerWithUnit();
+      appendFileSync(join(managerDir(), 'events.jsonl'), '{"ts":"x","type":\n');
+
+      expect(runHook('ask', askPayload(unitPath())).code).toBe(2);
+    });
+
+    test('an unreadable ledger allows', () => {
+      ledgerWithUnit();
+      rmSync(join(managerDir(), 'events.jsonl'));
+      mkdirSync(join(managerDir(), 'events.jsonl'));
+
+      expect(runHook('ask', askPayload(unitPath()))).toEqual(silent);
+    });
+
+    describe('first turn before the path is recorded', () => {
+      const queuedOnBranch = (branch: string, extra: Record<string, unknown> = {}) => {
+        const checkout = join(sandbox, 'checkouts', 'first');
+        mkdirSync(checkout, { recursive: true });
+        git(checkout, ['init', '-q', '-b', branch]);
+        startedLedger([unitAdd('a', extra)]);
+
+        return checkout;
+      };
+
+      test('denies a queued unit whose id is the branch', () => {
+        expect(runHook('ask', askPayload(queuedOnBranch('a'))).code).toBe(2);
+      });
+
+      test('denies on the app-prefixed and suffixed branch', () => {
+        expect(runHook('ask', askPayload(queuedOnBranch('claude/a-8a68c6'))).code).toBe(2);
+      });
+
+      test('denies on the recorded branch', () => {
+        expect(runHook('ask', askPayload(queuedOnBranch('feature/login', { branch: 'feature/login' }))).code).toBe(2);
+      });
+
+      test('allows an unrelated branch', () => {
+        expect(runHook('ask', askPayload(queuedOnBranch('claude/ab-8a68c6')))).toEqual(silent);
+      });
+
+      test('allows an attended unit', () => {
+        expect(runHook('ask', askPayload(queuedOnBranch('a', { attended: true })))).toEqual(silent);
+      });
+
+      test('the longest matching id wins', () => {
+        const checkout = join(sandbox, 'checkouts', 'longest');
+        mkdirSync(checkout, { recursive: true });
+        git(checkout, ['init', '-q', '-b', 'a-b']);
+        startedLedger([unitAdd('a'), unitAdd('a-b')]);
+
+        expect(JSON.parse(runHook('ask', askPayload(checkout)).out).hookSpecificOutput.permissionDecisionReason).toContain('relayed unit a-b');
+      });
+
+      test('the path match wins over the branch match', () => {
+        mkdirSync(unitPath(), { recursive: true });
+        git(unitPath(), ['init', '-q', '-b', 'b']);
+        startedLedger([unitAdd('a', { path: unitPath(), state: 'running' }), unitAdd('b')]);
+
+        expect(JSON.parse(runHook('ask', askPayload(unitPath())).out).hookSpecificOutput.permissionDecisionReason).toContain('relayed unit a');
+      });
+
+      test('a linked worktree nested in a unit path is not that unit', () => {
+        git(sandbox, ['init', '-q', '-b', 'main']);
+        git(sandbox, ['commit', '-q', '--allow-empty', '-m', 'init']);
+        const nested = join(sandbox, 'trees', 'nested');
+        git(sandbox, ['worktree', 'add', '-q', '-b', 'nested', nested]);
+        startedLedger([unitAdd('a', { path: join(sandbox, 'trees'), state: 'running' })]);
+
+        expect(runHook('ask', askPayload(realpathSync(nested)))).toEqual(silent);
+      });
     });
 
     test('allows without a ledger', () => {
@@ -4703,6 +4846,128 @@ describe('manager hooks', () => {
       expect(fixture.tool_name).toBe('AskUserQuestion');
       expect(runHook('ask', { ...fixture, cwd: unitPath() }).code).toBe(2);
       expect(runHook('ask', { ...fixture, cwd: '/repo' })).toEqual(silent);
+    });
+  });
+});
+
+describe('manager review fixes', () => {
+  test('a summary set on a finished unit does not re-offer the backlog', () => {
+    startedLedger([unitAdd('a', { state: 'merged' })]);
+    managerOk(['backlog', 'add', '--title', 'flaky seed', '--from', 'a']);
+    managerOk(['status']);
+    managerOk(['unit', 'set', 'a', '--summary', 'shipped']);
+    managerOk(['unit', 'set', 'a', '--state', 'merged']);
+
+    expect(managerOk(['status'])).not.toContain('re-offer');
+  });
+
+  test('a unit turning merged still re-offers the backlog', () => {
+    startedLedger([unitAdd('a', { state: 'running' })]);
+    managerOk(['backlog', 'add', '--title', 'flaky seed', '--from', 'a']);
+    managerOk(['status']);
+    managerOk(['unit', 'set', 'a', '--state', 'merged']);
+
+    expect(managerOk(['status'])).toContain('re-offer B1');
+  });
+
+  describe('numeric unit ids keep add order', () => {
+    beforeEach(() => {
+      writeProjectConfig({ limits: { 'manager.parallel': 1 } });
+      startedLedger([unitAdd('b'), unitAdd('42'), unitAdd('7')]);
+    });
+
+    test('start lines follow add order under the cap', () => {
+      const out = managerOk(['status']);
+
+      expect(out).toContain('start b');
+      expect(out).not.toContain('start 7');
+      expect(out).not.toContain('start 42');
+    });
+
+    test('the status table, brief siblings and unseen lines follow add order', () => {
+      const rows = managerOk(['status']).split('\n').slice(1, 4).map((row) => row.split(' | ')[0]);
+      expect(rows).toEqual(['b', '42', '7']);
+
+      expect(managerOk(['brief', 'b']).match(/^- (\S+) \(queued\)/gm)).toEqual(['- 42 (queued)', '- 7 (queued)']);
+
+      managerOk(['unit', 'set', '7', '--state', 'running']);
+      managerOk(['unit', 'set', '42', '--state', 'running']);
+      expect(managerOk(['beat'])).toBe('42 unseen\n7 unseen\n');
+    });
+  });
+
+  describe('prototype keys are not ledger entries', () => {
+    beforeEach(() => {
+      startedLedger([unitAdd('a'), { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] }]);
+    });
+
+    test.each([
+      ['unit set constructor', ['unit', 'set', 'constructor', '--state', 'running']],
+      ['unit add with a prototype dep', ['unit', 'add', 'b', '--title', 't', '--kind', 'free', '--deps', 'toString', '--dep-mode', 'wait']],
+      ['question answer __proto__', ['question', 'answer', '__proto__', '--answer', 'x', '--by', 'user']],
+      ['manager answer on preset:toString', ['question', 'answer', 'Q1', '--by', 'manager', '--answer', 'x', '--basis', 'preset:toString']],
+    ])('%s exits 1 and appends nothing', (_label, args) => {
+      const before = managerLog().length;
+
+      expect(manager(args).code).toBe(1);
+      expect(managerLog()).toHaveLength(before);
+    });
+  });
+
+  test('unit id none is reserved', () => {
+    managerOk(['start']);
+
+    expect(manager(['unit', 'add', 'none', '--title', 't', '--kind', 'free']).code).toBe(1);
+  });
+
+  describe('manager commands from a unit session', () => {
+    const unitPath = () => join(sandbox, 'trees', 'a');
+    const fromUnit = (args: readonly string[]) => manager(args, { cwd: unitPath() });
+
+    beforeEach(() => {
+      mkdirSync(unitPath(), { recursive: true });
+      startedLedger([
+        unitAdd('a', { path: unitPath(), state: 'running' }),
+        { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] },
+      ]);
+    });
+
+    test.each([
+      ['start', ['start']],
+      ['unit set', ['unit', 'set', 'a', '--attended', 'true']],
+      ['question answer', ['question', 'answer', 'Q1', '--by', 'user', '--answer', 'pg']],
+      ['rule add', ['rule', 'add', 'always pg']],
+      ['backlog add', ['backlog', 'add', '--title', 't', '--from', 'a']],
+      ['beat', ['beat']],
+      ['status', ['status']],
+    ])('%s exits 1 and appends nothing', (_label, args) => {
+      const before = managerLog().length;
+      const result = fromUnit(args);
+
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('manager session only');
+      expect(managerLog()).toHaveLength(before);
+    });
+
+    test('the manager cwd still works', () => {
+      managerOk(['rule', 'add', 'always pg']);
+
+      expect(managerLog().at(-1)).toMatchObject({ type: 'rule-add' });
+    });
+
+    test('a unit whose path equals the manager cwd does not block the manager', () => {
+      startedLedger([unitAdd('a', { path: sandbox, state: 'running' })]);
+
+      managerOk(['rule', 'add', 'always pg']);
+    });
+
+    test('a queued unit found by branch is refused too', () => {
+      const checkout = join(sandbox, 'checkouts', 'first');
+      mkdirSync(checkout, { recursive: true });
+      git(checkout, ['init', '-q', '-b', 'claude/b-8a68c6']);
+      startedLedger([unitAdd('b')]);
+
+      expect(manager(['rule', 'add', 'x'], { cwd: checkout }).code).toBe(1);
     });
   });
 });

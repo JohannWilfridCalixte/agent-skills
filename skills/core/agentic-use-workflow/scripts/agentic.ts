@@ -2310,7 +2310,9 @@ const traceBlocked = async (workItem: string | undefined, entry: { harness: stri
   });
 };
 
-const managerSpawnIssues = (state: ManagerState, id: string, payload: Record<string, unknown>, brief: string) => {
+const managerSpawnIssues = (state: ManagerState | undefined, id: string, payload: Record<string, unknown>, brief: string) => {
+  if (state === undefined) return { issues: ['no readable manager ledger'], expected: '' };
+
   const unit = state.units[id];
   if (unit === undefined) return { issues: [`unit "${id}" is not in the ledger`], expected: '' };
 
@@ -2328,9 +2330,25 @@ const managerSpawnIssues = (state: ManagerState, id: string, payload: Record<str
   return { issues, expected: ` (model ${claudeAlias('claude', unit.model)}, effort ${unit.effort})` };
 };
 
-const checkManagerSpawn = (context: Context, adapter: HookAdapter, payload: Record<string, unknown>, brief: string, id: string) => {
-  const state = loadManagerState(managerPaths(context));
-  if (state === undefined) return;
+const managerBriefCommand = (id: string) => `bun ${join(import.meta.dir, 'agentic.ts')} manager brief ${id}`;
+
+const checkManagerSpawn = (context: Context, adapter: HookAdapter, payload: Record<string, unknown>, tool: string | undefined, brief: string) => {
+  const id = briefLine(brief, 'Manager unit');
+  if (id === 'none') return;
+
+  const state = hookManagerState(context);
+  if (id === undefined) {
+    if (state === undefined || tool !== 'mcp__ccd_session__start_session' || !isManagerCwd(state, hookCwd(context, payload))) return;
+
+    adapter.deny(
+      [
+        'spawn blocked: a session started from the manager needs a `Manager unit: <id>` line, or `Manager unit: none` for a session outside the ledger',
+        `fix: run \`${managerBriefCommand('<id>')}\` and paste its prompt, or add \`Manager unit: none\``,
+      ].join('\n'),
+    );
+
+    return;
+  }
 
   const { issues, expected } = managerSpawnIssues(state, id, payload, brief);
   if (issues.length === 0) return;
@@ -2338,7 +2356,7 @@ const checkManagerSpawn = (context: Context, adapter: HookAdapter, payload: Reco
   adapter.deny(
     [
       `spawn blocked, manager unit ${id}: ${issues.join(', ')}`,
-      `fix: run \`bun ${join(import.meta.dir, 'agentic.ts')} manager brief ${id}\` and paste its prompt, with the printed model and effort${expected}`,
+      `fix: run \`${managerBriefCommand(id)}\` and paste its prompt, with the printed model and effort${expected}`,
     ].join('\n'),
   );
 };
@@ -2361,11 +2379,7 @@ const hookSpawnCommand: Command = {
     if (tool !== undefined && !spawnToolNames[harness]?.includes(tool)) return;
 
     const brief = adapter.prompt(payload);
-    const managerUnit = harness === 'claude' && brief !== undefined ? briefLine(brief, 'Manager unit') : undefined;
-    if (managerUnit !== undefined) {
-      checkManagerSpawn(context, adapter, payload, brief ?? '', managerUnit);
-      return;
-    }
+    if (harness === 'claude') checkManagerSpawn(context, adapter, payload, tool, brief ?? '');
 
     const item = await findHookItem(context, hookCwd(context, payload), brief === undefined ? undefined : briefLine(brief, 'Work item'));
     if (item === undefined || brief === undefined || /^[ \t]*Work item:[ \t]*none\b/m.test(brief)) return;
@@ -2529,6 +2543,7 @@ const hookCompactCommand: Command = {
 
 const unitStates = ['queued', 'running', 'waiting', 'paused', 'pr', 'merged', 'done', 'failed'];
 const activeStates = ['running', 'waiting', 'pr'];
+const liveUnitStates = [...activeStates, 'paused'];
 const closedStates = ['merged', 'done', 'failed'];
 const unitKinds = ['playbook', 'free', 'sidequest', 'adopted'];
 const depModes = ['wait', 'stacked'];
@@ -2589,6 +2604,7 @@ interface ManagerBacklogEntry {
 interface ManagerState {
   cwd: string | null;
   units: Record<string, ManagerUnit>;
+  order: string[];
   questions: Record<string, ManagerQuestion>;
   rules: Record<string, string>;
   backlog: Record<string, ManagerBacklogEntry>;
@@ -2618,11 +2634,16 @@ const managerPaths = (context: Context): ManagerPaths => {
   return { dir, events: join(dir, 'events.jsonl'), state: join(dir, 'state.json'), decisions: join(dir, 'decisions.md') };
 };
 
+const dictionary = <T>(): Record<string, T> => Object.create(null);
+
 const stringRecord = (value: unknown): Record<string, string> =>
-  Object.fromEntries(Object.entries(isRecord(value) ? value : {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+  Object.assign(
+    dictionary<string>(),
+    Object.fromEntries(Object.entries(isRecord(value) ? value : {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+  );
 
 const blankUnit = (): ManagerUnit => ({
-  title: '', kind: 'free', playbook: null, input: null, model: 'default', effort: 'default', deps: [], depMode: null, presets: {},
+  title: '', kind: 'free', playbook: null, input: null, model: 'default', effort: 'default', deps: [], depMode: null, presets: dictionary(),
   for: null, state: 'queued', session: null, path: null, branch: null, pr: null, attended: false, pausedBy: null, summary: null,
   marker: null, misses: 0,
 });
@@ -2651,11 +2672,13 @@ const applyManagerEvent = (state: ManagerState, event: ManagerEvent, index: numb
       for: textOf(event.for) ?? null,
     };
     applyUnitChanges(state.units[id], event);
+    if (!state.order.includes(id)) state.order.push(id);
   }
 
   if (event.type === 'unit-set' && unit !== undefined) {
+    const before = unit.state;
     applyUnitChanges(unit, event);
-    if (closedStates.includes(unit.state) && unit.state !== 'failed') state.lastFinished = index;
+    if (before !== unit.state && (unit.state === 'done' || unit.state === 'merged')) state.lastFinished = index;
   }
 
   if (event.type === 'question-open') {
@@ -2716,7 +2739,7 @@ const applyManagerEvent = (state: ManagerState, event: ManagerEvent, index: numb
 
 const deriveManager = (events: readonly ManagerEvent[]) => {
   const state: ManagerState = {
-    cwd: null, units: {}, questions: {}, rules: {}, backlog: {}, usage: null, released: [], lastStatus: -1, lastFinished: -1, updated: null,
+    cwd: null, units: dictionary(), order: [], questions: dictionary(), rules: dictionary(), backlog: dictionary(), usage: null, released: [], lastStatus: -1, lastFinished: -1, updated: null,
   };
   events.forEach((event, index) => {
     applyManagerEvent(state, event, index);
@@ -2726,32 +2749,93 @@ const deriveManager = (events: readonly ManagerEvent[]) => {
   return state;
 };
 
-const readManagerEvents = (paths: ManagerPaths) =>
+const parseManagerLine = (line: string): ManagerEvent | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(line);
+
+    return isRecord(parsed) && typeof parsed.ts === 'string' && typeof parsed.type === 'string' ? { ...parsed, ts: parsed.ts, type: parsed.type } : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const readManagerEvents = (paths: ManagerPaths, lenient: boolean) =>
   readFileSync(paths.events, 'utf8')
     .split('\n')
     .map((line, index) => ({ line, lineNumber: index + 1 }))
     .filter(({ line }) => line.trim() !== '')
-    .map(({ line, lineNumber }) => {
-      const parsed: unknown = (() => {
-        try {
-          return JSON.parse(line);
-        } catch {
-          return undefined;
-        }
-      })();
-      if (!isRecord(parsed) || typeof parsed.ts !== 'string' || typeof parsed.type !== 'string') {
-        throw new CliError(1, `_manager/events.jsonl line ${lineNumber}: expected a JSON object with ts and type`, false);
-      }
+    .flatMap(({ line, lineNumber }) => {
+      const event = parseManagerLine(line);
+      if (event !== undefined) return [event];
+      if (lenient) return [];
 
-      return { ...parsed, ts: parsed.ts, type: parsed.type };
+      throw new CliError(1, `_manager/events.jsonl line ${lineNumber}: expected a JSON object with ts and type`, false);
     });
 
-const loadManagerState = (paths: ManagerPaths) => (existsSync(paths.events) ? deriveManager(readManagerEvents(paths)) : undefined);
+const loadManagerState = (paths: ManagerPaths) => (existsSync(paths.events) ? deriveManager(readManagerEvents(paths, false)) : undefined);
+
+const hookManagerState = (context: Context) => {
+  try {
+    const paths = managerPaths(context);
+
+    return existsSync(paths.events) ? deriveManager(readManagerEvents(paths, true)) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const isManagerCwd = (state: ManagerState, cwd: string) => state.cwd !== null && realPathOrSelf(state.cwd) === realPathOrSelf(cwd);
+
+const unitPathMatches = (state: ManagerState, here: string) => {
+  const linked = linkedWorktrees(here).map(realPathOrSelf);
+
+  return Object.entries(state.units).flatMap(([id, unit]) => {
+    const path = unit.path === null ? undefined : realPathOrSelf(unit.path);
+    if (path === undefined || !liveUnitStates.includes(unit.state) || !isInside(here, path)) return [];
+
+    const nestedWorktree = linked.some((worktree) => worktree !== path && isInside(worktree, path) && isInside(here, worktree));
+
+    return nestedWorktree ? [] : [{ id, unit, path }];
+  });
+};
+
+const unitBranchMatches = (state: ManagerState, here: string) => {
+  const branch = gitOutput(here, ['branch', '--show-current'])?.trim();
+  if (branch === undefined || branch === '') return [];
+
+  const leaf = branch.split('/').at(-1) ?? branch;
+
+  return Object.entries(state.units).flatMap(([id, unit]) => {
+    const named = new RegExp(`^${id}(-[0-9a-f]+)?$`).test(leaf) || unit.branch === branch || unit.branch === leaf;
+    const reachable = unit.state === 'queued' || liveUnitStates.includes(unit.state);
+
+    return !unit.attended && reachable && named ? [{ id, unit, path: here }] : [];
+  });
+};
+
+const unitAt = (state: ManagerState, cwd: string) => {
+  const here = realPathOrSelf(cwd);
+  const byPath = unitPathMatches(state, here);
+  const matches = byPath.length > 0 ? byPath : unitBranchMatches(state, here);
+
+  return matches.sort((left, right) => right.path.length - left.path.length || right.id.length - left.id.length)[0];
+};
+
+const refuseFromUnit = (state: ManagerState, cwd: string) => {
+  if (isManagerCwd(state, cwd)) return;
+
+  const match = unitAt(state, cwd);
+  if (match !== undefined && !isManagerCwd(state, match.path)) {
+    throw new CliError(1, `manager commands run from the manager session only (cwd is inside unit ${match.id})`, false);
+  }
+};
 
 const requireManager = (context: Context) => {
   const paths = managerPaths(context);
   const state = loadManagerState(paths);
   if (state === undefined) throw new CliError(1, 'no manager ledger: run manager start', false);
+
+  refuseFromUnit(state, context.cwd);
 
   return { paths, state };
 };
@@ -2759,7 +2843,7 @@ const requireManager = (context: Context) => {
 const recordManagerEvent = async (paths: ManagerPaths, event: Omit<ManagerEvent, 'ts'>) => {
   await mkdir(paths.dir, { recursive: true });
   await appendFile(paths.events, `${JSON.stringify({ ts: nowTimestamp(), ...event })}\n`);
-  const state = deriveManager(readManagerEvents(paths));
+  const state = deriveManager(readManagerEvents(paths, false));
   await writeFile(paths.state, `${JSON.stringify(state, null, 2)}\n`);
 
   return state;
@@ -2835,7 +2919,7 @@ const renderBrief = (state: ManagerState, id: string) => {
 
   const source = stackedBranch(state, id, unit);
   const presets = Object.entries(unit.presets).map(([key, value]) => `- ${key}: ${value}`);
-  const siblings = Object.entries(state.units)
+  const siblings = orderedUnits(state)
     .filter(([other, sibling]) => other !== id && !closedStates.includes(sibling.state))
     .map(([other, sibling]) => `- ${other} (${sibling.state}): ${sibling.title}`);
   const sections = [
@@ -2852,6 +2936,13 @@ const renderBrief = (state: ManagerState, id: string) => {
   return { startLine, prompt: sections.filter((section) => section !== '').join('\n\n') };
 };
 
+const orderedUnits = (state: ManagerState) =>
+  state.order.flatMap((id): [string, ManagerUnit][] => {
+    const unit = state.units[id];
+
+    return unit === undefined ? [] : [[id, unit]];
+  });
+
 const activeCount = (state: ManagerState) => Object.values(state.units).filter((unit) => activeStates.includes(unit.state)).length;
 
 const stackedDepsReady = (state: ManagerState, unit: ManagerUnit) =>
@@ -2859,7 +2950,7 @@ const stackedDepsReady = (state: ManagerState, unit: ManagerUnit) =>
 
 const startableUnits = (state: ManagerState, parallel: number) => {
   const started: string[] = [];
-  for (const [id, unit] of Object.entries(state.units)) {
+  for (const [id, unit] of orderedUnits(state)) {
     if (unit.state !== 'queued' || !stackedDepsReady(state, unit)) continue;
     if (activeCount(state) + started.length >= parallel) break;
     started.push(id);
@@ -2869,7 +2960,7 @@ const startableUnits = (state: ManagerState, parallel: number) => {
 };
 
 const activeWaiters = (state: ManagerState) =>
-  Object.entries(state.units).filter(([, unit]) => activeStates.includes(unit.state) && unit.depMode === 'wait' && unit.deps.length > 0);
+  orderedUnits(state).filter(([, unit]) => activeStates.includes(unit.state) && unit.depMode === 'wait' && unit.deps.length > 0);
 
 const allMerged = (state: ManagerState, deps: readonly string[]) => deps.every((dep) => state.units[dep]?.state === 'merged');
 
@@ -2877,7 +2968,7 @@ const openQuestionOf = (state: ManagerState, unitId: string) =>
   Object.entries(state.questions).find(([, question]) => question.unit === unitId && question.answer === undefined)?.[0];
 
 const statusTable = (state: ManagerState) => {
-  const rows = Object.entries(state.units).map(([id, unit]) =>
+  const rows = orderedUnits(state).map(([id, unit]) =>
     [
       id, unit.state, unit.kind, `${unit.model}/${unit.effort}`, [unit.branch, unit.pr].filter(Boolean).join(' ') || '-',
       unit.attended ? 'yes' : 'no', openQuestionOf(state, id) ?? '-',
@@ -2894,7 +2985,7 @@ const statusReport = (state: ManagerState, limits: ManagerLimits) => {
   const offered = Object.entries(state.backlog)
     .filter(([, entry]) => entry.state === 'open' && (state.lastFinished > entry.lastOffered || entry.raised > entry.lastOffered))
     .map(([id]) => id);
-  const units = Object.entries(state.units);
+  const units = orderedUnits(state);
   const attention = [
     ...Object.entries(state.questions)
       .filter(([, question]) => question.answer === undefined)
@@ -2955,6 +3046,7 @@ const managerStartCommand: Command = {
     const paths = managerPaths(context);
     const cwd = realPathOrSelf(context.cwd);
     let state = loadManagerState(paths);
+    if (state !== undefined) refuseFromUnit(state, context.cwd);
     if (state === undefined) {
       await mkdir(paths.dir, { recursive: true });
       await writeFile(paths.decisions, '# Manager decisions\n');
@@ -3009,6 +3101,7 @@ const unitAddCommand: Command = {
     const [id = ''] = context.positionals;
     const { paths, state } = requireManager(context);
     if (!unitIdShape.test(id)) throw new CliError(1, `invalid unit id "${id}": expected ${unitIdShape.source}`, false);
+    if (id === 'none') throw new CliError(1, 'unit id "none" is reserved', false);
     if (state.units[id] !== undefined) throw new CliError(1, `unit "${id}" already exists`, false);
 
     const title = nonEmptyFlag(context, 'title');
@@ -3241,8 +3334,8 @@ const beatCommand: Command = {
 
       return unit.state === 'running' ? `${id} ${rungOf(unit.misses)} (misses ${unit.misses})` : `${id} idle ${unit.state}`;
     });
-    const unseenLines = Object.entries(next.units)
-      .filter(([id, unit]) => unit.state === 'running' && !(id in seen))
+    const unseenLines = orderedUnits(next)
+      .filter(([id, unit]) => unit.state === 'running' && !Object.hasOwn(seen, id))
       .map(([id]) => `${id} unseen`);
     const { usage: limit } = managerLimits(context);
     const usageLines =
@@ -3269,23 +3362,8 @@ const statusManagerCommand: Command = {
   },
 };
 
-const liveUnitStates = [...activeStates, 'paused'];
-
-const isManagerCwd = (state: ManagerState, cwd: string) => state.cwd !== null && realPathOrSelf(state.cwd) === realPathOrSelf(cwd);
-
-const unitAt = (state: ManagerState, cwd: string) => {
-  const here = realPathOrSelf(cwd);
-  const candidates = Object.entries(state.units).flatMap(([id, unit]) => {
-    const path = unit.path === null ? undefined : realPathOrSelf(unit.path);
-
-    return path !== undefined && liveUnitStates.includes(unit.state) && isInside(here, path) ? [{ id, unit, path }] : [];
-  });
-
-  return candidates.sort((left, right) => right.path.length - left.path.length)[0];
-};
-
 const managerCompactText = (context: Context, cwd: string) => {
-  const state = loadManagerState(managerPaths(context));
+  const state = hookManagerState(context);
   if (state === undefined) return undefined;
   if (isManagerCwd(state, cwd)) return renderStatus(state, managerLimits(context));
 
@@ -3309,7 +3387,7 @@ const hookAskCommand: Command = {
     const tool = payload === undefined ? undefined : textOf(payload.tool_name);
     if (payload === undefined || (tool !== undefined && tool !== 'AskUserQuestion')) return;
 
-    const state = loadManagerState(managerPaths(context));
+    const state = hookManagerState(context);
     const cwd = hookCwd(context, payload);
     if (state === undefined || isManagerCwd(state, cwd)) return;
 

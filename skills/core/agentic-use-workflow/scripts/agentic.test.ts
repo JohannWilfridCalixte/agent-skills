@@ -3975,7 +3975,7 @@ describe('manager brief', () => {
     `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
-    'Merge a PR only after a manager message relays the owner\'s yes for that PR.',
+    'Merge a PR only at the head sha for which a manager message relays the owner\'s yes; head moved since → report `pr-ready` again.',
   ];
 
   test('prints the start line and the exact playbook prompt', () => {
@@ -4556,7 +4556,7 @@ describe('manager hooks', () => {
 
     test('an altered relay block denies', () => {
       ledgerWithUnit();
-      const result = spawn(promptOf().replace('Merge a PR only after', 'Merge a PR anytime after'));
+      const result = spawn(promptOf().replace('Merge a PR only at', 'Merge a PR anytime at'));
 
       expect(result.code).toBe(2);
       expect(result.err).toContain('relay protocol');

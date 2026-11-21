@@ -2881,7 +2881,7 @@ const relayProtocol = (id: string, attended: boolean) =>
     `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
-    "Merge a PR only after a manager message relays the owner's yes for that PR.",
+    "Merge a PR only at the head sha for which a manager message relays the owner's yes; head moved since → report `pr-ready` again.",
   ].join('\n');
 
 const briefTask = (unit: ManagerUnit) => {

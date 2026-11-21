@@ -2575,7 +2575,7 @@ interface ManagerUnit {
   branch: string | null;
   pr: string | null;
   attended: boolean;
-  pausedBy: string | null;
+  pausedBy: string[];
   summary: string | null;
   marker: string | null;
   misses: number;
@@ -2644,12 +2644,18 @@ const stringRecord = (value: unknown): Record<string, string> =>
 
 const blankUnit = (): ManagerUnit => ({
   title: '', kind: 'free', playbook: null, input: null, model: 'default', effort: 'default', deps: [], depMode: null, presets: dictionary(),
-  for: null, state: 'queued', session: null, path: null, branch: null, pr: null, attended: false, pausedBy: null, summary: null,
+  for: null, state: 'queued', session: null, path: null, branch: null, pr: null, attended: false, pausedBy: [], summary: null,
   marker: null, misses: 0,
 });
 
-const applyUnitChanges = (unit: ManagerUnit, event: ManagerEvent) =>
-  Object.assign(unit, Object.fromEntries(settableUnitKeys.filter((key) => key in event).map((key) => [key, event[key]])));
+const applyUnitChanges = (unit: ManagerUnit, event: ManagerEvent) => {
+  const { pausedBy, ...fields } = event;
+  Object.assign(unit, Object.fromEntries(settableUnitKeys.filter((key) => key !== 'pausedBy' && key in fields).map((key) => [key, fields[key]])));
+  if (typeof event.state === 'string' && event.state !== 'paused') unit.pausedBy = [];
+  for (const blocker of typeof pausedBy === 'string' ? [pausedBy] : stringsOf(pausedBy)) {
+    if (!unit.pausedBy.includes(blocker)) unit.pausedBy.push(blocker);
+  }
+};
 
 const rungOf = (misses: number) => (['ok', 'nudge', 'stop-resume'][misses] ?? 'ask');
 
@@ -3001,8 +3007,8 @@ const statusReport = (state: ManagerState, limits: ManagerLimits) => {
       .flatMap(([id, unit]) => unit.deps.filter((dep) => state.units[dep]?.state !== 'merged').map((dep) => `hold ${id}: implementation waits for ${dep}`)),
     ...released.map((id) => `release ${id}: ${state.units[id]?.deps.join(', ')} merged, update onto the new base`),
     ...units
-      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy !== null && state.units[unit.pausedBy]?.state === 'merged')
-      .map(([id, unit]) => `resume ${id}: ${unit.pausedBy} merged`),
+      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.length > 0 && allMerged(state, unit.pausedBy))
+      .map(([id, unit]) => `resume ${id}: ${unit.pausedBy.join(', ')} merged`),
     ...(state.usage !== null && state.usage >= limits.usage ? [`usage ${state.usage}%: ask owner before starting queued units`] : []),
     ...offered.map((id) => `re-offer ${id}: ${state.backlog[id]?.title}`),
     ...Object.entries(state.questions)
@@ -3135,7 +3141,7 @@ const unitAddCommand: Command = {
 const unitSetCommand: Command = {
   name: 'manager unit set',
   usage:
-    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit] [--summary t]',
+    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends)] [--summary t]',
   arguments: 1,
   flags: ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'paused-by', 'summary'],
   required: [],

@@ -3932,7 +3932,7 @@ describe('manager unit set', () => {
   test('sets pr, summary, model, effort, attended and paused-by', () => {
     managerOk(['unit', 'set', 'a', '--pr', 'https://x/pull/1', '--summary', 'done it', '--model', 'sonnet', '--effort', 'low', '--attended', 'true', '--paused-by', 'b']);
 
-    expect(managerState().units.a).toMatchObject({ pr: 'https://x/pull/1', summary: 'done it', model: 'sonnet', effort: 'low', attended: true, pausedBy: 'b' });
+    expect(managerState().units.a).toMatchObject({ pr: 'https://x/pull/1', summary: 'done it', model: 'sonnet', effort: 'low', attended: true, pausedBy: ['b'] });
   });
 
   test('--path is stored as realpath when it exists', () => {
@@ -4348,6 +4348,20 @@ describe('manager status', () => {
 
     managerOk(['unit', 'set', 'side', '--state', 'merged']);
     expect(status()).toContain('resume a: side merged');
+  });
+
+  test('resume of a unit paused by several sidequests once all merged', () => {
+    startedLedger([
+      unitAdd('sq1', { state: 'running' }),
+      unitAdd('sq2', { state: 'running' }),
+      unitAdd('c', { state: 'paused', pausedBy: 'sq1' }),
+    ]);
+    managerOk(['unit', 'set', 'c', '--paused-by', 'sq2']);
+    managerOk(['unit', 'set', 'sq2', '--state', 'merged']);
+    expect(status()).not.toContain('resume c');
+
+    managerOk(['unit', 'set', 'sq1', '--state', 'merged']);
+    expect(status()).toContain('resume c: sq1, sq2 merged');
   });
 
   test('usage line from the latest beat', () => {

@@ -41,7 +41,7 @@ From `manager status`:
 
 - `hold <id>` → the unit keeps holding implementation; nothing to send.
 - `release <id>` → message the waiting unit: dep merged, update from the fresh default branch, start implementation.
-- `resume <id>` → message the paused unit: update onto the new base, its held answers (SKILL.md Kept states), resume.
+- `resume <id>` → message the paused unit (all its sidequests merged): update onto the new base, its held answers (SKILL.md Kept states), resume.
 - Stacked dependents → message each: retarget the PR onto the default branch, rebase.
 
 Done when every released, resumed and stacked unit got its message and is `running`.

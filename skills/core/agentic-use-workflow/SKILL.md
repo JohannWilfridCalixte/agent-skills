@@ -27,6 +27,7 @@ Every mechanic below runs through `bun {agentic-use-workflow}/scripts/agentic.ts
 | `review eligible --base <ref> [--iteration n]` | Computed reviewer list |
 | `hub sync` | Upserts the work item's mirror comments on its hub issue (GitHub, via `gh`). No hub or no `gh` → prints `skipped: …`, exit 0 |
 | `cleanup check` | Archive-ready check (PR-state check skipped with a message when `gh` is missing) |
+| `manager start` / `unit add\|set` / `brief` / `question open\|answer` / `rule add` / `backlog add\|set` / `beat` / `status` | Agents-manager ledger in `{output}/_manager/` (`events.jsonl`, derived `state.json`, `decisions.md`); work-item commands never see it. Flags: each command's usage line in the helper's usage text |
 | `hook spawn` / `hook compact` | Harness hook entry points (shipped by the plugins' hooks; skills-CLI installs: wire them per the README) |
 
 Exit 0 ok, 1 validation/runtime failure, 2 usage error. Sub-agents run only `put`, for their own report; otherwise `>>` appends.

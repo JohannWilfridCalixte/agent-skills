@@ -99,6 +99,9 @@ Built-in defaults are capability classes, not model ids: `frontier` (the stronge
 | `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | session or subagent | frontier / high |
 | `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | session or subagent | frontier / high |
 | `audit` | every agent that `security-audit` launches under `agentic-security-audit` (reconnaissance, hunters, critics, verifiers) | frontier / high |
+| `unit` | agents-manager work unit, one app session each | frontier / high |
+| `unit.sidequest` | agents-manager sidequest unit | code / high |
+| `unit.<playbook>` | agents-manager playbook unit (`unit.debug`, …); falls back to `unit` | frontier / high |
 
 In the Claude desktop app, which offers a session tool, long steps (`implement`, `tickets`, `plan`, `write`, `review.*`) run as separate app sessions instead of subagents, with the same brief, model and effort; a step whose model or effort is above your session's still runs as a subagent. Details: `agentic-use-workflow` [references/delegation.md](../skills/core/agentic-use-workflow/references/delegation.md#sessions).
 
@@ -140,6 +143,9 @@ Worked examples, for cursor with the config above:
 | `review.iterations` | 3 | The review fix loop stops and asks you |
 | `babysit.rounds` | 5 | PR fix rounds stop and ask you. Watching the PR itself is not capped |
 | `implement.retries` | 2 | A red unit stops and asks you |
+| `manager.parallel` | 4 | Agents manager: extra units queue until a slot frees |
+| `manager.heartbeat` | 15 | Agents manager: minutes between stale-unit checks |
+| `manager.usage` | 80 | Agents manager: plan usage % at which queued units stop starting and it asks you |
 
 ## Review gates
 

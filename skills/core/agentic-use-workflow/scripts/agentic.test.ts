@@ -3743,3 +3743,667 @@ describe('merge', () => {
     expect(agentic(['merge', 'extra', '--work', 'demo']).code).toBe(2);
   });
 });
+
+const managerDir = () => join(outputRoot, '_manager');
+const managerState = () => JSON.parse(readFileSync(join(managerDir(), 'state.json'), 'utf8'));
+const managerLog = () =>
+  readFileSync(join(managerDir(), 'events.jsonl'), 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line));
+
+const manager = (args: readonly string[], options: RunOptions = {}) => agentic(['manager', ...args], options);
+
+const managerOk = (args: readonly string[], options: RunOptions = {}) => {
+  const result = manager(args, options);
+  expect(result.err).toBe('');
+  expect(result.code).toBe(0);
+
+  return result.out;
+};
+
+const writeManagerLog = (events: readonly Record<string, unknown>[]) => {
+  mkdirSync(managerDir(), { recursive: true });
+  const lines = events.map((event, index) => JSON.stringify({ ts: `2026-11-21T10:00:${String(index).padStart(2, '0')}Z`, ...event }));
+  writeFileSync(join(managerDir(), 'events.jsonl'), `${lines.join('\n')}\n`);
+};
+
+const unitAdd = (id: string, extra: Record<string, unknown> = {}) => ({
+  type: 'unit-add',
+  id,
+  title: `title of ${id}`,
+  kind: 'free',
+  model: 'opus',
+  effort: 'high',
+  deps: [],
+  presets: {},
+  ...extra,
+});
+
+const unitSet = (id: string, changes: Record<string, unknown>) => ({ type: 'unit-set', id, ...changes });
+
+const startedLedger = (extra: readonly Record<string, unknown>[] = []) =>
+  writeManagerLog([{ type: 'start', cwd: sandbox }, ...extra]);
+
+const writeProjectConfig = (config: object) => writeFileSync(join(sandbox, '.agentic.json'), JSON.stringify(config));
+
+describe('manager start', () => {
+  test('creates the ledger, records the cwd and prints heartbeat then status', () => {
+    const out = managerOk(['start']);
+
+    expect(out.split('\n')[0]).toBe('heartbeat: 15m');
+    expect(out).toContain('attention: none');
+    expect(readFileSync(join(managerDir(), 'decisions.md'), 'utf8')).toContain('# Manager decisions');
+    expect(managerLog()).toHaveLength(1);
+    expect(managerLog()[0]).toMatchObject({ type: 'start', cwd: sandbox });
+    expect(managerState().cwd).toBe(sandbox);
+  });
+
+  test('a second run from the same cwd appends nothing', () => {
+    managerOk(['start']);
+    managerOk(['start']);
+
+    expect(managerLog()).toHaveLength(1);
+  });
+
+  test('a run from another cwd records the new cwd', () => {
+    managerOk(['start']);
+    const other = join(sandbox, 'other');
+    mkdirSync(other);
+    managerOk(['start'], { cwd: other });
+
+    expect(managerLog()).toHaveLength(2);
+    expect(managerState().cwd).toBe(other);
+  });
+
+  test('heartbeat comes from limits, project over user', () => {
+    const home = join(sandbox, 'home');
+    mkdirSync(join(home, '.agentic'), { recursive: true });
+    writeFileSync(join(home, '.agentic', 'config.json'), JSON.stringify({ limits: { 'manager.heartbeat': 20, 'manager.parallel': 2 } }));
+    writeProjectConfig({ limits: { 'manager.heartbeat': 30 } });
+
+    expect(managerOk(['start'], { env: { HOME: home } }).split('\n')[0]).toBe('heartbeat: 30m');
+  });
+
+  test.each([
+    ['status'],
+    ['brief', 'a'],
+    ['unit', 'add', 'a', '--title', 't', '--kind', 'free'],
+  ])('other commands need a ledger: manager %s', (...args) => {
+    const result = manager(args);
+
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('no manager ledger: run manager start');
+  });
+});
+
+describe('manager unit add', () => {
+  beforeEach(() => {
+    managerOk(['start']);
+  });
+
+  const add = (id: string, flags: readonly string[]) => manager(['unit', 'add', id, '--title', `title ${id}`, ...flags]);
+
+  test('queues a free unit with the built-in unit tier', () => {
+    expect(managerOk(['unit', 'add', 'a', '--title', 'First', '--kind', 'free'])).toBe('unit a queued model opus effort high\n');
+    expect(managerState().units.a).toMatchObject({ title: 'First', kind: 'free', state: 'queued', model: 'opus', effort: 'high', attended: false });
+    expect(managerLog().at(-1)).toMatchObject({ type: 'unit-add', id: 'a' });
+  });
+
+  test('a playbook unit strips the agentic- prefix and stores input, deps, presets and for', () => {
+    managerOk(['unit', 'add', 'base', '--title', 'Base', '--kind', 'free']);
+    managerOk([
+      'unit', 'add', 'dbg', '--title', 'Debug', '--kind', 'playbook', '--playbook', 'agentic-debug', '--input', 'login 500',
+      '--deps', 'base', '--dep-mode', 'wait', '--preset', 'mode=light', '--preset', 'tickets=no', '--for', 'base',
+    ]);
+
+    expect(managerState().units.dbg).toMatchObject({
+      playbook: 'debug', input: 'login 500', deps: ['base'], depMode: 'wait', presets: { mode: 'light', tickets: 'no' }, for: 'base',
+    });
+  });
+
+  test('a sidequest uses unit.sidequest: sonnet / high', () => {
+    expect(managerOk(['unit', 'add', 's', '--title', 'Side', '--kind', 'sidequest'])).toBe('unit s queued model sonnet effort high\n');
+  });
+
+  test('steps.claude.unit overrides a playbook unit', () => {
+    writeProjectConfig({ steps: { claude: { unit: { model: 'sonnet', effort: 'low' } } } });
+
+    expect(add('a', ['--kind', 'playbook', '--playbook', 'debug']).out).toBe('unit a queued model sonnet effort low\n');
+  });
+
+  test('steps.claude["unit.debug"] overrides only debug units', () => {
+    writeProjectConfig({ steps: { claude: { 'unit.debug': { model: 'haiku', effort: 'low' } } } });
+
+    expect(add('a', ['--kind', 'playbook', '--playbook', 'debug']).out).toBe('unit a queued model haiku effort low\n');
+    expect(add('b', ['--kind', 'playbook', '--playbook', 'implement-feature']).out).toBe('unit b queued model opus effort high\n');
+  });
+
+  test('--model and --effort win', () => {
+    writeProjectConfig({ steps: { claude: { unit: { model: 'sonnet' } } } });
+
+    expect(add('a', ['--kind', 'free', '--model', 'haiku', '--effort', 'max']).out).toBe('unit a queued model haiku effort max\n');
+  });
+
+  test.each([
+    ['bad id', 'Bad_Id', ['--kind', 'free']],
+    ['bad kind', 'a', ['--kind', 'weird']],
+    ['playbook kind without --playbook', 'a', ['--kind', 'playbook']],
+    ['unknown playbook', 'a', ['--kind', 'playbook', '--playbook', 'nope']],
+    ['--playbook on a free unit', 'a', ['--kind', 'free', '--playbook', 'debug']],
+    ['unknown dep', 'a', ['--kind', 'free', '--deps', 'ghost', '--dep-mode', 'wait']],
+    ['--deps without --dep-mode', 'a', ['--kind', 'free', '--deps', 'x']],
+    ['bad dep-mode', 'a', ['--kind', 'free', '--deps', 'x', '--dep-mode', 'later']],
+    ['unknown --for', 'a', ['--kind', 'sidequest', '--for', 'ghost']],
+    ['bad preset', 'a', ['--kind', 'free', '--preset', 'novalue']],
+    ['empty title', 'a', ['--kind', 'free', '--title', '']],
+  ])('%s exits 1', (_label, id, flags) => {
+    managerOk(['unit', 'add', 'x', '--title', 'X', '--kind', 'free']);
+
+    expect(manager(['unit', 'add', id, '--title', 'T', ...flags]).code).toBe(1);
+    expect(Object.keys(managerState().units)).toEqual(['x']);
+  });
+
+  test('a duplicate id exits 1', () => {
+    expect(add('a', ['--kind', 'free']).code).toBe(0);
+    expect(add('a', ['--kind', 'free']).code).toBe(1);
+  });
+
+  test('missing --title or --kind exits 2', () => {
+    expect(manager(['unit', 'add', 'a', '--kind', 'free']).code).toBe(2);
+    expect(manager(['unit', 'add', 'a', '--title', 'T']).code).toBe(2);
+  });
+});
+
+describe('manager unit set', () => {
+  beforeEach(() => {
+    startedLedger([unitAdd('a'), unitAdd('b')]);
+  });
+
+  test('updates only the given fields', () => {
+    const out = managerOk(['unit', 'set', 'a', '--state', 'running', '--branch', 'feat-a', '--session', 'local_1']);
+
+    expect(out).toBe('unit a updated: state, session, branch\n');
+    expect(managerState().units.a).toMatchObject({ state: 'running', branch: 'feat-a', session: 'local_1', model: 'opus', title: 'title of a' });
+    expect(managerLog().at(-1)).toEqual({ ts: expect.any(String), type: 'unit-set', id: 'a', state: 'running', branch: 'feat-a', session: 'local_1' });
+  });
+
+  test('sets pr, summary, model, effort, attended and paused-by', () => {
+    managerOk(['unit', 'set', 'a', '--pr', 'https://x/pull/1', '--summary', 'done it', '--model', 'sonnet', '--effort', 'low', '--attended', 'true', '--paused-by', 'b']);
+
+    expect(managerState().units.a).toMatchObject({ pr: 'https://x/pull/1', summary: 'done it', model: 'sonnet', effort: 'low', attended: true, pausedBy: 'b' });
+  });
+
+  test('--path is stored as realpath when it exists', () => {
+    const real = join(sandbox, 'real');
+    mkdirSync(real);
+    symlinkSync(real, join(sandbox, 'link'));
+    managerOk(['unit', 'set', 'a', '--path', join(sandbox, 'link')]);
+    managerOk(['unit', 'set', 'b', '--path', join(sandbox, 'missing')]);
+
+    expect(managerState().units.a.path).toBe(real);
+    expect(managerState().units.b.path).toBe(join(sandbox, 'missing'));
+  });
+
+  test.each([
+    ['unknown unit', ['ghost', '--state', 'running']],
+    ['bad state', ['a', '--state', 'sleeping']],
+    ['bad attended', ['a', '--attended', 'maybe']],
+    ['unknown paused-by', ['a', '--paused-by', 'ghost']],
+  ])('%s exits 1 and changes nothing', (_label, args) => {
+    const before = managerLog().length;
+
+    expect(manager(['unit', 'set', ...args]).code).toBe(1);
+    expect(managerLog()).toHaveLength(before);
+  });
+
+  test('no field given exits 2', () => {
+    expect(manager(['unit', 'set', 'a']).code).toBe(2);
+  });
+});
+
+describe('manager brief', () => {
+  const relayLines = (id: string) => [
+    '## Relay protocol',
+    'Start the final message of every turn with one status line, then its block:',
+    '',
+    `- \`Unit ${id}: question\` — numbered questions, each with options, your recommended one first. Use it wherever a skill asks the user or calls a question tool, then end your turn. The answer arrives as a message from the manager.`,
+    `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
+    `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
+    `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
+    `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
+    '',
+    'Merge a PR only after a manager message relays the owner\'s yes for that PR.',
+  ];
+
+  test('prints the start line and the exact playbook prompt', () => {
+    startedLedger([
+      unitAdd('other', { title: 'Other work', state: 'queued' }),
+      unitAdd('fix', {
+        title: 'Fix login',
+        kind: 'playbook',
+        playbook: 'debug',
+        input: 'login 500',
+        model: 'sonnet',
+        effort: 'medium',
+        presets: { mode: 'light', workspace: 'current' },
+      }),
+    ]);
+
+    const expected = [
+      'start_session: model=sonnet effort=medium use_worktree=true branch_name=fix',
+      '--- prompt ---',
+      'Manager unit: fix',
+      'Work item: none',
+      '',
+      'You are work unit fix of an agents-manager session: Fix login. The owner talks only to the manager; the manager relays.',
+      '',
+      '## Task',
+      '/agentic-debug login 500',
+      '',
+      'Already decided by the owner; use these as answers and ask only what is still open:',
+      '- mode: light',
+      '- workspace: current',
+      '',
+      'Other units in this repo; their areas are theirs:',
+      '- other (queued): Other work',
+      '',
+      ...relayLines('fix'),
+      '',
+    ].join('\n');
+
+    expect(managerOk(['brief', 'fix'])).toBe(expected);
+  });
+
+  test('a free unit prints its input as the task; a sidequest names its raiser; merged siblings are left out', () => {
+    startedLedger([
+      unitAdd('raiser', { state: 'merged' }),
+      unitAdd('side', { kind: 'sidequest', input: 'repair the flaky seed', for: 'raiser' }),
+    ]);
+    const out = managerOk(['brief', 'side']);
+
+    expect(out).toContain('## Task\nrepair the flaky seed\nRaised by unit raiser.\n');
+    expect(out).not.toContain('Other units in this repo');
+    expect(out).not.toContain('Already decided');
+  });
+
+  test('wait and stacked deps; stacked adds source_branch', () => {
+    startedLedger([
+      unitAdd('base', { state: 'running', branch: 'base-branch' }),
+      unitAdd('w', { deps: ['base'], depMode: 'wait' }),
+      unitAdd('s', { deps: ['base'], depMode: 'stacked' }),
+    ]);
+    const wait = managerOk(['brief', 'w']);
+    const stacked = managerOk(['brief', 's']);
+
+    expect(wait.split('\n')[0]).toBe('start_session: model=opus effort=high use_worktree=true branch_name=w');
+    expect(wait).toContain('Depends on base (wait). Hold implementation until the manager relays that base merged: stop before writing code and report `blocked`.');
+    expect(stacked.split('\n')[0]).toBe('start_session: model=opus effort=high use_worktree=true branch_name=s source_branch=base-branch');
+    expect(stacked).toContain('Depends on base (stacked). Your branch starts from base-branch; retarget your PR after base merges.');
+  });
+
+  test('a stacked dep without a recorded branch exits 1', () => {
+    startedLedger([unitAdd('base'), unitAdd('s', { deps: ['base'], depMode: 'stacked' })]);
+
+    expect(manager(['brief', 's']).code).toBe(1);
+  });
+
+  test('an attended unit gets the unused question bullet', () => {
+    startedLedger([unitAdd('a', { attended: true })]);
+
+    expect(managerOk(['brief', 'a'])).toContain('- `Unit a: question` — unused: the owner answers you in this session directly.\n- `Unit a: sidequest`');
+  });
+
+  test('unknown unit exits 1', () => {
+    startedLedger();
+
+    expect(manager(['brief', 'ghost']).code).toBe(1);
+  });
+});
+
+describe('manager question', () => {
+  beforeEach(() => {
+    startedLedger([unitAdd('a'), unitAdd('b', { presets: { mode: 'light' } })]);
+  });
+
+  const open = (unit: string, text: string, extra: readonly string[] = []) => managerOk(['question', 'open', unit, '--text', text, ...extra]);
+
+  test('opens numbered questions with options', () => {
+    expect(open('a', 'Which db?', ['--option', 'pg', '--option', 'mysql'])).toBe('Q1\n');
+    expect(open('b', 'Which ui?')).toBe('Q2\n');
+    expect(managerState().questions).toEqual({
+      Q1: { unit: 'a', text: 'Which db?', options: ['pg', 'mysql'] },
+      Q2: { unit: 'b', text: 'Which ui?', options: [] },
+    });
+  });
+
+  test('unknown unit or empty text exits 1', () => {
+    expect(manager(['question', 'open', 'ghost', '--text', 'x']).code).toBe(1);
+    expect(manager(['question', 'open', 'a', '--text', '']).code).toBe(1);
+  });
+
+  test('an owner answer appends to decisions.md with basis owner', () => {
+    open('a', 'Which db?');
+
+    expect(managerOk(['question', 'answer', 'Q1', '--answer', 'pg', '--by', 'user'])).toBe('Q1 answered by user\n');
+    expect(readFileSync(join(managerDir(), 'decisions.md'), 'utf8')).toContain('## Q1 · a · user\n**Q:** Which db?\n**A:** pg\n**Basis:** owner\n');
+    expect(managerState().questions.Q1).toMatchObject({ answer: 'pg', by: 'user' });
+  });
+
+  test('a manager answer needs a valid basis', () => {
+    open('a', 'Which db?');
+    open('b', 'Which mode?');
+    managerOk(['rule', 'add', 'always pg']);
+    const answer = (q: string, basis: readonly string[]) => manager(['question', 'answer', q, '--answer', 'x', '--by', 'manager', ...basis]);
+
+    expect(answer('Q1', []).code).toBe(1);
+    expect(answer('Q1', ['--basis', 'R9']).code).toBe(1);
+    expect(answer('Q1', ['--basis', 'Q2']).code).toBe(1);
+    expect(answer('Q1', ['--basis', 'preset:mode']).code).toBe(1);
+    expect(answer('Q2', ['--basis', 'preset:mode']).code).toBe(0);
+    expect(answer('Q1', ['--basis', 'R1']).code).toBe(0);
+    expect(managerState().questions.Q1).toMatchObject({ by: 'manager', basis: 'R1' });
+    expect(readFileSync(join(managerDir(), 'decisions.md'), 'utf8')).toContain('## Q1 · a · manager\n**Q:** Which db?\n**A:** x\n**Basis:** R1\n');
+  });
+
+  test('an answered question is a valid basis; answering twice, unknown id or bad --by exits 1', () => {
+    open('a', 'Which db?');
+    open('b', 'Same db?');
+    managerOk(['question', 'answer', 'Q1', '--answer', 'pg', '--by', 'user']);
+
+    expect(manager(['question', 'answer', 'Q2', '--answer', 'pg', '--by', 'manager', '--basis', 'Q1']).code).toBe(0);
+    expect(manager(['question', 'answer', 'Q1', '--answer', 'x', '--by', 'user']).code).toBe(1);
+    expect(manager(['question', 'answer', 'Q9', '--answer', 'x', '--by', 'user']).code).toBe(1);
+    expect(manager(['question', 'answer', 'Q2', '--answer', 'x', '--by', 'robot']).code).toBe(1);
+  });
+});
+
+describe('manager rule and backlog', () => {
+  beforeEach(() => {
+    startedLedger([unitAdd('a'), unitAdd('b')]);
+  });
+
+  test('rules are numbered', () => {
+    expect(managerOk(['rule', 'add', 'always pg'])).toBe('R1\n');
+    expect(managerOk(['rule', 'add', 'never mock'])).toBe('R2\n');
+    expect(managerState().rules).toEqual({ R1: 'always pg', R2: 'never mock' });
+    expect(manager(['rule', 'add', '']).code).toBe(1);
+  });
+
+  test('backlog add and set', () => {
+    expect(managerOk(['backlog', 'add', '--title', 'flaky seed', '--from', 'a', '--context', 'seen in CI', '--ticket', 'https://t/1'])).toBe('B1\n');
+    expect(managerState().backlog.B1).toMatchObject({ title: 'flaky seed', from: ['a'], context: 'seen in CI', ticket: 'https://t/1', state: 'open' });
+
+    expect(managerOk(['backlog', 'set', 'B1', '--state', 'started', '--from', 'b', '--ticket', 'https://t/2'])).toBe('B1 updated\n');
+    expect(managerState().backlog.B1).toMatchObject({ from: ['a', 'b'], state: 'started', ticket: 'https://t/2' });
+  });
+
+  test.each([
+    ['add unknown --from', ['backlog', 'add', '--title', 't', '--from', 'ghost']],
+    ['add empty title', ['backlog', 'add', '--title', '', '--from', 'a']],
+    ['set unknown id', ['backlog', 'set', 'B9', '--state', 'dropped']],
+    ['set bad state', ['backlog', 'set', 'B1', '--state', 'later']],
+    ['set unknown --from', ['backlog', 'set', 'B1', '--from', 'ghost']],
+  ])('%s exits 1', (_label, args) => {
+    managerOk(['backlog', 'add', '--title', 't', '--from', 'a']);
+
+    expect(manager(args).code).toBe(1);
+  });
+
+  test('backlog set with no field exits 2', () => {
+    managerOk(['backlog', 'add', '--title', 't', '--from', 'a']);
+
+    expect(manager(['backlog', 'set', 'B1']).code).toBe(2);
+  });
+});
+
+describe('manager beat', () => {
+  beforeEach(() => {
+    startedLedger([unitAdd('a', { state: 'running' }), unitAdd('b', { state: 'queued' })]);
+  });
+
+  const beat = (...flags: readonly string[]) => managerOk(['beat', ...flags]);
+
+  test('ladder: ok, nudge, stop-resume, ask, ask', () => {
+    const lines = ['a=m1', 'a=m1', 'a=m1', 'a=m1', 'a=m1'].map((seen) => beat('--seen', seen));
+
+    expect(lines).toEqual([
+      'a ok (misses 0)\n',
+      'a nudge (misses 1)\n',
+      'a stop-resume (misses 2)\n',
+      'a ask (misses 3)\n',
+      'a ask (misses 4)\n',
+    ]);
+  });
+
+  test('a changed marker resets the ladder', () => {
+    beat('--seen', 'a=m1');
+    beat('--seen', 'a=m1');
+
+    expect(beat('--seen', 'a=m2')).toBe('a ok (misses 0)\n');
+    expect(managerState().units.a).toMatchObject({ marker: 'm2', misses: 0 });
+  });
+
+  test('a beat while not running is idle and resets the count', () => {
+    beat('--seen', 'a=m1');
+    beat('--seen', 'a=m1');
+    managerOk(['unit', 'set', 'a', '--state', 'paused']);
+
+    expect(beat('--seen', 'a=m1')).toBe('a idle paused\n');
+    managerOk(['unit', 'set', 'a', '--state', 'running']);
+    expect(beat('--seen', 'a=m1')).toBe('a nudge (misses 1)\n');
+  });
+
+  test('running units not seen are unseen; units seen but idle are listed in order', () => {
+    expect(beat('--seen', 'b=x')).toBe('b idle queued\na unseen\n');
+  });
+
+  test('usage at or above manager.usage asks the owner', () => {
+    expect(beat('--usage', '79')).not.toContain('usage');
+    expect(beat('--usage', '80')).toContain('usage 80% >= 80%: ask owner before starting queued units (continue / pause queue / downgrade models)');
+    expect(managerState().usage).toBe(80);
+  });
+
+  test('usage limit comes from config', () => {
+    writeProjectConfig({ limits: { 'manager.usage': 50 } });
+
+    expect(beat('--usage', '60')).toContain('usage 60% >= 50%');
+  });
+
+  test.each([
+    ['unknown unit', ['--seen', 'ghost=m']],
+    ['no marker', ['--seen', 'a']],
+    ['bad usage', ['--usage', 'lots']],
+    ['usage over 100', ['--usage', '101']],
+  ])('%s exits 1', (_label, flags) => {
+    expect(manager(['beat', ...flags]).code).toBe(1);
+  });
+});
+
+describe('manager status', () => {
+  const status = () => managerOk(['status']);
+
+  test('prints the unit table', () => {
+    startedLedger([
+      unitAdd('a', { kind: 'playbook', playbook: 'debug', model: 'sonnet', effort: 'medium' }),
+      unitSet('a', { state: 'running', branch: 'feat-a', attended: true }),
+      { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] },
+      unitAdd('b'),
+      unitSet('b', { state: 'pr', pr: 'https://x/pull/2' }),
+    ]);
+    const lines = status().split('\n');
+
+    expect(lines[0]).toBe('unit | state | kind | model/effort | branch/PR | attended | question');
+    expect(lines[1]).toBe('a | running | playbook | sonnet/medium | feat-a | yes | Q1');
+    expect(lines[2]).toBe('b | pr | free | opus/high | https://x/pull/2 | no | -');
+  });
+
+  test('records a status event', () => {
+    startedLedger([unitAdd('a')]);
+    status();
+
+    expect(managerLog().at(-1)).toMatchObject({ type: 'status', released: [], offered: [] });
+  });
+
+  test('question, stale, merge-yes lines in order', () => {
+    startedLedger([
+      unitAdd('a', { state: 'running' }),
+      unitAdd('b', { state: 'pr', pr: 'https://x/pull/2' }),
+      { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] },
+      { type: 'beat', seen: { a: 'm' } },
+      { type: 'beat', seen: { a: 'm' } },
+    ]);
+    const out = status();
+
+    expect(out).toContain('question Q1 a: Which db?');
+    expect(out).toContain('stale a: nudge');
+    expect(out).toContain('merge-yes b: https://x/pull/2');
+    expect(out.indexOf('question Q1')).toBeLessThan(out.indexOf('stale a'));
+    expect(out.indexOf('stale a')).toBeLessThan(out.indexOf('merge-yes b'));
+  });
+
+  test('answered questions leave the question list', () => {
+    startedLedger([
+      unitAdd('a'),
+      { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] },
+      { type: 'question-answer', id: 'Q1', answer: 'pg', by: 'user' },
+    ]);
+
+    expect(status()).not.toContain('question Q1');
+  });
+
+  describe('start lines', () => {
+    const queued = (n: number) => Array.from({ length: n }, (_, index) => unitAdd(`q${index + 1}`));
+    const active = (n: number) => Array.from({ length: n }, (_, index) => unitAdd(`r${index + 1}`, { state: 'running' }));
+
+    test('queued units start under the default parallel cap of 4, in add order, counting listed ones', () => {
+      startedLedger([...active(2), ...queued(4)]);
+      const out = status();
+
+      expect(out).toContain('start q1');
+      expect(out).toContain('start q2');
+      expect(out).not.toContain('start q3');
+      expect(out.indexOf('start q1')).toBeLessThan(out.indexOf('start q2'));
+    });
+
+    test('waiting and pr units count as active; paused ones free the slot', () => {
+      startedLedger([unitAdd('w', { state: 'waiting' }), unitAdd('p', { state: 'pr' }), unitAdd('z', { state: 'paused' }), ...active(1), ...queued(2)]);
+      const out = status();
+
+      expect(out).toContain('start q1');
+      expect(out).not.toContain('start q2');
+    });
+
+    test('the project parallel limit is honoured', () => {
+      writeProjectConfig({ limits: { 'manager.parallel': 1 } });
+      startedLedger([...active(1), ...queued(1)]);
+
+      expect(status()).not.toContain('start q1');
+    });
+
+    test('a stacked dep needs a recorded branch and a started dep; a wait dep does not block', () => {
+      startedLedger([
+        unitAdd('base', { state: 'running' }),
+        unitAdd('nobranch', { state: 'queued' }),
+        unitAdd('stack-a', { deps: ['base'], depMode: 'stacked' }),
+        unitAdd('stack-b', { deps: ['nobranch'], depMode: 'stacked' }),
+        unitAdd('wait-c', { deps: ['nobranch'], depMode: 'wait' }),
+        unitSet('base', { branch: 'base-b' }),
+      ]);
+      const out = status();
+
+      expect(out).toContain('start stack-a');
+      expect(out).not.toContain('start stack-b');
+      expect(out).toContain('start wait-c');
+    });
+  });
+
+  test('hold then release once for an active unit with a wait dep', () => {
+    startedLedger([unitAdd('base', { state: 'running' }), unitAdd('w', { state: 'running', deps: ['base'], depMode: 'wait' })]);
+
+    expect(status()).toContain('hold w: implementation waits for base');
+
+    managerOk(['unit', 'set', 'base', '--state', 'merged']);
+    const released = status();
+    expect(released).toContain('release w: base merged, update onto the new base');
+    expect(released).not.toContain('hold w');
+    expect(managerState().released).toEqual(['w']);
+    expect(status()).not.toContain('release w');
+  });
+
+  test('resume of a paused unit once its paused-by unit merged', () => {
+    startedLedger([unitAdd('side', { state: 'running' }), unitAdd('a', { state: 'paused', pausedBy: 'side' })]);
+    expect(status()).not.toContain('resume a');
+
+    managerOk(['unit', 'set', 'side', '--state', 'merged']);
+    expect(status()).toContain('resume a: side merged');
+  });
+
+  test('usage line from the latest beat', () => {
+    startedLedger([unitAdd('a'), { type: 'beat', seen: {}, usage: 85 }]);
+
+    expect(status()).toContain('usage 85%: ask owner before starting queued units');
+  });
+
+  test('backlog re-offer when a unit finishes or a raiser is added, then quiet until the next trigger', () => {
+    startedLedger([unitAdd('a', { state: 'running' }), unitAdd('b', { state: 'running' })]);
+    managerOk(['backlog', 'add', '--title', 'flaky seed', '--from', 'a']);
+    expect(status()).not.toContain('re-offer');
+
+    managerOk(['unit', 'set', 'b', '--state', 'done']);
+    expect(status()).toContain('re-offer B1: flaky seed');
+    expect(status()).not.toContain('re-offer');
+
+    managerOk(['backlog', 'set', 'B1', '--from', 'b']);
+    expect(status()).toContain('re-offer B1: flaky seed');
+    managerOk(['backlog', 'set', 'B1', '--state', 'dropped']);
+    managerOk(['unit', 'set', 'a', '--state', 'done']);
+    expect(status()).not.toContain('re-offer');
+  });
+
+  test('manager answers since the previous status', () => {
+    startedLedger([
+      unitAdd('a'),
+      { type: 'rule-add', id: 'R1', text: 'always pg' },
+      { type: 'question-open', id: 'Q1', unit: 'a', text: 'Which db?', options: [] },
+      { type: 'question-answer', id: 'Q1', answer: 'pg', by: 'manager', basis: 'R1' },
+      { type: 'question-open', id: 'Q2', unit: 'a', text: 'Which ui?', options: [] },
+      { type: 'question-answer', id: 'Q2', answer: 'web', by: 'user' },
+    ]);
+    const first = status();
+
+    expect(first).toContain('answered Q1 a by manager: pg (basis R1)');
+    expect(first).not.toContain('answered Q2');
+    expect(status()).not.toContain('answered Q1');
+  });
+
+  test('state.json is re-derived from the hand-written log', () => {
+    startedLedger([unitAdd('a'), unitSet('a', { state: 'running', path: '/p' })]);
+    status();
+
+    expect(managerState().units.a).toMatchObject({ state: 'running', path: '/p', misses: 0 });
+    expect(managerState().cwd).toBe(sandbox);
+  });
+});
+
+describe('manager ledger and work items', () => {
+  test('_manager is not a work item for --work resolution', () => {
+    managerOk(['start']);
+    writeLog('20261108-demo', [{ type: 'started' }]);
+
+    expect(agentic(['state', '--work', 'manager']).code).toBe(2);
+    expect(agentic(['state', '--work', 'demo']).code).toBe(0);
+  });
+
+  test('_manager does not count for cwd matching or in the candidate list', () => {
+    const workspace = join(sandbox, 'ws');
+    mkdirSync(workspace);
+    managerOk(['start']);
+    writeFileSync(join(managerDir(), 'state.json'), JSON.stringify({ workspace: { path: workspace } }));
+    writeLog('20261108-demo', [{ type: 'started' }]);
+    writeFileSync(join(itemDir('20261108-demo'), 'state.json'), JSON.stringify({ workspace: { path: workspace } }));
+
+    expect(JSON.parse(agentic(['state'], { cwd: workspace }).out).work).toBe('20261108-demo');
+    expect(agentic(['state']).err).not.toContain('_manager');
+  });
+});

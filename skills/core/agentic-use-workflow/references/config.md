@@ -88,6 +88,9 @@ Capability classes, not model ids: `frontier` (strongest reasoning model), `code
 | `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | session or subagent | frontier / high |
 | `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | session or subagent | frontier / high |
 | `audit` | every agent `security-audit` launches under `agentic-security-audit` | frontier / high |
+| `unit` | agents-manager work unit (session) | frontier / high |
+| `unit.sidequest` | agents-manager sidequest unit | code / high |
+| `unit.<playbook>` | agents-manager playbook unit (`unit.debug`, …); falls back to `unit` | frontier / high |
 
 Projects override the example reviewers' rows via `.agentic/review-gates.json` or `.agentic.json` `steps`.
 
@@ -122,3 +125,6 @@ Example (cursor, config above): `review.code-review` → model `composer-2.5` (f
 | `review.iterations` | 3 | Stop the fix loop, ask the user |
 | `babysit.rounds` | 5 | Fix rounds on the PR. Stop fixing, ask the user (watching itself isn't capped) |
 | `implement.retries` | 2 | Stop the unit, ask the user |
+| `manager.parallel` | 4 | Agents manager: extra units queue until a slot frees |
+| `manager.heartbeat` | 15 | Agents manager: minutes between stale-unit beats |
+| `manager.usage` | 80 | Agents manager: plan usage % at which queued units stop starting and the owner is asked |

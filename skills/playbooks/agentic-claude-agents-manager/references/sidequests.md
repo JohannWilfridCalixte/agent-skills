@@ -4,7 +4,7 @@ A unit hit a project-global problem outside its scope: SKILL.md step 4.
 
 ## Note
 
-`sidequest` block: problem, where, whether it blocks, workaround. Ask the owner: address now?
+`sidequest` block: problem, where, whether it blocks, workaround. `manager unit set <raiser> --state waiting`, then ask the owner: address now?
 
 ## Yes
 
@@ -18,8 +18,12 @@ Done when the sidequest unit is `running` and every unit the owner chose is `pau
 
 ## No
 
-`manager backlog add --title … --from <unit> --context …`. Offer a tracker ticket: yes → create it in the project's tracker, `manager backlog set B<n> --ticket <url>`. `SendMessage` the unit: continue with its stated workaround.
+`manager backlog add --title … --from <unit> --context …`. Offer a tracker ticket: yes → create it in the project's tracker, `manager backlog set B<n> --ticket <url>`. `SendMessage` the unit: continue with its stated workaround; `unit set --state running`.
+
+Done when `B<n>` is open, the ticket answer is recorded and the unit is `running` with its continue message.
 
 ## Re-offer
 
 `re-offer B<n>` line (a unit finished, or another unit raised it: `backlog set B<n> --from <unit>`) → ask the owner again. Started → `backlog set B<n> --state started` plus Yes above; dropped → `--state dropped`.
+
+Done when the owner answered and `B<n>` carries the answer.

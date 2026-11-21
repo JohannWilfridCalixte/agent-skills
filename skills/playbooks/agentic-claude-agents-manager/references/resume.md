@@ -4,9 +4,9 @@ A new manager session over an existing ledger, or a hand-started session taken o
 
 ## Resume
 
-`manager start` printed the ledger's table. Per live unit: `get_session` (exists, `isRunning`, branch, model, effort) and `list_events` since its last known state; re-ask nothing already answered. Session gone → owner: relaunch from its brief / mark `failed`. A unit live → re-arm the heartbeat ([heartbeat.md](heartbeat.md) Arm). Then `manager status` → SKILL.md step 4.
+`manager start` printed the ledger's table. Per live unit: `get_session` (exists, `isRunning`, branch, model, effort) and `list_events` since its last known state; re-ask nothing already answered. Session gone → owner: relaunch / mark `failed`. Relaunch → `manager unit set <id> --state queued`; its `start` line → [launch.md](launch.md) Launch one unit. Heartbeat → [heartbeat.md](heartbeat.md) Arm. Then `manager status` → SKILL.md step 4.
 
-Done when every live unit's session is checked and the heartbeat is armed if one is live.
+Done when every live unit's session is checked and the heartbeat matches heartbeat.md Arm.
 
 ## Adoption
 

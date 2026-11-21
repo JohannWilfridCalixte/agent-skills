@@ -2310,6 +2310,39 @@ const traceBlocked = async (workItem: string | undefined, entry: { harness: stri
   });
 };
 
+const managerSpawnIssues = (state: ManagerState, id: string, payload: Record<string, unknown>, brief: string) => {
+  const unit = state.units[id];
+  if (unit === undefined) return { issues: [`unit "${id}" is not in the ledger`], expected: '' };
+
+  const toolInput = recordField(payload, 'tool_input');
+  const gotModel = textOf(toolInput.model);
+  const gotEffort = textOf(toolInput.effort);
+  const issues: string[] = [];
+  if (!/^[ \t]*Work item:[ \t]*none\b/m.test(brief)) issues.push('Work item: none');
+  if (!brief.includes(relayProtocol(id, unit.attended))) issues.push('the relay protocol block, verbatim');
+  if (claudeAlias('claude', unit.model) !== (gotModel === undefined ? undefined : claudeAlias('claude', gotModel))) {
+    issues.push(`model ${claudeAlias('claude', unit.model)} (got ${gotModel ?? 'none'})`);
+  }
+  if (unit.effort !== gotEffort) issues.push(`effort ${unit.effort} (got ${gotEffort ?? 'none'})`);
+
+  return { issues, expected: ` (model ${claudeAlias('claude', unit.model)}, effort ${unit.effort})` };
+};
+
+const checkManagerSpawn = (context: Context, adapter: HookAdapter, payload: Record<string, unknown>, brief: string, id: string) => {
+  const state = loadManagerState(managerPaths(context));
+  if (state === undefined) return;
+
+  const { issues, expected } = managerSpawnIssues(state, id, payload, brief);
+  if (issues.length === 0) return;
+
+  adapter.deny(
+    [
+      `spawn blocked, manager unit ${id}: ${issues.join(', ')}`,
+      `fix: run \`bun ${join(import.meta.dir, 'agentic.ts')} manager brief ${id}\` and paste its prompt, with the printed model and effort${expected}`,
+    ].join('\n'),
+  );
+};
+
 const hookSpawnCommand: Command = {
   name: 'hook spawn',
   usage: 'hook spawn [--harness claude|cursor|codex] [--work <slug>]   (reads the harness hook payload on stdin)',
@@ -2328,6 +2361,12 @@ const hookSpawnCommand: Command = {
     if (tool !== undefined && !spawnToolNames[harness]?.includes(tool)) return;
 
     const brief = adapter.prompt(payload);
+    const managerUnit = harness === 'claude' && brief !== undefined ? briefLine(brief, 'Manager unit') : undefined;
+    if (managerUnit !== undefined) {
+      checkManagerSpawn(context, adapter, payload, brief ?? '', managerUnit);
+      return;
+    }
+
     const item = await findHookItem(context, hookCwd(context, payload), brief === undefined ? undefined : briefLine(brief, 'Work item'));
     if (item === undefined || brief === undefined || /^[ \t]*Work item:[ \t]*none\b/m.test(brief)) return;
 
@@ -2462,24 +2501,28 @@ const hookCompactCommand: Command = {
 
     const cwd = hookCwd(context, payload);
     const item = await findHookItem(context, cwd);
-    if (item === undefined) return;
+    const events = item === undefined ? [] : await safeEvents(item);
+    const workText = item === undefined ? undefined : `${resumeText(item, events, cwd)}\n${cardText(item, events)}`;
+    const text = [managerCompactText(context, cwd), workText].filter((part) => part !== undefined).join('\n\n');
+    if (text === '') return;
 
-    const events = await safeEvents(item);
-    const output = adapter(payload, `${resumeText(item, events, cwd)}\n${cardText(item, events)}`);
+    const output = adapter(payload, text);
     if (output === undefined) return;
 
-    const run = currentRun(events);
-    await appendEvent(item, {
-      ts: nowTimestamp(),
-      work: item.name,
-      run: run?.run ?? null,
-      harness,
-      workflow: run?.workflow ?? 'implement',
-      step: 'hook',
-      type: 'note',
-      summary: 'compact: resume injected',
-      data: { hook: 'compact' },
-    });
+    if (item !== undefined) {
+      const run = currentRun(events);
+      await appendEvent(item, {
+        ts: nowTimestamp(),
+        work: item.name,
+        run: run?.run ?? null,
+        harness,
+        workflow: run?.workflow ?? 'implement',
+        step: 'hook',
+        type: 'note',
+        summary: 'compact: resume injected',
+        data: { hook: 'compact' },
+      });
+    }
     writeOut(`${output}\n`);
   },
 };
@@ -3226,6 +3269,59 @@ const statusManagerCommand: Command = {
   },
 };
 
+const liveUnitStates = [...activeStates, 'paused'];
+
+const isManagerCwd = (state: ManagerState, cwd: string) => state.cwd !== null && realPathOrSelf(state.cwd) === realPathOrSelf(cwd);
+
+const unitAt = (state: ManagerState, cwd: string) => {
+  const here = realPathOrSelf(cwd);
+  const candidates = Object.entries(state.units).flatMap(([id, unit]) => {
+    const path = unit.path === null ? undefined : realPathOrSelf(unit.path);
+
+    return path !== undefined && liveUnitStates.includes(unit.state) && isInside(here, path) ? [{ id, unit, path }] : [];
+  });
+
+  return candidates.sort((left, right) => right.path.length - left.path.length)[0];
+};
+
+const managerCompactText = (context: Context, cwd: string) => {
+  const state = loadManagerState(managerPaths(context));
+  if (state === undefined) return undefined;
+  if (isManagerCwd(state, cwd)) return renderStatus(state, managerLimits(context));
+
+  const match = unitAt(state, cwd);
+
+  return match === undefined || match.unit.attended ? undefined : relayProtocol(match.id, false);
+};
+
+const hookAskCommand: Command = {
+  name: 'hook ask',
+  usage: 'hook ask [--harness claude]   (reads the harness hook payload on stdin)',
+  arguments: 0,
+  flags: ['harness'],
+  required: [],
+  async run(context) {
+    const harness = flagText(context, 'harness') ?? 'claude';
+    const adapter = hookAdapters[harness];
+    if (adapter === undefined) throw new CliError(2, `invalid harness "${harness}": expected ${harnesses.join('|')}`);
+
+    const payload = await readHookPayload();
+    const tool = payload === undefined ? undefined : textOf(payload.tool_name);
+    if (payload === undefined || (tool !== undefined && tool !== 'AskUserQuestion')) return;
+
+    const state = loadManagerState(managerPaths(context));
+    const cwd = hookCwd(context, payload);
+    if (state === undefined || isManagerCwd(state, cwd)) return;
+
+    const match = unitAt(state, cwd);
+    if (match === undefined || match.unit.attended || isManagerCwd(state, match.path)) return;
+
+    adapter.deny(
+      `relayed unit ${match.id}: end your turn with the question block (\`Unit ${match.id}: question\`, numbered questions with options, recommended first); the manager relays it to the owner.`,
+    );
+  },
+};
+
 const commands: readonly Command[] = [
   startCommand,
   putCommand,
@@ -3241,6 +3337,7 @@ const commands: readonly Command[] = [
   cleanupCheckCommand,
   hookSpawnCommand,
   hookCompactCommand,
+  hookAskCommand,
   hookSubagentStopCommand,
   managerStartCommand,
   unitAddCommand,

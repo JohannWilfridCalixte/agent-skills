@@ -3238,7 +3238,8 @@ describe('hook fixtures (doc-derived stdin shapes)', () => {
   test('every fixture declares its source: captured for Claude, doc-derived otherwise', async () => {
     for (const file of new Bun.Glob('hook-*.json').scanSync(fixtureDir)) {
       const source = String((await fixture(file))._source);
-      if (file.startsWith('hook-claude-')) expect(source).toMatch(/^captured \d{4}-\d{2}-\d{2}, Claude Code \d+\.\d+\.\d+/);
+      if (file === 'hook-claude-ask.json') expect(source).toContain('doc-derived from code.claude.com/docs/en/hooks');
+      else if (file.startsWith('hook-claude-')) expect(source).toMatch(/^captured \d{4}-\d{2}-\d{2}, Claude Code \d+\.\d+\.\d+/);
       else expect(source).toContain('doc-derived 2026-11-08, not captured');
     }
   });
@@ -4405,5 +4406,303 @@ describe('manager ledger and work items', () => {
 
     expect(JSON.parse(agentic(['state'], { cwd: workspace }).out).work).toBe('20261108-demo');
     expect(agentic(['state']).err).not.toContain('_manager');
+  });
+});
+
+describe('manager hooks', () => {
+  const unitPath = () => join(sandbox, 'trees', 'a');
+  const startSessionPayload = (prompt: string, toolInput: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      cwd: sandbox,
+      tool_name: 'mcp__ccd_session__start_session',
+      tool_input: { prompt, model: 'claude-opus-4-7', effort: 'high', ...toolInput },
+    });
+
+  const runHook = (subcommand: string, payload: Record<string, unknown> | string, cwd = sandbox) => {
+    const result = Bun.spawnSync([process.execPath, scriptPath, 'hook', subcommand, '--harness', 'claude'], {
+      cwd,
+      env: { ...process.env, AGENTIC_OUTPUT: outputRoot },
+      stdin: new TextEncoder().encode(typeof payload === 'string' ? payload : JSON.stringify(payload)),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    return { code: result.exitCode, out: result.stdout.toString(), err: result.stderr.toString() };
+  };
+
+  const silent = { code: 0, out: '', err: '' };
+
+  const ledgerWithUnit = (extra: Record<string, unknown> = {}) => {
+    mkdirSync(unitPath(), { recursive: true });
+    startedLedger([unitAdd('a', { path: unitPath(), state: 'running', model: 'opus', effort: 'high', ...extra })]);
+  };
+
+  describe('spawn', () => {
+    const spawn = (prompt: string, toolInput: Record<string, unknown> = {}) => runHook('spawn', startSessionPayload(prompt, toolInput));
+
+    const promptOf = (id = 'a') => {
+      const out = Bun.spawnSync([process.execPath, scriptPath, 'manager', 'brief', id], {
+        cwd: sandbox,
+        env: { ...process.env, AGENTIC_OUTPUT: outputRoot },
+      }).stdout.toString();
+
+      return out.slice(out.indexOf('Manager unit:'));
+    };
+
+    test('no ledger allows', () => {
+      expect(spawn('Manager unit: a\nWork item: none\n\nanything')).toEqual(silent);
+    });
+
+    test('a prompt without a Manager unit line keeps today behaviour', () => {
+      ledgerWithUnit();
+
+      expect(spawn('Work item: none\n\nTask: look around')).toEqual(silent);
+    });
+
+    test('the printed brief with matching model and effort allows', () => {
+      ledgerWithUnit();
+
+      expect(spawn(promptOf())).toEqual(silent);
+    });
+
+    test('a model alias equals the ledger full id', () => {
+      ledgerWithUnit({ model: 'claude-opus-4-7' });
+
+      expect(spawn(promptOf(), { model: 'opus' })).toEqual(silent);
+    });
+
+    test('an attended brief carries its own relay block', () => {
+      ledgerWithUnit({ attended: true });
+
+      expect(spawn(promptOf())).toEqual(silent);
+    });
+
+    test('unknown unit denies naming the brief command', () => {
+      ledgerWithUnit();
+      const result = spawn('Manager unit: ghost\nWork item: none');
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('ghost');
+      expect(result.err).toContain('manager brief ghost');
+      expect(JSON.parse(result.out).hookSpecificOutput.permissionDecision).toBe('deny');
+    });
+
+    test('missing Work item: none denies', () => {
+      ledgerWithUnit();
+      const result = spawn(promptOf().replace('Work item: none', 'Work item: x'));
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('Work item: none');
+    });
+
+    test('an altered relay block denies', () => {
+      ledgerWithUnit();
+      const result = spawn(promptOf().replace('Merge a PR only after', 'Merge a PR anytime after'));
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('relay protocol');
+    });
+
+    test('an attended relay block on a non-attended unit denies', () => {
+      ledgerWithUnit({ attended: true });
+      const attended = promptOf();
+      ledgerWithUnit();
+
+      expect(spawn(attended).code).toBe(2);
+    });
+
+    test('model mismatch denies with the expected model, effort and fix', () => {
+      ledgerWithUnit();
+      const result = spawn(promptOf(), { model: 'sonnet' });
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('model opus (got sonnet)');
+      expect(result.err).toContain('effort high');
+      expect(result.err).toContain(`bun ${scriptPath} manager brief a`);
+    });
+
+    test('effort mismatch denies', () => {
+      ledgerWithUnit();
+      const result = spawn(promptOf(), { effort: 'low' });
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain('effort high (got low)');
+    });
+
+    test('other tools are ignored', () => {
+      ledgerWithUnit();
+
+      expect(runHook('spawn', { cwd: sandbox, tool_name: 'Bash', tool_input: { prompt: 'Manager unit: ghost' } })).toEqual(silent);
+    });
+  });
+
+  describe('compact', () => {
+    const compactPayload = (cwd: string) => ({ cwd, hook_event_name: 'SessionStart', source: 'compact' });
+    const contextOf = (out: string) => JSON.parse(out).hookSpecificOutput.additionalContext as string;
+
+    test('the manager cwd gets the status text and records no event', () => {
+      ledgerWithUnit();
+      const before = managerLog().length;
+      const result = runHook('compact', compactPayload(sandbox));
+
+      expect(result.code).toBe(0);
+      expect(contextOf(result.out)).toContain('attention:');
+      expect(managerLog()).toHaveLength(before);
+    });
+
+    test('inside a non-attended unit path gets its relay block', () => {
+      ledgerWithUnit();
+      const nested = join(unitPath(), 'src');
+      mkdirSync(nested);
+      const result = runHook('compact', compactPayload(nested));
+
+      expect(contextOf(result.out)).toContain('## Relay protocol');
+      expect(contextOf(result.out)).toContain('`Unit a: question` — numbered questions');
+    });
+
+    test('an attended unit gets nothing from the manager', () => {
+      ledgerWithUnit({ attended: true });
+
+      expect(runHook('compact', compactPayload(unitPath()))).toEqual(silent);
+    });
+
+    test('a finished unit gets nothing', () => {
+      ledgerWithUnit({ state: 'merged' });
+
+      expect(runHook('compact', compactPayload(unitPath()))).toEqual(silent);
+    });
+
+    test('the most specific unit path wins', () => {
+      ledgerWithUnit();
+      const inner = join(unitPath(), 'inner');
+      mkdirSync(inner);
+      writeManagerLog([
+        { type: 'start', cwd: sandbox },
+        unitAdd('a', { path: unitPath(), state: 'running' }),
+        unitAdd('b', { path: inner, state: 'running' }),
+      ]);
+
+      expect(contextOf(runHook('compact', compactPayload(inner)).out)).toContain('`Unit b: question`');
+    });
+
+    test('a unit cwd that is also a work-item workspace gets both texts', () => {
+      ledgerWithUnit();
+      writeLog('20261108-demo', [{ type: 'started', data: { workspace: { path: unitPath(), branch: 'b' } } }]);
+      const text = contextOf(runHook('compact', compactPayload(unitPath())).out);
+
+      expect(text).toContain('## Relay protocol');
+      expect(text).toContain('work: 20261108-demo');
+    });
+
+    test('unrelated cwd with a ledger gives today output', () => {
+      ledgerWithUnit();
+      const other = join(sandbox, 'elsewhere');
+      mkdirSync(other);
+
+      expect(runHook('compact', compactPayload(other))).toEqual(silent);
+    });
+
+    test('no ledger keeps the work-item resume only', () => {
+      const workspace = join(sandbox, 'ws');
+      mkdirSync(workspace);
+      writeLog('20261108-demo', [{ type: 'started', data: { workspace: { path: workspace, branch: 'b' } } }]);
+      const text = contextOf(runHook('compact', compactPayload(workspace)).out);
+
+      expect(text).toContain('work: 20261108-demo');
+      expect(text).not.toContain('Relay protocol');
+    });
+  });
+
+  describe('ask', () => {
+    const askPayload = (cwd: string, extra: Record<string, unknown> = {}) => ({
+      cwd,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'Which?', header: 'h', options: [], multiSelect: false }] },
+      ...extra,
+    });
+
+    test('denies inside an active non-attended unit path', () => {
+      ledgerWithUnit();
+      const result = runHook('ask', askPayload(unitPath()));
+      const reason = JSON.parse(result.out).hookSpecificOutput.permissionDecisionReason as string;
+
+      expect(result.code).toBe(2);
+      expect(reason).toContain('relayed unit a');
+      expect(reason).toContain('`Unit a: question`');
+      expect(reason).toContain('the manager relays it to the owner');
+    });
+
+    test('denies from a nested cwd', () => {
+      ledgerWithUnit();
+      const nested = join(unitPath(), 'src');
+      mkdirSync(nested);
+
+      expect(runHook('ask', askPayload(nested)).code).toBe(2);
+    });
+
+    test('denies for a paused unit', () => {
+      ledgerWithUnit({ state: 'paused' });
+
+      expect(runHook('ask', askPayload(unitPath())).code).toBe(2);
+    });
+
+    test('allows without a ledger', () => {
+      expect(runHook('ask', askPayload(unitPath()))).toEqual(silent);
+    });
+
+    test('allows an attended unit', () => {
+      ledgerWithUnit({ attended: true });
+
+      expect(runHook('ask', askPayload(unitPath()))).toEqual(silent);
+    });
+
+    test.each(['merged', 'done'])('allows a %s unit', (state) => {
+      ledgerWithUnit({ state });
+
+      expect(runHook('ask', askPayload(unitPath()))).toEqual(silent);
+    });
+
+    test('allows the manager cwd', () => {
+      ledgerWithUnit();
+
+      expect(runHook('ask', askPayload(sandbox))).toEqual(silent);
+    });
+
+    test('allows a unit whose path equals the manager cwd', () => {
+      startedLedger([unitAdd('a', { path: sandbox, state: 'running' })]);
+
+      expect(runHook('ask', askPayload(sandbox))).toEqual(silent);
+    });
+
+    test('allows an unrelated cwd', () => {
+      ledgerWithUnit();
+      const other = join(sandbox, 'elsewhere');
+      mkdirSync(other);
+
+      expect(runHook('ask', askPayload(other))).toEqual(silent);
+    });
+
+    test('allows another tool name', () => {
+      ledgerWithUnit();
+
+      expect(runHook('ask', askPayload(unitPath(), { tool_name: 'Bash' }))).toEqual(silent);
+    });
+
+    test('allows an unreadable payload', () => {
+      ledgerWithUnit();
+
+      expect(runHook('ask', 'not json')).toEqual(silent);
+    });
+
+    test('doc-derived fixture: denies from a unit path', async () => {
+      ledgerWithUnit();
+      const fixture = JSON.parse(await Bun.file(join(import.meta.dir, 'fixtures', 'hook-claude-ask.json')).text());
+
+      expect(fixture._source).toContain('doc-derived');
+      expect(fixture.tool_name).toBe('AskUserQuestion');
+      expect(runHook('ask', { ...fixture, cwd: unitPath() }).code).toBe(2);
+      expect(runHook('ask', { ...fixture, cwd: '/repo' })).toEqual(silent);
+    });
   });
 });

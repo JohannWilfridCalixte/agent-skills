@@ -131,6 +131,10 @@ Claude Code, `.claude/settings.json`:
       {
         "matcher": "Agent|mcp__ccd_session__start_session",
         "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh spawn --harness claude", "timeout": 30 }]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{ "type": "command", "command": "bash \"$(git rev-parse --show-toplevel)\"/.agents/skills/agentic-use-workflow/scripts/hook.sh ask --harness claude", "timeout": 30 }]
       }
     ],
     "SessionStart": [

@@ -10,6 +10,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/core/agentic-use-workflow/scripts/hook.sh\" ask --harness claude",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "SessionStart": [

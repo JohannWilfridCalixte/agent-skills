@@ -1,0 +1,67 @@
+---
+name: agentic-claude-agents-manager
+description: Run work units as Claude desktop app sessions and coordinate them (question relay, heartbeat, merge order, sidequests). Claude desktop only.
+disable-model-invocation: true
+argument-hint: "[resume | <units>]"
+---
+
+# Claude Agents Manager
+
+Playbook. This session is the **manager**: it starts work **units** as app sessions, relays their questions, watches them, orders their merges. The owner decides; the manager carries, orders, checks. State lives in the **ledger** (`{output}/_manager/`), written only through `manager <sub>` = `bun {agentic-use-workflow}/scripts/agentic.ts manager <sub>`. Flags: the helper's usage text (`agentic.ts`, no args).
+
+## Hard limits
+
+1. **Code moves through units.** A fix, merge or rebase is a message to the owning unit, or a new unit. The manager edits no file in the repo or a unit's tree and runs no git write.
+2. **Unit state is read, never driven.** Reads: `agentic.ts resume --work <slug>` / `state --work <slug>`, `list_events`, `get_session`, `mcp__ccd_pr__get_status`; changes go by message. An agentic skill invoked on a unit's slug makes the manager its entry skill and fails the unit's open runs.
+
+## Authority
+
+The owner answers everything. The manager answers alone only with a **basis**: an `R<n>` rule, a `preset:<key>` of the unit, an answered `Q<n>`; each such answer is one chat line `Q<n> <unit>: <answer> (basis …)`. Merges and destructive moves (restart from scratch, archive, discard work): the owner's explicit yes, each time.
+
+## 1. Start
+
+Call the Skill tool with "agentic-use-workflow" (helper path, config). Run `manager start` from this session's cwd: it records the manager cwd, which the hooks key on.
+
+- `resume`, or the printed table lists units → [references/resume.md](references/resume.md).
+- `<units>` → the units to add.
+- No argument → ask the owner which units.
+
+Owner asks to take over a session started by hand → resume.md Adoption.
+
+Done when `manager start` exited 0 and the units to add are known.
+
+## 2. Launch table
+
+`manager unit add` each unit per [references/launch.md](references/launch.md): kinds, presets, dependencies, model cap. Show the **launch table** and ask the owner once to confirm or edit; edits → `manager unit set`.
+
+Done when the owner confirmed and `manager status` lists every unit.
+
+## 3. Launch
+
+Each `start <id>` attention line → launch.md Launch one unit. First unit `running` → arm the heartbeat ([references/heartbeat.md](references/heartbeat.md) Arm).
+
+Done when every unit with a `start` line is `running` with session, path and branch recorded, or stays `queued` with its reason told to the owner.
+
+## 4. Wake loop
+
+Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**. `release`, `re-offer` and `answered` print once: act on them in this wake.
+
+| Note status / attention line | Go to |
+|---|---|
+| `question`, `blocked`, `done`, no status line; `question Q<n>` | [references/relay.md](references/relay.md) |
+| `working` | stay idle: the heartbeat tracks its progress |
+| `sidequest`; `re-offer` | [references/sidequests.md](references/sidequests.md) |
+| `pr-ready`; `merge-yes`, `hold`, `release`, `resume` | [references/merges.md](references/merges.md) |
+| cron fire; `stale`, `usage` | [references/heartbeat.md](references/heartbeat.md) |
+| `start` | step 3 |
+| `answered` | nothing: its chat line went out when given |
+
+A note is a report, not proof: check its claims (commits on its branch, cited files exist, PR state) before recording `done` or `pr`.
+
+Done per wake when every attention line is acted on or waits on the owner.
+
+## 5. Finish
+
+Every unit `done` or `failed` → `CronDelete` the heartbeat, re-offer open backlog (sidequests.md Re-offer), give the owner the final table: unit, state, PR, summary.
+
+Done when `manager status` lists only `done` or `failed` units, each with a `unit set --summary` recorded, no heartbeat cron is armed, and the owner has the table.

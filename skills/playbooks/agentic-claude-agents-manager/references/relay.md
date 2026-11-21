@@ -30,7 +30,7 @@ Done when the unit is `waiting` on a recorded cause, or got its unblock and is `
 
 ## Done
 
-Unit sent a merge → merges.md Verify, then Teardown. Else verify its claims (SKILL.md step 4). They hold → `manager unit set <id> --state done --summary …`. Failed beyond recovery → owner, then `--state failed`.
+Unit sent a merge → merges.md Verify, then Teardown; already `merged` → Teardown. Else verify its claims (SKILL.md step 4). They hold → `manager unit set <id> --state done --summary …`. Failed beyond recovery → owner, then `--state failed`.
 
 Done when the unit is `done` or `failed` with its summary, or handed to merges.md.
 

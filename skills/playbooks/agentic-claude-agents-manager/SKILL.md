@@ -46,7 +46,9 @@ Done when every unit with a `start` line is `running` with session, path and bra
 
 Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**, once. `release`, `re-offer` and `answered` print once: act in this wake. A line already put to the owner (`merge-yes`, `usage`, `question`) waits for the answer; the answer stands for that PR head, and for `usage` until a status prints no `usage` line and it comes back. `start` in a turn that cannot launch → launch.md Launch refused; under a paused queue → skip it.
 
-**Hand-off**: a message that gives a unit work (answer, unblock, what its PR misses, release, resume, merge, rebase, cleanup) → `manager unit set <id> --state running` in the same wake, so the heartbeat watches that turn.
+**Hand-off**: a message that gives a unit work (answer, unblock, what its PR misses, release, resume, merge, rebase) → `manager unit set <id> --state running` in the same wake, so the heartbeat watches that turn.
+
+**Kept states**: a `merged` unit stays `merged` (its cleanup message included); a `paused` unit stays `paused` until its `resume` line, its notes handled as usual minus the state moves (a question in it → relay.md Question, without `waiting`).
 
 | Note status / attention line | Go to |
 |---|---|
@@ -66,6 +68,6 @@ Done per wake when every attention line is acted on or waits on the owner.
 
 ## 5. Finish
 
-Every unit `done` or `failed` → heartbeat disarmed (heartbeat.md Arm), re-offer open backlog (sidequests.md Re-offer), give the owner the final table: unit, state, PR, summary.
+Every unit `merged`, `done` or `failed` → heartbeat disarmed (heartbeat.md Arm), re-offer open backlog (sidequests.md Re-offer), give the owner the final table: unit, state, PR, summary.
 
-Done when `manager status` lists only `done` or `failed` units, each with a `unit set --summary` recorded, no heartbeat cron is armed, and the owner has the table.
+Done when `manager status` lists only `merged`, `done` or `failed` units, each with a `unit set --summary` recorded, no heartbeat cron is armed, and the owner has the table.

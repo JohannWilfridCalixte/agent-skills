@@ -4,7 +4,7 @@ From a `pr-ready` note to an archived session: SKILL.md step 4.
 
 ## PR ready
 
-`pr-ready` note → `manager unit set <id> --state pr --pr <url>` at once; its `merge-yes` line → Ask.
+`pr-ready` note → check its claims (SKILL.md step 4): PR open → `manager unit set <id> --state pr --pr <url>`; its `merge-yes` line → Ask.
 
 Done when the unit is `pr`.
 
@@ -16,7 +16,7 @@ Deps first (a stacked chain from its base up), then units others `wait` on, then
 
 `mcp__ccd_pr__get_status` on the unit's session. **Reviewed** = review decision approved, or, for a playbook unit, its own review step reported clean in its `pr-ready` block.
 
-- Checks pending → `SendMessage` the unit: report `pr-ready` again once checks finish.
+- Checks pending → `SendMessage` the unit: wait for them in this turn (`gh pr checks <url> --watch`), then report `pr-ready` again.
 - Checks failing, changes requested or merge conflicts (Conflicts) → `SendMessage` the unit what is missing.
 - A human review only the owner can give → owner.
 - Checks green and reviewed → head sha: `gh pr view <url> --json headRefOid -q .headRefOid`. One AskUserQuestion naming the PR url and that sha: merge and archive the session after cleanup / merge, keep the session / not yet. Every PR and every new head gets its own yes; the answer stands per SKILL.md step 4.
@@ -54,6 +54,6 @@ Done when the unit reports the PR mergeable again, or the owner has the question
 
 ## Teardown
 
-Only after Verify is done (`merged`, then a `manager status`). Cleanup missing from the unit's note → `SendMessage` it to clean up; its next note → here. Merge yes included archive → `archive_session` (the app asks the owner to approve; a session mid-turn is not archived: retry next wake). Then `unit set --state done --summary …`.
+Only after Verify is done (`merged`, then a `manager status`). Cleanup missing from the unit's note → `SendMessage` it to clean up; its next note → here. Merge yes included archive → `archive_session` (the app asks the owner to approve; a session mid-turn is not archived: retry next wake). Then `unit set <id> --summary …`; the unit stays `merged` (SKILL.md Kept states).
 
-Done when the unit is `done` with its summary.
+Done when the unit is `merged` with its summary.

@@ -4500,6 +4500,7 @@ describe('manager hooks', () => {
   };
 
   describe('spawn', () => {
+    const queuedUnit = (extra: Record<string, unknown> = {}) => ledgerWithUnit({ state: 'queued', ...extra });
     const spawn = (prompt: string, toolInput: Record<string, unknown> = {}) => runHook('spawn', startSessionPayload(prompt, toolInput));
 
     const promptOf = (id = 'a') => {
@@ -4523,7 +4524,7 @@ describe('manager hooks', () => {
     });
 
     test('from the manager cwd a prompt without the line denies naming both forms', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn('Work item: none\n\nTask: look around');
 
       expect(result.code).toBe(2);
@@ -4533,19 +4534,19 @@ describe('manager hooks', () => {
     });
 
     test('from the manager cwd Manager unit: none skips the manager check', () => {
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(spawn('Manager unit: none\nWork item: none\n\nTask: look around')).toEqual(silent);
     });
 
     test('an Agent spawn from the manager cwd without the line is unchanged', () => {
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(runHook('spawn', { cwd: sandbox, tool_name: 'Agent', tool_input: { prompt: 'Task: look around' } })).toEqual(silent);
     });
 
     test('from another cwd a prompt without the line is unchanged', () => {
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(runHook('spawn', { ...JSON.parse(startSessionPayload('Task: x')), cwd: unitPath() })).toEqual(silent);
     });
@@ -4562,7 +4563,7 @@ describe('manager hooks', () => {
     });
 
     test('a corrupt ledger line is skipped and the brief still checks', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const prompt = promptOf();
       appendFileSync(join(managerDir(), 'events.jsonl'), '{"ts":"2026-11-21T11:00:00Z","type":"unit-s');
 
@@ -4571,7 +4572,7 @@ describe('manager hooks', () => {
     });
 
     test('an unreadable ledger denies a Manager unit brief', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const prompt = promptOf();
       rmSync(join(managerDir(), 'events.jsonl'));
       mkdirSync(join(managerDir(), 'events.jsonl'));
@@ -4580,25 +4581,33 @@ describe('manager hooks', () => {
     });
 
     test('the printed brief with matching model and effort allows', () => {
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(spawn(promptOf())).toEqual(silent);
     });
 
     test('a model alias equals the ledger full id', () => {
-      ledgerWithUnit({ model: 'claude-opus-4-7' });
+      queuedUnit({ model: 'claude-opus-4-7' });
 
       expect(spawn(promptOf(), { model: 'opus' })).toEqual(silent);
     });
 
     test('an attended brief carries its own relay block', () => {
-      ledgerWithUnit({ attended: true });
+      queuedUnit({ attended: true });
 
       expect(spawn(promptOf())).toEqual(silent);
     });
 
+    test.each(['running', 'merged', 'failed'])('a %s unit denies naming its state', (state) => {
+      ledgerWithUnit({ state });
+      const result = spawn(promptOf());
+
+      expect(result.code).toBe(2);
+      expect(result.err).toContain(`unit a is ${state}, only a queued unit starts`);
+    });
+
     test('unknown unit denies naming the brief command', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn('Manager unit: ghost\nWork item: none');
 
       expect(result.code).toBe(2);
@@ -4608,7 +4617,7 @@ describe('manager hooks', () => {
     });
 
     test('missing Work item: none denies', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn(promptOf().replace('Work item: none', 'Work item: x'));
 
       expect(result.code).toBe(2);
@@ -4616,7 +4625,7 @@ describe('manager hooks', () => {
     });
 
     test('an altered relay block denies', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn(promptOf().replace('Merge a PR only at', 'Merge a PR anytime at'));
 
       expect(result.code).toBe(2);
@@ -4624,15 +4633,15 @@ describe('manager hooks', () => {
     });
 
     test('an attended relay block on a non-attended unit denies', () => {
-      ledgerWithUnit({ attended: true });
+      queuedUnit({ attended: true });
       const attended = promptOf();
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(spawn(attended).code).toBe(2);
     });
 
     test('model mismatch denies with the expected model, effort and fix', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn(promptOf(), { model: 'sonnet' });
 
       expect(result.code).toBe(2);
@@ -4642,7 +4651,7 @@ describe('manager hooks', () => {
     });
 
     test('effort mismatch denies', () => {
-      ledgerWithUnit();
+      queuedUnit();
       const result = spawn(promptOf(), { effort: 'low' });
 
       expect(result.code).toBe(2);
@@ -4650,7 +4659,7 @@ describe('manager hooks', () => {
     });
 
     test('other tools are ignored', () => {
-      ledgerWithUnit();
+      queuedUnit();
 
       expect(runHook('spawn', { cwd: sandbox, tool_name: 'Bash', tool_input: { prompt: 'Manager unit: ghost' } })).toEqual(silent);
     });

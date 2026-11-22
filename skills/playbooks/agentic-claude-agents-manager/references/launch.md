@@ -49,6 +49,6 @@ Done when the owner has the line for every queued unit.
 
 ## Spawn denied
 
-The spawn hook's reason names the fix (`manager brief <id>`, expected model and effort) → re-run `manager brief <id>` and pass its output unchanged. A session from this cwd that is no unit → prompt line `Manager unit: none`.
+The spawn hook's reason names the fix (`manager brief <id>`, expected model and effort) → re-run `manager brief <id>` and pass its output unchanged. A session from this cwd that is no unit → prompt line `Manager unit: none`. Unit not `queued` (already started, or closed) → no second session: message the running session, or add a new unit.
 
 Done when the relaunch passed the hook.

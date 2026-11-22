@@ -2325,6 +2325,7 @@ const managerSpawnIssues = (state: ManagerState | undefined, id: string, payload
   const gotModel = textOf(toolInput.model);
   const gotEffort = textOf(toolInput.effort);
   const issues: string[] = [];
+  if (unit.state !== 'queued') issues.push(`unit ${id} is ${unit.state}, only a queued unit starts`);
   if (!/^[ \t]*Work item:[ \t]*none\b/m.test(brief)) issues.push('Work item: none');
   if (!brief.includes(relayProtocol(id, unit.attended))) issues.push('the relay protocol block, verbatim');
   if (claudeAlias('claude', unit.model) !== (gotModel === undefined ? undefined : claudeAlias('claude', gotModel))) {

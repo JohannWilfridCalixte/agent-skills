@@ -3018,6 +3018,9 @@ const statusReport = (state: ManagerState, limits: ManagerLimits) => {
     ...units
       .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.length > 0 && allMerged(state, unit.pausedBy))
       .map(([id, unit]) => `resume ${id}: ${unit.pausedBy.join(', ')} merged`),
+    ...units
+      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.some((sidequest) => state.units[sidequest]?.state === 'failed'))
+      .map(([id, unit]) => `stuck ${id}: paused by failed ${unit.pausedBy.filter((sidequest) => state.units[sidequest]?.state === 'failed').join(', ')}`),
     ...(state.usage !== null && state.usage >= limits.usage ? [`usage ${state.usage}%: ask owner before starting queued units`] : []),
     ...offered.map((id) => `re-offer ${id}: ${state.backlog[id]?.title}`),
     ...Object.entries(state.questions)

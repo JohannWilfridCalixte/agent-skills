@@ -48,13 +48,13 @@ Idle between wakes. A wake is a unit's **note** (first 400 chars of its final me
 
 **Hand-off**: a message that gives a unit work (answer, unblock, what its PR misses, release, resume, merge, rebase) → `manager unit set <id> --state running` in the same wake, so the heartbeat watches that turn.
 
-**Kept states**: a `merged` unit stays `merged` (its cleanup message included); a `paused` unit stays `paused` until its `resume` line, its notes handled as usual minus the state moves (a question in it → relay.md Question, without `waiting`). An answer to a `paused` unit is held and goes out in its `resume` message, its only Hand-off.
+**Kept states**: a `merged` unit stays `merged` (its cleanup message included); a `paused` unit stays `paused` until its `resume` line or the owner's answer to its `stuck` line, its notes handled as usual minus the state moves (a question in it → relay.md Question, without `waiting`). An answer to a `paused` unit is held and goes out in its `resume` message, its only Hand-off.
 
 | Note status / attention line | Go to |
 |---|---|
 | `question`, `blocked`, `done`, no status line; `question Q<n>` | [references/relay.md](references/relay.md) |
 | `working` | stay idle: the heartbeat tracks its progress |
-| `sidequest`; `re-offer` | [references/sidequests.md](references/sidequests.md) |
+| `sidequest`; `re-offer`, `stuck` | [references/sidequests.md](references/sidequests.md) |
 | `pr-ready`; `merge-yes`, `hold`, `release`, `resume` | [references/merges.md](references/merges.md) |
 | cron fire; `usage` | [references/heartbeat.md](references/heartbeat.md) |
 | `stale` | nothing: the cron wake's `beat` acted on its rung |

@@ -4402,6 +4402,35 @@ describe('manager status', () => {
     expect(status()).toContain('resume c: sq1, sq2 merged');
   });
 
+  test('stuck line when a paused unit\'s sidequest failed', () => {
+    startedLedger([unitAdd('side', { state: 'failed' }), unitAdd('a', { state: 'paused', pausedBy: 'side' })]);
+
+    const text = status();
+    expect(text).toContain('stuck a: paused by failed side');
+    expect(text).not.toContain('resume a');
+  });
+
+  test('stuck, not resume, when one sidequest merged and one failed', () => {
+    startedLedger([
+      unitAdd('sq1', { state: 'merged' }),
+      unitAdd('sq2', { state: 'failed' }),
+      unitAdd('a', { state: 'paused', pausedBy: 'sq1' }),
+    ]);
+    managerOk(['unit', 'set', 'a', '--paused-by', 'sq2']);
+
+    const text = status();
+    expect(text).toContain('stuck a: paused by failed sq2');
+    expect(text).not.toContain('resume a');
+  });
+
+  test('all merged gives resume only, no stuck', () => {
+    startedLedger([unitAdd('side', { state: 'merged' }), unitAdd('a', { state: 'paused', pausedBy: 'side' })]);
+
+    const text = status();
+    expect(text).toContain('resume a: side merged');
+    expect(text).not.toContain('stuck');
+  });
+
   test('usage line from the latest beat', () => {
     startedLedger([unitAdd('a'), { type: 'beat', seen: {}, usage: 85 }]);
 

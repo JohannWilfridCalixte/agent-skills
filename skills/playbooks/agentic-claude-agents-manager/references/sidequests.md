@@ -28,3 +28,9 @@ Done when `B<n>` is open, the ticket answer is recorded and the unit is `running
 `re-offer B<n>` line (a unit finished, or another unit raised it: `backlog set B<n> --from <unit>`) → ask the owner again. Started → `backlog set B<n> --state started` plus Yes above; dropped → `--state dropped`.
 
 Done when the owner answered and `B<n>` carries the answer.
+
+## Failed
+
+`stuck <id>` line: a sidequest pausing the unit failed, nothing will resume it. Ask the owner per unit: resume with its workaround / keep paused (another sidequest: Yes above, `--paused-by` it) / fail the unit. Resume → `SendMessage` the unit: update, continue with its workaround, its held answers; `manager unit set <id> --state running` (leaving `paused` clears the list).
+
+Done when the owner answered and the unit is `running`, still `paused` by a new sidequest, or `failed`.

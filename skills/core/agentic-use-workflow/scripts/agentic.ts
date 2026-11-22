@@ -2810,6 +2810,8 @@ const unitPathMatches = (state: ManagerState, here: string) => {
   });
 };
 
+const isAppSuffixed = (leaf: string, id: string) => leaf.startsWith(`${id}-`) && /^[0-9a-f]{6}$/.test(leaf.slice(id.length + 1));
+
 const unitBranchMatches = (state: ManagerState, here: string) => {
   const branch = gitOutput(here, ['branch', '--show-current'])?.trim();
   if (branch === undefined || branch === '') return [];
@@ -2817,7 +2819,7 @@ const unitBranchMatches = (state: ManagerState, here: string) => {
   const leaf = branch.split('/').at(-1) ?? branch;
 
   return Object.entries(state.units).flatMap(([id, unit]) => {
-    const named = new RegExp(`^${id}(-[0-9a-f]+)?$`).test(leaf) || unit.branch === branch || unit.branch === leaf;
+    const named = leaf === id || isAppSuffixed(leaf, id) || unit.branch === branch || unit.branch === leaf;
     const reachable = unit.state === 'queued' || liveUnitStates.includes(unit.state);
 
     return !unit.attended && reachable && named ? [{ id, unit, path: here }] : [];

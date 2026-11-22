@@ -32,7 +32,7 @@ One session per work unit today: the owner starts each playbook or task by hand,
   - Written only through `bun agentic.ts manager <sub>`: `start`, `unit add`, `unit set`, `brief`, `question open`, `question answer`, `rule add`, `backlog add`, `backlog set`, `beat`, `status`. Flags: helper usage. Unit id `none` is reserved.
   - Launch order: `unit add` each unit (deps first), then the launch table is shown and the owner confirms once. Edits beyond model / effort / attended: unit marked `failed` and re-added.
   - `manager` commands are refused (exit 1) from a unit's cwd, except for a unit whose path equals the manager cwd.
-  - Unit matching (hooks and the refusal above): cwd inside a live unit's recorded path (`running | waiting | paused | pr`) first, then current branch against unit id (+ app hex suffix) or the recorded branch.
+  - Unit matching (hooks and the refusal above): cwd inside a live unit's recorded path (`running | waiting | paused | pr`) first, then current branch against unit id (+ `-` and the app's 6-hex suffix) or the recorded branch.
   - Ledger read: hooks lenient (unparseable lines skipped, read error = no ledger → allow), CLI strict (bad line → exit 1). Exception: a `Manager unit: <id>` spawn fails closed.
   - `hook spawn`: strict from the manager's cwd.
     - A `start_session` from the recorded manager cwd needs a `Manager unit: <id>` line, or `Manager unit: none` for a session outside the ledger; else deny.
@@ -112,7 +112,7 @@ sequenceDiagram
 - A unit turn woken by another session's message cannot `start_session`: its steps fall back to subagents.
 - Anything enumerating work items in `{output}` must skip `_manager`.
 - Wake limit seen live: after many child notes in a row with no owner message, the app holds further notes until the owner's next turn (a held `done` note arrived with the owner's next message). `working` turn-ends spend that budget; a later `question` or `done` note can be held, so the heartbeat (which reads an idle unit's last message) is the guaranteed channel.
-- Branch fallback matches non-attended units that are `queued` or live. Unit matching by branch is loose (hex suffix pattern may over-match; unit id used unescaped in a pattern). Spawn check ignores unit state.
+- Branch fallback matches non-attended units that are `queued` or live. Spawn check ignores unit state.
 
 ## History
 

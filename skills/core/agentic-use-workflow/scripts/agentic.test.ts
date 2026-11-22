@@ -4820,6 +4820,33 @@ describe('manager hooks', () => {
         expect(runHook('ask', askPayload(queuedOnBranch('claude/ab-8a68c6')))).toEqual(silent);
       });
 
+      test('allows a branch that only starts with the unit id', () => {
+        const checkout = join(sandbox, 'checkouts', 'loose');
+        mkdirSync(checkout, { recursive: true });
+        git(checkout, ['init', '-q', '-b', 'claude/fix-bad']);
+        startedLedger([unitAdd('fix')]);
+
+        expect(runHook('ask', askPayload(checkout))).toEqual(silent);
+      });
+
+      test('denies the app suffix on the unit id', () => {
+        const checkout = join(sandbox, 'checkouts', 'suffix');
+        mkdirSync(checkout, { recursive: true });
+        git(checkout, ['init', '-q', '-b', 'claude/fix-8a68c6']);
+        startedLedger([unitAdd('fix')]);
+
+        expect(runHook('ask', askPayload(checkout)).code).toBe(2);
+      });
+
+      test('a hand-edited unit id with regex metacharacters neither throws nor matches', () => {
+        const checkout = join(sandbox, 'checkouts', 'meta');
+        mkdirSync(checkout, { recursive: true });
+        git(checkout, ['init', '-q', '-b', 'claude/a-8a68c6']);
+        startedLedger([unitAdd('a(')]);
+
+        expect(runHook('ask', askPayload(checkout))).toEqual(silent);
+      });
+
       test('allows an attended unit', () => {
         expect(runHook('ask', askPayload(queuedOnBranch('a', { attended: true })))).toEqual(silent);
       });

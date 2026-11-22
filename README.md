@@ -118,9 +118,9 @@ done
 
 ### Hooks
 
-Four hooks back the workflow: `hook spawn` blocks a subagent spawn or session start whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named, and `hook ask` (Claude desktop app only, PreToolUse `AskUserQuestion`) tells a relayed manager unit to end its turn with its question block instead of prompting. From the agents manager's cwd, `hook spawn` also needs a `Manager unit:` line in the brief, and `hook compact` re-injects the manager status (or a unit's relay block). Details: [docs/configuration.md](docs/configuration.md#hooks).
+Four hooks back the workflow: `hook spawn` blocks a subagent spawn or session start whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named, and `hook ask` (Claude Code only, ships in the Claude plugin, acts only where a manager ledger exists; PreToolUse `AskUserQuestion`) tells a relayed manager unit to end its turn with its question block instead of prompting. Details: [docs/configuration.md](docs/configuration.md#hooks).
 
-- **Plugins** (Claude Code, Cursor, Codex) ship them. Codex: review and trust the plugin hooks with `/hooks`.
+- **Plugins** (Claude Code, Cursor, Codex) ship them. `hook ask` is in the Claude plugin only. Codex: review and trust the plugin hooks with `/hooks`.
 - **skills CLI installs** get no hooks. Wire them by hand, adjusting the path if the skills landed elsewhere than `.agents/skills`.
 
 Claude Code, `.claude/settings.json`:
@@ -153,7 +153,7 @@ Claude Code, `.claude/settings.json`:
 }
 ```
 
-Codex, `.codex/hooks.json`: same shape without `SubagentStop` and the `AskUserQuestion` entry, with `--harness codex`.
+Codex, `.codex/hooks.json`: same shape, `Agent` spawn matcher only, no `SubagentStop`, no `AskUserQuestion`, with `--harness codex`.
 
 Cursor, `.cursor/hooks.json`:
 
@@ -265,8 +265,8 @@ Per harness:
   - Opens no work item.
 - **`agentic-claude-agents-manager`** (Claude desktop app only):
   - The manager session runs units (playbooks, free tasks, sidequests) as separate app sessions, up to `manager.parallel`.
-  - Relay: a unit's questions reach you through the manager; the manager auto-answers only from decisions you recorded. A heartbeat (`manager.heartbeat` minutes) checks for stalled units.
-  - Merges go in order, each on your yes for one PR at one head sha. A sidequest raised by a unit can pause its raiser.
+  - Relay: a unit's questions reach you through the manager; the manager answers alone only on a recorded basis (a rule you set, a launch preset, an answered question). A heartbeat (`manager.heartbeat` minutes) checks for stalled units.
+  - Merges go in order, each on your explicit yes for that PR; the manager re-checks the head before relaying and the merged sha after. A sidequest raised by a unit can pause its raiser.
   - State lives in the ledger `{output}/_manager/`. The rest: [SKILL.md](skills/playbooks/agentic-claude-agents-manager/SKILL.md), [ADR-0008](docs/tech/adr/0008-agents-manager.md).
 
 ### Light vs full mode

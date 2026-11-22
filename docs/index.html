@@ -597,10 +597,10 @@ codex plugin add agentic@agentic</code></pre></div></dd>
             <h4>agentic-claude-agents-manager</h4>
             <div>
               <p>Running several units (playbooks, free tasks) in parallel from one Claude desktop app session that relays their questions, watches them and orders merges. Claude desktop app only.</p>
-              <div class="code"><pre><code data-cmd="agentic-claude-agents-manager resume">/agentic-claude-agents-manager resume</code></pre></div>
+              <div class="code"><pre><code>/agentic-claude-agents-manager resume</code></pre></div>
               <ul class="more">
-                <li>Each unit is its own app session; its questions reach you through the manager, which auto-answers only from decisions you recorded.</li>
-                <li>A heartbeat checks for stalled units. Merges go in order, each on your yes for one PR at one head sha.</li>
+                <li>Each unit is its own app session; its questions reach you through the manager, which answers alone only on a recorded basis (a rule you set, a launch preset, an answered question).</li>
+                <li>A heartbeat checks for stalled units. Merges go in order, each on your explicit yes for that PR; the manager re-checks the head before relaying and the merged sha after.</li>
                 <li>State lives in the ledger <code>{output}/_manager/</code>.</li>
               </ul>
             </div>
@@ -702,7 +702,7 @@ codex plugin add agentic@agentic</code></pre></div></dd>
         <div class="layers wide">
           <div class="layer layer-play">
             <h4>Playbooks</h4>
-            <p>User-invoked end-to-end chains in <code>skills/playbooks</code>. Each one calls flow skills in order.</p>
+            <p>User-invoked end-to-end chains in <code>skills/playbooks</code>. Most call flow skills in order; <code>agentic-claude-agents-manager</code> coordinates other playbooks as app sessions.</p>
             <ul class="chips" aria-label="Playbooks">
               <li>agentic-implement-feature</li><li>agentic-change-feature</li><li>agentic-debug</li><li>agentic-pr-review</li><li>agentic-security-audit</li><li>agentic-claude-agents-manager</li>
             </ul>

@@ -15,8 +15,8 @@
 - Step keys `write`, `plan`; an unknown step key exits 1.
 - Sessions: in the Claude desktop app, long steps (`implement`, `review.*`, `plan`, `write`, `tickets`) run as separate app sessions (`mcp__ccd_session__start_session`), reporting through `put reports/{agent}.md`; else subagents as before. `hook spawn` checks session starts like `Agent` spawns (`hooks/claude.json` matcher widened). `hook subagent-stop` does not cover sessions.
 - Skill `agentic-claude-agents-manager` (Claude desktop app only): runs units as app sessions, relays their questions, watches them, orders merges.
-- Helper `manager` commands (`start`, `unit add|set`, `brief`, `question open|answer`, `rule add`, `backlog add|set`, `beat`, `status`), ledger in `{output}/_manager/`.
-- `hook ask` (Claude, PreToolUse `AskUserQuestion`, shipped in `hooks/claude.json`): a relayed manager unit must end its turn with its question block.
+- Helper `manager` commands (ledger `{output}/_manager/`; usage: `agentic.ts` with no args).
+- `hook ask` (Claude Code only, PreToolUse `AskUserQuestion`, shipped in `hooks/claude.json`): a relayed manager unit must end its turn with its question block.
 - Step keys `unit`, `unit.sidequest` (`unit.<playbook>` falls back to `unit`); limits `manager.parallel` 4, `manager.heartbeat` 15, `manager.usage` 80.
 
 ### Changed

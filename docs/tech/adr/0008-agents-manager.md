@@ -120,3 +120,4 @@ sequenceDiagram
 |---|---|
 | 2026-11-21 | Created |
 | 2026-11-22 | Re-synced with the built feature: sixth status `working`; merge yes names the head sha (protocol binding); strict `hook spawn` + `Manager unit: none`; `manager` refused from unit cwd; lenient hook ledger reads; unit matching; sidequests start first, `--paused-by` list; `--deps` needs `--dep-mode`; launch order; heartbeat rules; limits read by code; wake-limit consequence; alternatives reasons re-sourced |
+| 2026-11-22 | Review fixes: `merge --head <sha>` helper-enforced, required from a relayed unit; spawn denied unless unit `queued`; `stuck` line (dep or sidequest closed without merge); `unit set --deps`, `--state paused --paused-by` replace; 6-hex branch suffix; relay steers turn ends onto a status |

@@ -958,6 +958,9 @@ const mergeRefusal = (review: ReviewVerdict, view: Record<string, unknown>) => {
 
 const refuseUnboundRelayedMerge = (context: Context, approved: string | undefined) => {
   const ledger = hookManagerState(context);
+  if (ledger === undefined && approved === undefined && existsSync(managerPaths(context).events)) {
+    throw new CliError(1, 'merge: manager ledger unreadable: pass --head <approved sha>', false);
+  }
   const match = ledger === undefined || isManagerCwd(ledger, context.cwd) ? undefined : unitAt(ledger, context.cwd);
   if (match !== undefined && !match.unit.attended && approved === undefined) {
     throw new CliError(1, `merge: manager unit ${match.id} needs --head <approved sha>`, false);
@@ -3025,9 +3028,9 @@ const statusReport = (state: ManagerState, limits: ManagerLimits) => {
     ...units.filter(([, unit]) => unit.state === 'running' && unit.misses >= 1).map(([id, unit]) => `stale ${id}: ${rungOf(unit.misses)}`),
     ...units.filter(([, unit]) => unit.state === 'pr').map(([id, unit]) => `merge-yes ${id}: ${unit.pr}`),
     ...startableUnits(state, limits.parallel).map((id) => `start ${id}`),
-    ...[...activeWaiters(state), ...units.filter(([, unit]) => unit.state === 'queued' && unit.depMode === 'stacked')].flatMap(([id, unit]) =>
-      unit.deps.filter((dep) => closedUnmerged(state, dep)).map((dep) => `stuck ${id}: dep ${dep} closed without merge`),
-    ),
+    ...units
+      .filter(([, unit]) => unit.state === 'queued' || liveUnitStates.includes(unit.state))
+      .flatMap(([id, unit]) => unit.deps.filter((dep) => closedUnmerged(state, dep)).map((dep) => `stuck ${id}: dep ${dep} closed without merge`)),
     ...activeWaiters(state)
       .filter(([, unit]) => !allMerged(state, unit.deps))
       .flatMap(([id, unit]) =>
@@ -3172,24 +3175,25 @@ const unitAddCommand: Command = {
 const unitSetCommand: Command = {
   name: 'manager unit set',
   usage:
-    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends; replaces with --state paused)] [--deps a,b (replaces; empty clears)] [--summary t]',
+    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends; with --state paused replaces closed entries, keeps open ones)] [--deps a,b (subset of current; empty clears)] [--summary t]',
   arguments: 1,
   flags: ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'paused-by', 'deps', 'summary'],
   required: [],
   async run(context) {
     const [id = ''] = context.positionals;
     const { paths, state } = requireManager(context);
-    existingUnit(state, id);
+    const unit = existingUnit(state, id);
 
     const path = flagText(context, 'path');
-    const pausedBy = flagText(context, 'paused-by');
-    if (pausedBy !== undefined) existingUnit(state, pausedBy);
+    const pausedByText = flagText(context, 'paused-by');
+    if (pausedByText !== undefined) existingUnit(state, pausedByText);
+    const repause = pausedByText !== undefined && flagText(context, 'state') === 'paused';
+    const pausedBy = repause ? [...unit.pausedBy.filter((sidequest) => !closedUnmerged(state, sidequest)), pausedByText] : pausedByText;
 
     const depsText = flagText(context, 'deps');
     const deps = depsText?.split(',').map((dep) => dep.trim()).filter(Boolean);
     for (const dep of deps ?? []) {
-      if (dep === id) throw new CliError(1, `unit "${id}" cannot depend on itself`, false);
-      existingUnit(state, dep);
+      if (!unit.deps.includes(dep)) throw new CliError(1, `--deps only drops deps: ${dep} is not a dep of ${id}`, false);
     }
 
     const attended = enumFlag(context, 'attended', ['true', 'false']);

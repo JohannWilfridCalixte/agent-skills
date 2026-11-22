@@ -3806,6 +3806,26 @@ describe('merge', () => {
     test('no ledger merges without --head', () => {
       expect(merge().code).toBe(0);
     });
+
+    test('an unreadable ledger refuses without --head, before gh', () => {
+      relayed();
+      rmSync(join(outputRoot, '_manager', 'events.jsonl'));
+      mkdirSync(join(outputRoot, '_manager', 'events.jsonl'));
+
+      const result = merge();
+
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('merge: manager ledger unreadable: pass --head <approved sha>');
+      expect(ghCalls()).toEqual([]);
+    });
+
+    test('an unreadable ledger merges with --head', () => {
+      relayed();
+      rmSync(join(outputRoot, '_manager', 'events.jsonl'));
+      mkdirSync(join(outputRoot, '_manager', 'events.jsonl'));
+
+      expect(merge(view(), undefined, ['--head', head]).code).toBe(0);
+    });
   });
 
   test('arguments are a usage error', () => {
@@ -4030,22 +4050,32 @@ describe('manager unit set', () => {
     expect(manager(['unit', 'set', 'a']).code).toBe(2);
   });
 
-  test('--state paused with --paused-by replaces the list, bare --paused-by appends', () => {
+  test('--state paused with --paused-by drops closed entries only, bare --paused-by appends', () => {
+    startedLedger([unitAdd('a'), unitAdd('b', { state: 'failed' }), unitAdd('c', { state: 'running' })]);
     managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'b']);
-    managerOk(['unit', 'set', 'a', '--paused-by', 'a']);
-    expect(managerState().units.a.pausedBy).toEqual(['b', 'a']);
+    managerOk(['unit', 'set', 'a', '--paused-by', 'c']);
+    expect(managerState().units.a.pausedBy).toEqual(['b', 'c']);
 
-    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'b']);
-    expect(managerState().units.a.pausedBy).toEqual(['b']);
+    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'a']);
+    expect(managerState().units.a.pausedBy).toEqual(['c', 'a']);
   });
 
-  test('--deps replaces the deps list and an empty value clears it', () => {
-    startedLedger([unitAdd('a'), unitAdd('b'), unitAdd('c', { deps: ['a'], depMode: 'wait' })]);
-    managerOk(['unit', 'set', 'c', '--deps', 'a,b']);
-    expect(managerState().units.c).toMatchObject({ deps: ['a', 'b'], depMode: 'wait' });
+  test('--deps only drops, an empty value clears it', () => {
+    startedLedger([unitAdd('a'), unitAdd('b'), unitAdd('c', { deps: ['a', 'b'], depMode: 'wait' })]);
+    managerOk(['unit', 'set', 'c', '--deps', 'a']);
+    expect(managerState().units.c).toMatchObject({ deps: ['a'], depMode: 'wait' });
 
     managerOk(['unit', 'set', 'c', '--deps', '']);
     expect(managerState().units.c.deps).toEqual([]);
+  });
+
+  test('--deps naming a unit that is not a dep exits 1', () => {
+    startedLedger([unitAdd('a'), unitAdd('b'), unitAdd('c', { deps: ['a'], depMode: 'wait' })]);
+
+    const result = manager(['unit', 'set', 'c', '--deps', 'a,b']);
+
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('--deps only drops deps: b is not a dep of c');
   });
 
   test.each([
@@ -4498,6 +4528,36 @@ describe('manager status', () => {
     const text = status();
     expect(text).toContain('stuck s: dep base closed without merge');
     expect(text).not.toContain('start s');
+  });
+
+  test('stuck for a running stacked unit whose dep failed', () => {
+    startedLedger([unitAdd('base', { state: 'failed', branch: 'feat-base' }), unitAdd('s', { state: 'running', deps: ['base'], depMode: 'stacked' })]);
+
+    expect(status()).toContain('stuck s: dep base closed without merge');
+  });
+
+  test('stuck for a queued wait unit whose dep is done', () => {
+    startedLedger([unitAdd('base', { state: 'done' }), unitAdd('w', { deps: ['base'], depMode: 'wait' })]);
+
+    expect(status()).toContain('stuck w: dep base closed without merge');
+  });
+
+  test('re-pausing keeps an open sidequest: no resume until it merged too', () => {
+    startedLedger([
+      unitAdd('sq1', { state: 'done' }),
+      unitAdd('sq2', { state: 'running' }),
+      unitAdd('sq3', { state: 'running' }),
+      unitAdd('a', { state: 'paused', pausedBy: 'sq1' }),
+    ]);
+    managerOk(['unit', 'set', 'a', '--paused-by', 'sq2']);
+    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'sq3']);
+    expect(managerState().units.a.pausedBy).toEqual(['sq2', 'sq3']);
+
+    managerOk(['unit', 'set', 'sq3', '--state', 'merged']);
+    expect(status()).not.toContain('resume a');
+
+    managerOk(['unit', 'set', 'sq2', '--state', 'merged']);
+    expect(status()).toContain('resume a: sq2, sq3 merged');
   });
 
   test('stuck, not resume, for a unit paused by a done sidequest', () => {

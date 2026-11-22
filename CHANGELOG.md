@@ -22,9 +22,9 @@
 ### Changed
 
 - `hook spawn`: a brief carrying `Manager unit: <id>` must match the `manager brief` output (ledger model and effort; fails closed); from the manager's cwd a `start_session` needs that line or `Manager unit: none`.
-- `merge --head <sha>`: refuses another PR head; required from a relayed unit's checkout.
+- `merge --head <sha>`: refuses another PR head; required from a relayed unit's checkout and when the manager ledger is unreadable.
 - `hook spawn`: a `Manager unit: <id>` brief is denied unless the unit is `queued`.
-- Manager: `stuck <id>` attention line for a unit whose dep or pausing sidequest closed without merge; `unit set --deps` replaces deps; `--state paused --paused-by` replaces the list; branch fallback matches only the app's 6-hex suffix; relay protocol steers turn ends onto a status.
+- Manager: `stuck <id>` attention line for every unit not closed whose dep, or paused unit whose sidequest, closed without merge; `unit set --deps` only drops deps; `--state paused --paused-by` drops closed entries, keeps open ones; branch fallback matches only the app's 6-hex suffix; relay protocol steers turn ends onto a status.
 - `hook compact`: the manager's cwd gets `manager status`, a relayed unit gets its relay block.
 
 ## 4.0.0 - 2026-11-08

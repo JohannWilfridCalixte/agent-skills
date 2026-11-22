@@ -50,10 +50,15 @@ Done when every released, resumed and stacked unit got its message and is `runni
 
 `stuck <id>` line: a dep or a sidequest ended `failed` or `done` without merging, so nothing releases or resumes the unit. Ask the owner per unit:
 
-- `dep <ref>` line → continue without it: `manager unit set <id> --deps <remaining deps>` (empty clears), then `SendMessage` the unit: update from the default branch, proceed (SKILL.md Hand-off). Or fail the unit: `manager unit set <id> --state failed --summary …`.
-- `paused by <ref>` line → resume with its workaround: `SendMessage` the unit (update, workaround, its held answers), `manager unit set <id> --state running`. Or keep paused under a new sidequest: [sidequests.md](sidequests.md) Yes, then `manager unit set <id> --state paused --paused-by <new sq>` (replaces the list). Or fail the unit as above.
+- `dep <ref>` line → continue without it: `manager unit set <id> --deps <remaining deps>` (only drops; empty clears), then `manager status` and act on that unit's line:
+  - `start` (queued) → [launch.md](launch.md) Launch one unit.
+  - `release` → After merge above.
+  - `hold` → nothing.
+  - no line, unit live (no dep left) → `SendMessage`: dep dropped, update from the default branch (stacked: rebase onto it, retarget the PR), proceed (SKILL.md Hand-off).
+  Or fail the unit: `manager unit set <id> --state failed --summary …`.
+- `paused by <ref>` line → resume with its workaround, only when no listed sidequest is still open: `SendMessage` the unit (update, workaround, its held answers), `manager unit set <id> --state running`. Or keep paused under a new sidequest: [sidequests.md](sidequests.md) Yes, then `manager unit set <id> --state paused --paused-by <new sq>` (drops the closed entries, keeps the open ones). Or fail the unit as above.
 
-Done when the owner answered and the unit is `running`, `paused` by a new sidequest or `failed`.
+Done when the owner answered and the unit is `running`, `queued` with its deps fixed, `paused` or `failed`.
 
 ## Conflicts
 

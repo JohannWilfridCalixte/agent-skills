@@ -3374,8 +3374,8 @@ describe('merge', () => {
 
   const prEvent: TestEvent = { type: 'artifact', step: 'implement', data: { name: 'pr', pr: { url: prUrl, round: 1 } } };
 
-  const merge = (rollup: Record<string, unknown> = view(), actions: { runs: unknown; jobs: unknown } = { runs, jobs: startedJobs }) =>
-    agentic(['merge', '--work', 'demo'], {
+  const merge = (rollup: Record<string, unknown> = view(), actions: { runs: unknown; jobs: unknown } = { runs, jobs: startedJobs }, extra: readonly string[] = []) =>
+    agentic(['merge', '--work', 'demo', ...extra], {
       cwd: repo,
       env: { AGENTIC_GH: ghPath, FAKE_VIEW: JSON.stringify(rollup), FAKE_RUNS: JSON.stringify(actions.runs), FAKE_JOBS: JSON.stringify(actions.jobs), FAKE_GH_LOG: ghLog },
     });
@@ -3409,6 +3409,41 @@ describe('merge', () => {
     expect(mergeCalls()).toEqual([`pr merge 7 --squash --match-head-commit ${head}`]);
     const logged = readLog(name).at(-1);
     expect(logged).toMatchObject({ workflow: 'babysit-pr', step: 'merge', type: 'completed', data: { pr: 7, head, proof: 'github-checks' } });
+  });
+
+  test('--head with the full sha merges pinned to the full head', () => {
+    expect(merge(view(), undefined, ['--head', head]).code).toBe(0);
+    expect(mergeCalls()).toEqual([`pr merge 7 --squash --match-head-commit ${head}`]);
+  });
+
+  test('--head with a 7-char prefix merges pinned to the full head', () => {
+    expect(merge(view(), undefined, ['--head', head.slice(0, 7).toUpperCase()]).code).toBe(0);
+    expect(mergeCalls()).toEqual([`pr merge 7 --squash --match-head-commit ${head}`]);
+  });
+
+  test('--head for another sha refuses before any merge and logs nothing', () => {
+    const before = readLog(name).length;
+
+    const result = merge(view(), undefined, ['--head', 'b'.repeat(40)]);
+
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('merge: PR head aaaaaaa is not the approved head bbbbbbb');
+    expect(mergeCalls()).toEqual([]);
+    expect(readLog(name)).toHaveLength(before);
+  });
+
+  test('--head refuses before the review check', () => {
+    writeLog(name, [prEvent]);
+
+    expect(merge(view(), undefined, ['--head', 'b'.repeat(40)]).err).toContain('is not the approved head');
+  });
+
+  test.each(['abc12', 'zzzzzzz', 'a'.repeat(41)])('--head %s is not 7-40 hex: refuses naming the flag', (bad) => {
+    const result = merge(view(), undefined, ['--head', bad]);
+
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('--head');
+    expect(mergeCalls()).toEqual([]);
   });
 
   test('Actions blocked (jobs without steps) and marker for head: merges with local-ci proof', () => {
@@ -3964,6 +3999,8 @@ describe('manager unit set', () => {
 });
 
 describe('manager brief', () => {
+  const MERGE_LINE =
+    "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.";
   const relayLines = (id: string) => [
     '## Relay protocol',
     'Start the final message of every turn with one status line, then its block:',
@@ -3975,7 +4012,7 @@ describe('manager brief', () => {
     `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
-    'Merge a PR only at the head sha for which a manager message relays the owner\'s yes; head moved since → report `pr-ready` again.',
+    MERGE_LINE,
   ];
 
   test('prints the start line and the exact playbook prompt', () => {

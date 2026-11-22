@@ -49,7 +49,7 @@ Every commit pushed after the PR opened went through step 3's review; nothing is
 
 CI green and no unresolved actionable thread → merge-ready: report once, log it as a `note` event, keep watching. The report: PR link, pending approvals, tickets, artifacts, remaining minors, open escalations, plus any lines the caller passed (e.g. the root cause from `agentic-debug`).
 
-Then run `bun {agentic-use-workflow}/scripts/agentic.ts merge` from the PR's checkout; refused → stop, report the failed condition, ask.
+Then run `bun {agentic-use-workflow}/scripts/agentic.ts merge` from the PR's checkout, with `--head <sha>` when the user's yes names a head; refused → stop, report the failed condition, ask.
 
 ## Stop
 

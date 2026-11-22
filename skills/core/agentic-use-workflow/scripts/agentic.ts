@@ -958,11 +958,13 @@ const mergeRefusal = (review: ReviewVerdict, view: Record<string, unknown>) => {
 
 const mergeCommand: Command = {
   name: 'merge',
-  usage: 'merge [--work <slug>]   (squash-merges the PR when review is clean, no conflict, CI proof for head; else exit 1)',
+  usage: 'merge [--head <sha>] [--work <slug>]   (squash-merges the PR when its head is the approved --head, review is clean, no conflict, CI proof for head; else exit 1)',
   arguments: 0,
-  flags: [],
+  flags: ['head'],
   required: [],
   async run(context) {
+    const approved = flagText(context, 'head');
+    if (approved !== undefined && !/^[0-9a-f]{7,40}$/i.test(approved)) throw new CliError(1, 'merge: --head must be 7-40 hex chars', false);
     const item = await resolveWorkItem(context, { allowCreate: false });
     const events = await readEvents(item);
     const state = deriveState(item.name, events);
@@ -973,6 +975,9 @@ const mergeCommand: Command = {
     const parsed: unknown = JSON.parse(await gh.call(['pr', 'view', prNumber, '--json', 'mergeable,headRefOid,statusCheckRollup']));
     const view = isRecord(parsed) ? parsed : {};
     const head = textOf(view.headRefOid) ?? '';
+    if (approved !== undefined && !head.toLowerCase().startsWith(approved.toLowerCase())) {
+      throw new CliError(1, `merge: PR head ${head.slice(0, 7)} is not the approved head ${approved.slice(0, 7)}`, false);
+    }
 
     const review = reviewVerdict(events, head, context.cwd, textOf(state.workspace?.base));
     const refusal = mergeRefusal(review, view);
@@ -2887,7 +2892,7 @@ const relayProtocol = (id: string, attended: boolean) =>
     `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
-    "Merge a PR only at the head sha for which a manager message relays the owner's yes; head moved since → report `pr-ready` again.",
+    "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.",
   ].join('\n');
 
 const briefTask = (unit: ManagerUnit) => {

@@ -25,7 +25,7 @@ Done when the owner answered for that head, or the unit got its message and is `
 
 ## Merge
 
-On yes, read the head sha again: moved since the ask → Ask again. Same → `SendMessage` the owning unit quoting the owner's yes and the approved sha: merge at that sha, clean up, report. Playbook units merge with `agentic.ts merge`; others with `gh pr merge <url> --squash --match-head-commit <sha>`.
+On yes, read the head sha again: moved since the ask → Ask again. Same → `SendMessage` the owning unit quoting the owner's yes and the approved sha: merge at that sha, clean up, report. Playbook units merge with `agentic.ts merge --head <sha>` (refuses another head); others with `gh pr merge <url> --squash --match-head-commit <sha>`.
 
 Done when the unit got the message and is `running` (SKILL.md Hand-off).
 

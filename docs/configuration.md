@@ -206,7 +206,7 @@ bun <agentic-use-workflow dir>/scripts/agentic.ts <command>
 | `put <path>` | Write stdin to an allowlisted work-item file from any worktree, log `artifact` |
 | `step <key>` | Resolve model and effort, print the filled brief, log `started` |
 | `gate --task T1,T2` / `gate --baseline` | Run the `verify` command at HEAD, log `checks` |
-| `merge` | Squash-merge the PR once review, mergeability and CI proof hold for its head |
+| `merge` | Squash-merge the PR once review, mergeability and CI proof hold for its head; `--head <sha>` refuses any other head |
 | `review eligible --base <ref>` | Reviewers to run, from [Review gates](#review-gates) |
 | `hub sync` | Mirror the work item to its hub issue (GitHub, via `gh`) |
 | `cleanup check` | Check the work item is ready to archive |

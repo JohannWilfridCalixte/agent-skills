@@ -21,7 +21,7 @@
 
 ### Changed
 
-- `hook spawn`: from the manager's cwd a `start_session` needs `Manager unit: <id>` (the `manager brief` output, ledger model and effort; fails closed) or `Manager unit: none`.
+- `hook spawn`: a brief carrying `Manager unit: <id>` must match the `manager brief` output (ledger model and effort; fails closed); from the manager's cwd a `start_session` needs that line or `Manager unit: none`.
 - `hook compact`: the manager's cwd gets `manager status`, a relayed unit gets its relay block.
 
 ## 4.0.0 - 2026-11-08

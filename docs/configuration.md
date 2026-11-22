@@ -99,6 +99,9 @@ Built-in defaults are capability classes, not model ids: `frontier` (the stronge
 | `review.code-review`, `review.super-review`, `review.claude-security-review`, `review.pr-security-review`, `review.agentic-review-secrets`, `review.agentic-review-access-control` | session or subagent | frontier / high |
 | `review.review-access-tenant-isolation` (example reviewer, replace with your project's) | session or subagent | frontier / high |
 | `audit` | every agent that `security-audit` launches under `agentic-security-audit` (reconnaissance, hunters, critics, verifiers) | frontier / high |
+| `unit` | agents-manager work unit, one app session each | frontier / high |
+| `unit.sidequest` | agents-manager sidequest unit | code / high |
+| `unit.<playbook>` | agents-manager playbook unit (`unit.debug`, …); falls back to `unit` | frontier / high |
 
 In the Claude desktop app, which offers a session tool, long steps (`implement`, `tickets`, `plan`, `write`, `review.*`) run as separate app sessions instead of subagents, with the same brief, model and effort; a step whose model or effort is above your session's still runs as a subagent. Details: `agentic-use-workflow` [references/delegation.md](../skills/core/agentic-use-workflow/references/delegation.md#sessions).
 
@@ -140,6 +143,9 @@ Worked examples, for cursor with the config above:
 | `review.iterations` | 3 | The review fix loop stops and asks you |
 | `babysit.rounds` | 5 | PR fix rounds stop and ask you. Watching the PR itself is not capped |
 | `implement.retries` | 2 | A red unit stops and asks you |
+| `manager.parallel` | 4 | Agents manager: extra units queue until a slot frees |
+| `manager.heartbeat` | 15 | Agents manager: minutes between stale-unit checks |
+| `manager.usage` | 80 | Agents manager: plan usage % at which queued units stop starting and it asks you |
 
 ## Review gates
 
@@ -200,11 +206,12 @@ bun <agentic-use-workflow dir>/scripts/agentic.ts <command>
 | `put <path>` | Write stdin to an allowlisted work-item file from any worktree, log `artifact` |
 | `step <key>` | Resolve model and effort, print the filled brief, log `started` |
 | `gate --task T1,T2` / `gate --baseline` | Run the `verify` command at HEAD, log `checks` |
-| `merge` | Squash-merge the PR once review, mergeability and CI proof hold for its head |
+| `merge` | Squash-merge the PR once review, mergeability and CI proof hold for its head; `--head <sha>` refuses any other head, required from a relayed unit's checkout |
 | `review eligible --base <ref>` | Reviewers to run, from [Review gates](#review-gates) |
 | `hub sync` | Mirror the work item to its hub issue (GitHub, via `gh`) |
 | `cleanup check` | Check the work item is ready to archive |
-| `hook spawn` / `hook compact` / `hook subagent-stop` | Hook entry points, see [Hooks](#hooks) |
+| `manager start` / `unit add\|set` / `brief` / `question open\|answer` / `rule add` / `backlog add\|set` / `beat` / `status` | Agents manager ledger (`{output}/_manager/`); usage text: run with no arguments |
+| `hook spawn` / `hook compact` / `hook subagent-stop` / `hook ask` | Hook entry points, see [Hooks](#hooks) |
 
 `--work <slug>` selects the work item on any command. `gh` is optional: `hub sync` and the PR check of `cleanup check` skip with a message when it is absent, and `hub sync` also when no hub is set. GitHub only.
 
@@ -218,12 +225,13 @@ Exit codes: `0` ok. `1` failed check or runtime failure (validation error, missi
 
 ## Hooks
 
-Three hooks run through `scripts/hook.sh`, which calls `agentic.ts hook`:
+Four hooks run through `scripts/hook.sh`, which calls `agentic.ts hook`:
 
-- `hook spawn`: before a subagent spawn or session start, while a work item has an open run for the current directory, checks that the brief carries `Step:`, `Work item:` (an existing, non-archived path), `Skills:`, `Progress:` (or the word `read-only`), `Agent:`, and that a `started` event exists for that agent. A brief that skips `agentic.ts step` fails this. The spawn is denied with the fix command and the expected model and effort. A brief with `Work item: none`, or no open run, passes.
-- `hook compact`: after context compaction, re-injects the resume summary of the open work item.
+- `hook spawn`: before a subagent spawn or session start, while a work item has an open run for the current directory, checks that the brief carries `Step:`, `Work item:` (an existing, non-archived path), `Skills:`, `Progress:` (or the word `read-only`), `Agent:`, and that a `started` event exists for that agent. A brief that skips `agentic.ts step` fails this. The spawn is denied with the fix command and the expected model and effort. A brief with `Work item: none`, or no open run, passes. Manager rule, independent of the open run (Claude only): a brief carrying `Manager unit: <id>` (any cwd, `Agent` or `start_session`) must match the `manager brief` output (unit in the ledger and `queued`, ledger model and effort); no readable ledger is denied. From the manager's cwd, a `start_session` with no `Manager unit:` line is denied. `Manager unit: none` marks a session outside the ledger (self-declared, not verified).
+- `hook compact`: after context compaction, re-injects the resume summary of the open work item. From the manager's cwd it also prints `manager status`; in a relayed unit's path, its relay block.
 - `hook subagent-stop` (Claude Code only): when a subagent stops, reads its transcript; a skill named in its `started` event but never loaded (Skill call or `SKILL.md` read) blocks the stop once, then logs a `note`.
+- `hook ask` (Claude Code only, PreToolUse `AskUserQuestion`): allows the manager, attended units, unrelated sessions and a unit whose path is the manager's cwd. Denies a non-attended unit (matched by path, then branch); the reason tells it to end its turn with `Unit <id>: question` for the manager to relay.
 
-The Claude Code, Codex and Cursor plugins ship them (`hooks/<harness>.json`). Codex asks you to review and trust plugin hooks through `/hooks`. Cursor has no post-compaction event, so `hook compact` runs at every session start. Without bun, `hook.sh` prints one line to stderr and exits 0: hooks never block.
+The Claude Code, Codex and Cursor plugins ship them (`hooks/<harness>.json`); `hook ask` ships only in the Claude plugin. Codex asks you to review and trust plugin hooks through `/hooks`. Cursor has no post-compaction event, so `hook compact` runs at every session start. Without bun, `hook.sh` prints one line to stderr and exits 0: hooks never block.
 
 Skills-CLI installs get no hooks: wire them by hand, see [README: Hooks](../README.md#hooks).

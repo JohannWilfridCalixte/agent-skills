@@ -24,6 +24,8 @@ Start refused or capped (a turn woken by another session's message is refused) â
 
 Known limit: `hook subagent-stop` (skill-load check) covers subagents only; a session's skill loads go unchecked.
 
+From the agents manager's cwd (`agentic-claude-agents-manager` ledger), `hook spawn` also needs a `Manager unit:` line in the prompt: `Manager unit: none` for a step session.
+
 ## Rules
 
 - Reports: â‰¤15 lines + path to full output.

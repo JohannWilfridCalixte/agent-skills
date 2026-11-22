@@ -14,6 +14,18 @@
 - Run model: playbook steps attach with `--workflow`, child runs, cwd-based work-item activation, unconfirmed decisions, compaction card, automatic quiet hub sync after milestones.
 - Step keys `write`, `plan`; an unknown step key exits 1.
 - Sessions: in the Claude desktop app, long steps (`implement`, `review.*`, `plan`, `write`, `tickets`) run as separate app sessions (`mcp__ccd_session__start_session`), reporting through `put reports/{agent}.md`; else subagents as before. `hook spawn` checks session starts like `Agent` spawns (`hooks/claude.json` matcher widened). `hook subagent-stop` does not cover sessions.
+- Skill `agentic-claude-agents-manager` (Claude desktop app only): runs units as app sessions, relays their questions, watches them, orders merges.
+- Helper `manager` commands (ledger `{output}/_manager/`; usage: `agentic.ts` with no args).
+- `hook ask` (Claude Code only, PreToolUse `AskUserQuestion`, shipped in `hooks/claude.json`): a relayed manager unit must end its turn with its question block.
+- Step keys `unit`, `unit.sidequest` (`unit.<playbook>` falls back to `unit`); limits `manager.parallel` 4, `manager.heartbeat` 15, `manager.usage` 80.
+
+### Changed
+
+- `hook spawn`: a brief carrying `Manager unit: <id>` must match the `manager brief` output (ledger model and effort; fails closed); from the manager's cwd a `start_session` needs that line or `Manager unit: none`.
+- `merge --head <sha>`: refuses another PR head; required from a relayed unit's checkout and when the manager ledger is unreadable.
+- `hook spawn`: a `Manager unit: <id>` brief is denied unless the unit is `queued`.
+- Manager: `stuck <id>` attention line for every unit not closed whose dep, or paused unit whose sidequest, closed without merge; `unit set --deps` only drops deps; `--state paused --paused-by` drops closed entries, keeps open ones; branch fallback matches only the app's 6-hex suffix; relay protocol steers turn ends onto a status.
+- `hook compact`: the manager's cwd gets `manager status`, a relayed unit gets its relay block.
 
 ## 4.0.0 - 2026-11-08
 

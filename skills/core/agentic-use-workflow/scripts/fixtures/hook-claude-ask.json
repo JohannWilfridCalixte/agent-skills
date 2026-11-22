@@ -1,0 +1,23 @@
+{
+  "_source": "doc-derived from code.claude.com/docs/en/hooks (PreToolUse, AskUserQuestion), 2026-11-21, sanitised",
+  "session_id": "sess-0001",
+  "transcript_path": "/home/dev/.claude/projects/demo/sess-0001.jsonl",
+  "cwd": "/repo",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "AskUserQuestion",
+  "tool_input": {
+    "questions": [
+      {
+        "question": "Which auth flow should the login use?",
+        "header": "Auth flow",
+        "options": [
+          { "label": "Session cookie", "description": "Server-side session, simplest" },
+          { "label": "JWT", "description": "Stateless token" }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  "tool_use_id": "toolu_0003"
+}

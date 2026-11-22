@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agentic Claude Agents Manager"
+  short_description: "Run and coordinate work units as Claude desktop sessions"
+policy:
+  allow_implicit_invocation: false

@@ -39,6 +39,7 @@ interface Command {
   readonly arguments: number;
   readonly flags: readonly string[];
   readonly switches?: readonly string[];
+  readonly lists?: readonly string[];
   readonly required: readonly string[];
   readonly run: (context: Context) => Promise<void>;
 }
@@ -72,6 +73,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const textOf = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
 const flagText = (context: Context, name: string) => textOf(context.values[name]);
+
+const flagList = (context: Context, name: string): string[] => stringsOf(context.values[name]);
 
 const writeOut = (text: string) => process.stdout.write(text);
 
@@ -130,12 +133,14 @@ const outputRoot = (context: Context) => {
   return resolve(main, configured ?? '.agentic/work');
 };
 
+const managerFolder = '_manager';
+
 const listItemNames = async (root: string) => {
   if (!existsSync(root)) return [];
   const entries = await readdir(root, { withFileTypes: true });
 
   return entries
-    .filter((entry) => entry.isDirectory() && entry.name !== '_archive' && !entry.name.startsWith('.'))
+    .filter((entry) => entry.isDirectory() && entry.name !== '_archive' && entry.name !== managerFolder && !entry.name.startsWith('.'))
     .map((entry) => entry.name)
     .sort();
 };
@@ -951,13 +956,27 @@ const mergeRefusal = (review: ReviewVerdict, view: Record<string, unknown>) => {
   return undefined;
 };
 
+const refuseUnboundRelayedMerge = (context: Context, approved: string | undefined) => {
+  const ledger = hookManagerState(context);
+  if (ledger === undefined && approved === undefined && existsSync(managerPaths(context).events)) {
+    throw new CliError(1, 'merge: manager ledger unreadable: pass --head <approved sha>', false);
+  }
+  const match = ledger === undefined || isManagerCwd(ledger, context.cwd) ? undefined : unitAt(ledger, context.cwd);
+  if (match !== undefined && !match.unit.attended && approved === undefined) {
+    throw new CliError(1, `merge: manager unit ${match.id} needs --head <approved sha>`, false);
+  }
+};
+
 const mergeCommand: Command = {
   name: 'merge',
-  usage: 'merge [--work <slug>]   (squash-merges the PR when review is clean, no conflict, CI proof for head; else exit 1)',
+  usage: 'merge [--head <sha>] [--work <slug>]   (squash-merges the PR when its head is the approved --head, review is clean, no conflict, CI proof for head; else exit 1)',
   arguments: 0,
-  flags: [],
+  flags: ['head'],
   required: [],
   async run(context) {
+    const approved = flagText(context, 'head');
+    if (approved !== undefined && !/^[0-9a-f]{7,40}$/i.test(approved)) throw new CliError(1, 'merge: --head must be 7-40 hex chars', false);
+    refuseUnboundRelayedMerge(context, approved);
     const item = await resolveWorkItem(context, { allowCreate: false });
     const events = await readEvents(item);
     const state = deriveState(item.name, events);
@@ -968,6 +987,9 @@ const mergeCommand: Command = {
     const parsed: unknown = JSON.parse(await gh.call(['pr', 'view', prNumber, '--json', 'mergeable,headRefOid,statusCheckRollup']));
     const view = isRecord(parsed) ? parsed : {};
     const head = textOf(view.headRefOid) ?? '';
+    if (approved !== undefined && !head.toLowerCase().startsWith(approved.toLowerCase())) {
+      throw new CliError(1, `merge: PR head ${head.slice(0, 7)} is not the approved head ${approved.slice(0, 7)}`, false);
+    }
 
     const review = reviewVerdict(events, head, context.cwd, textOf(state.workspace?.base));
     const refusal = mergeRefusal(review, view);
@@ -1334,6 +1356,7 @@ interface Builtin {
 }
 
 const codeMedium: Builtin = { tier: 'code', effort: 'medium' };
+const codeHigh: Builtin = { tier: 'code', effort: 'high' };
 const frontierHigh: Builtin = { tier: 'frontier', effort: 'high' };
 
 const exampleProjectReviewerSteps: Readonly<Record<string, Builtin>> = {
@@ -1356,6 +1379,8 @@ const builtinSteps: Readonly<Record<string, Builtin>> = {
   ...exampleProjectReviewerSteps,
   audit: frontierHigh,
   grill: frontierHigh,
+  unit: frontierHigh,
+  'unit.sidequest': codeHigh,
   chore: { tier: 'fast', effort: 'low', routing: 'chore' },
 };
 
@@ -2302,6 +2327,58 @@ const traceBlocked = async (workItem: string | undefined, entry: { harness: stri
   });
 };
 
+const managerSpawnIssues = (state: ManagerState | undefined, id: string, payload: Record<string, unknown>, brief: string) => {
+  if (state === undefined) return { issues: ['no readable manager ledger'], expected: '' };
+
+  const unit = state.units[id];
+  if (unit === undefined) return { issues: [`unit "${id}" is not in the ledger`], expected: '' };
+
+  const toolInput = recordField(payload, 'tool_input');
+  const gotModel = textOf(toolInput.model);
+  const gotEffort = textOf(toolInput.effort);
+  const issues: string[] = [];
+  if (unit.state !== 'queued') issues.push(`unit ${id} is ${unit.state}, only a queued unit starts`);
+  if (!/^[ \t]*Work item:[ \t]*none\b/m.test(brief)) issues.push('Work item: none');
+  if (!brief.includes(relayProtocol(id, unit.attended))) issues.push('the relay protocol block, verbatim');
+  if (claudeAlias('claude', unit.model) !== (gotModel === undefined ? undefined : claudeAlias('claude', gotModel))) {
+    issues.push(`model ${claudeAlias('claude', unit.model)} (got ${gotModel ?? 'none'})`);
+  }
+  if (unit.effort !== gotEffort) issues.push(`effort ${unit.effort} (got ${gotEffort ?? 'none'})`);
+
+  return { issues, expected: ` (model ${claudeAlias('claude', unit.model)}, effort ${unit.effort})` };
+};
+
+const managerBriefCommand = (id: string) => `bun ${join(import.meta.dir, 'agentic.ts')} manager brief ${id}`;
+
+const checkManagerSpawn = (context: Context, adapter: HookAdapter, payload: Record<string, unknown>, tool: string | undefined, brief: string) => {
+  const id = briefLine(brief, 'Manager unit');
+  if (id === 'none') return;
+
+  const state = hookManagerState(context);
+  if (id === undefined) {
+    if (state === undefined || tool !== 'mcp__ccd_session__start_session' || !isManagerCwd(state, hookCwd(context, payload))) return;
+
+    adapter.deny(
+      [
+        'spawn blocked: a session started from the manager needs a `Manager unit: <id>` line, or `Manager unit: none` for a session outside the ledger',
+        `fix: run \`${managerBriefCommand('<id>')}\` and paste its prompt, or add \`Manager unit: none\``,
+      ].join('\n'),
+    );
+
+    return;
+  }
+
+  const { issues, expected } = managerSpawnIssues(state, id, payload, brief);
+  if (issues.length === 0) return;
+
+  adapter.deny(
+    [
+      `spawn blocked, manager unit ${id}: ${issues.join(', ')}`,
+      `fix: run \`${managerBriefCommand(id)}\` and paste its prompt, with the printed model and effort${expected}`,
+    ].join('\n'),
+  );
+};
+
 const hookSpawnCommand: Command = {
   name: 'hook spawn',
   usage: 'hook spawn [--harness claude|cursor|codex] [--work <slug>]   (reads the harness hook payload on stdin)',
@@ -2320,6 +2397,8 @@ const hookSpawnCommand: Command = {
     if (tool !== undefined && !spawnToolNames[harness]?.includes(tool)) return;
 
     const brief = adapter.prompt(payload);
+    if (harness === 'claude') checkManagerSpawn(context, adapter, payload, tool, brief ?? '');
+
     const item = await findHookItem(context, hookCwd(context, payload), brief === undefined ? undefined : briefLine(brief, 'Work item'));
     if (item === undefined || brief === undefined || /^[ \t]*Work item:[ \t]*none\b/m.test(brief)) return;
 
@@ -2454,25 +2533,922 @@ const hookCompactCommand: Command = {
 
     const cwd = hookCwd(context, payload);
     const item = await findHookItem(context, cwd);
-    if (item === undefined) return;
+    const events = item === undefined ? [] : await safeEvents(item);
+    const workText = item === undefined ? undefined : `${resumeText(item, events, cwd)}\n${cardText(item, events)}`;
+    const text = [managerCompactText(context, cwd), workText].filter((part) => part !== undefined).join('\n\n');
+    if (text === '') return;
 
-    const events = await safeEvents(item);
-    const output = adapter(payload, `${resumeText(item, events, cwd)}\n${cardText(item, events)}`);
+    const output = adapter(payload, text);
     if (output === undefined) return;
 
-    const run = currentRun(events);
-    await appendEvent(item, {
-      ts: nowTimestamp(),
-      work: item.name,
-      run: run?.run ?? null,
-      harness,
-      workflow: run?.workflow ?? 'implement',
-      step: 'hook',
-      type: 'note',
-      summary: 'compact: resume injected',
-      data: { hook: 'compact' },
-    });
+    if (item !== undefined) {
+      const run = currentRun(events);
+      await appendEvent(item, {
+        ts: nowTimestamp(),
+        work: item.name,
+        run: run?.run ?? null,
+        harness,
+        workflow: run?.workflow ?? 'implement',
+        step: 'hook',
+        type: 'note',
+        summary: 'compact: resume injected',
+        data: { hook: 'compact' },
+      });
+    }
     writeOut(`${output}\n`);
+  },
+};
+
+const unitStates = ['queued', 'running', 'waiting', 'paused', 'pr', 'merged', 'done', 'failed'];
+const activeStates = ['running', 'waiting', 'pr'];
+const liveUnitStates = [...activeStates, 'paused'];
+const closedStates = ['merged', 'done', 'failed'];
+const unitKinds = ['playbook', 'free', 'sidequest', 'adopted'];
+const depModes = ['wait', 'stacked'];
+const backlogStates = ['open', 'started', 'dropped'];
+const answerers = ['user', 'manager'];
+const unitIdShape = /^[a-z0-9][a-z0-9-]*$/;
+const settableUnitKeys = ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'pausedBy', 'summary'];
+
+interface ManagerEvent {
+  readonly ts: string;
+  readonly type: string;
+  readonly [field: string]: unknown;
+}
+
+interface ManagerUnit {
+  title: string;
+  kind: string;
+  playbook: string | null;
+  input: string | null;
+  model: string;
+  effort: string;
+  deps: string[];
+  depMode: string | null;
+  presets: Record<string, string>;
+  for: string | null;
+  state: string;
+  session: string | null;
+  path: string | null;
+  branch: string | null;
+  pr: string | null;
+  attended: boolean;
+  pausedBy: string[];
+  summary: string | null;
+  marker: string | null;
+  misses: number;
+}
+
+interface ManagerQuestion {
+  unit: string;
+  text: string;
+  options: string[];
+  answer?: string;
+  by?: string;
+  basis?: string;
+  answeredAt?: number;
+}
+
+interface ManagerBacklogEntry {
+  title: string;
+  from: string[];
+  context: string | null;
+  ticket: string | null;
+  state: string;
+  lastOffered: number;
+  raised: number;
+}
+
+interface ManagerState {
+  cwd: string | null;
+  units: Record<string, ManagerUnit>;
+  order: string[];
+  questions: Record<string, ManagerQuestion>;
+  rules: Record<string, string>;
+  backlog: Record<string, ManagerBacklogEntry>;
+  usage: number | null;
+  released: string[];
+  lastStatus: number;
+  lastFinished: number;
+  updated: string | null;
+}
+
+interface ManagerLimits {
+  readonly parallel: number;
+  readonly heartbeat: number;
+  readonly usage: number;
+}
+
+interface ManagerPaths {
+  readonly dir: string;
+  readonly events: string;
+  readonly state: string;
+  readonly decisions: string;
+}
+
+const managerPaths = (context: Context): ManagerPaths => {
+  const dir = join(outputRoot(context), managerFolder);
+
+  return { dir, events: join(dir, 'events.jsonl'), state: join(dir, 'state.json'), decisions: join(dir, 'decisions.md') };
+};
+
+const dictionary = <T>(): Record<string, T> => Object.create(null);
+
+const stringRecord = (value: unknown): Record<string, string> =>
+  Object.assign(
+    dictionary<string>(),
+    Object.fromEntries(Object.entries(isRecord(value) ? value : {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+  );
+
+const blankUnit = (): ManagerUnit => ({
+  title: '', kind: 'free', playbook: null, input: null, model: 'default', effort: 'default', deps: [], depMode: null, presets: dictionary(),
+  for: null, state: 'queued', session: null, path: null, branch: null, pr: null, attended: false, pausedBy: [], summary: null,
+  marker: null, misses: 0,
+});
+
+const applyUnitChanges = (unit: ManagerUnit, event: ManagerEvent) => {
+  const { pausedBy, ...fields } = event;
+  Object.assign(unit, Object.fromEntries(settableUnitKeys.filter((key) => key !== 'pausedBy' && key in fields).map((key) => [key, fields[key]])));
+  if (event.type === 'unit-set' && Array.isArray(event.deps)) unit.deps = stringsOf(event.deps);
+  if (typeof event.state === 'string' && (event.state !== 'paused' || pausedBy !== undefined)) unit.pausedBy = [];
+  for (const blocker of typeof pausedBy === 'string' ? [pausedBy] : stringsOf(pausedBy)) {
+    if (!unit.pausedBy.includes(blocker)) unit.pausedBy.push(blocker);
+  }
+};
+
+const rungOf = (misses: number) => (['ok', 'nudge', 'stop-resume'][misses] ?? 'ask');
+
+const applyManagerEvent = (state: ManagerState, event: ManagerEvent, index: number) => {
+  const id = textOf(event.id) ?? '';
+  const unit = state.units[id];
+
+  if (event.type === 'start') state.cwd = textOf(event.cwd) ?? state.cwd;
+
+  if (event.type === 'unit-add') {
+    state.units[id] = {
+      ...blankUnit(),
+      title: textOf(event.title) ?? '',
+      kind: textOf(event.kind) ?? 'free',
+      playbook: textOf(event.playbook) ?? null,
+      input: textOf(event.input) ?? null,
+      deps: stringsOf(event.deps),
+      depMode: textOf(event.depMode) ?? null,
+      presets: stringRecord(event.presets),
+      for: textOf(event.for) ?? null,
+    };
+    applyUnitChanges(state.units[id], event);
+    if (!state.order.includes(id)) state.order.push(id);
+  }
+
+  if (event.type === 'unit-set' && unit !== undefined) {
+    const before = unit.state;
+    applyUnitChanges(unit, event);
+    if (before !== unit.state && (unit.state === 'done' || unit.state === 'merged')) state.lastFinished = index;
+  }
+
+  if (event.type === 'question-open') {
+    state.questions[id] = { unit: textOf(event.unit) ?? '', text: textOf(event.text) ?? '', options: stringsOf(event.options) };
+  }
+
+  const question = state.questions[id];
+  if (event.type === 'question-answer' && question !== undefined) {
+    Object.assign(question, { answer: textOf(event.answer), by: textOf(event.by), basis: textOf(event.basis), answeredAt: index });
+  }
+
+  if (event.type === 'rule-add') state.rules[id] = textOf(event.text) ?? '';
+
+  if (event.type === 'backlog-add') {
+    state.backlog[id] = {
+      title: textOf(event.title) ?? '',
+      from: stringsOf([event.from]),
+      context: textOf(event.context) ?? null,
+      ticket: textOf(event.ticket) ?? null,
+      state: 'open',
+      lastOffered: index,
+      raised: index,
+    };
+  }
+
+  const entry = state.backlog[id];
+  if (event.type === 'backlog-set' && entry !== undefined) {
+    entry.state = textOf(event.state) ?? entry.state;
+    entry.ticket = textOf(event.ticket) ?? entry.ticket;
+    const raiser = textOf(event.from);
+    if (raiser !== undefined) {
+      entry.from.push(raiser);
+      entry.raised = index;
+    }
+  }
+
+  if (event.type === 'beat') {
+    for (const [seenId, raw] of Object.entries(isRecord(event.seen) ? event.seen : {})) {
+      const seen = state.units[seenId];
+      const marker = textOf(raw);
+      if (seen === undefined || marker === undefined) continue;
+
+      seen.misses = seen.state === 'running' && seen.marker === marker ? seen.misses + 1 : 0;
+      seen.marker = marker;
+    }
+    if (typeof event.usage === 'number') state.usage = event.usage;
+  }
+
+  if (event.type === 'status') {
+    state.lastStatus = index;
+    state.released.push(...stringsOf(event.released));
+    for (const offered of stringsOf(event.offered)) {
+      const offeredEntry = state.backlog[offered];
+      if (offeredEntry !== undefined) offeredEntry.lastOffered = index;
+    }
+  }
+};
+
+const deriveManager = (events: readonly ManagerEvent[]) => {
+  const state: ManagerState = {
+    cwd: null, units: dictionary(), order: [], questions: dictionary(), rules: dictionary(), backlog: dictionary(), usage: null, released: [], lastStatus: -1, lastFinished: -1, updated: null,
+  };
+  events.forEach((event, index) => {
+    applyManagerEvent(state, event, index);
+    state.updated = event.ts;
+  });
+
+  return state;
+};
+
+const parseManagerLine = (line: string): ManagerEvent | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(line);
+
+    return isRecord(parsed) && typeof parsed.ts === 'string' && typeof parsed.type === 'string' ? { ...parsed, ts: parsed.ts, type: parsed.type } : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const readManagerEvents = (paths: ManagerPaths, lenient: boolean) =>
+  readFileSync(paths.events, 'utf8')
+    .split('\n')
+    .map((line, index) => ({ line, lineNumber: index + 1 }))
+    .filter(({ line }) => line.trim() !== '')
+    .flatMap(({ line, lineNumber }) => {
+      const event = parseManagerLine(line);
+      if (event !== undefined) return [event];
+      if (lenient) return [];
+
+      throw new CliError(1, `_manager/events.jsonl line ${lineNumber}: expected a JSON object with ts and type`, false);
+    });
+
+const loadManagerState = (paths: ManagerPaths) => (existsSync(paths.events) ? deriveManager(readManagerEvents(paths, false)) : undefined);
+
+const hookManagerState = (context: Context) => {
+  try {
+    const paths = managerPaths(context);
+
+    return existsSync(paths.events) ? deriveManager(readManagerEvents(paths, true)) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const isManagerCwd = (state: ManagerState, cwd: string) => state.cwd !== null && realPathOrSelf(state.cwd) === realPathOrSelf(cwd);
+
+const unitPathMatches = (state: ManagerState, here: string) => {
+  const linked = linkedWorktrees(here).map(realPathOrSelf);
+
+  return Object.entries(state.units).flatMap(([id, unit]) => {
+    const path = unit.path === null ? undefined : realPathOrSelf(unit.path);
+    if (path === undefined || !liveUnitStates.includes(unit.state) || !isInside(here, path)) return [];
+
+    const nestedWorktree = linked.some((worktree) => worktree !== path && isInside(worktree, path) && isInside(here, worktree));
+
+    return nestedWorktree ? [] : [{ id, unit, path }];
+  });
+};
+
+const isAppSuffixed = (leaf: string, id: string) => leaf.startsWith(`${id}-`) && /^[0-9a-f]{6}$/.test(leaf.slice(id.length + 1));
+
+const unitBranchMatches = (state: ManagerState, here: string) => {
+  const branch = gitOutput(here, ['branch', '--show-current'])?.trim();
+  if (branch === undefined || branch === '') return [];
+
+  const leaf = branch.split('/').at(-1) ?? branch;
+
+  return Object.entries(state.units).flatMap(([id, unit]) => {
+    const named = leaf === id || isAppSuffixed(leaf, id) || unit.branch === branch || unit.branch === leaf;
+    const reachable = unit.state === 'queued' || liveUnitStates.includes(unit.state);
+
+    return !unit.attended && reachable && named ? [{ id, unit, path: here }] : [];
+  });
+};
+
+const unitAt = (state: ManagerState, cwd: string) => {
+  const here = realPathOrSelf(cwd);
+  const byPath = unitPathMatches(state, here);
+  const matches = byPath.length > 0 ? byPath : unitBranchMatches(state, here);
+
+  return matches.sort((left, right) => right.path.length - left.path.length || right.id.length - left.id.length)[0];
+};
+
+const refuseFromUnit = (state: ManagerState, cwd: string) => {
+  if (isManagerCwd(state, cwd)) return;
+
+  const match = unitAt(state, cwd);
+  if (match !== undefined && !isManagerCwd(state, match.path)) {
+    throw new CliError(1, `manager commands run from the manager session only (cwd is inside unit ${match.id})`, false);
+  }
+};
+
+const requireManager = (context: Context) => {
+  const paths = managerPaths(context);
+  const state = loadManagerState(paths);
+  if (state === undefined) throw new CliError(1, 'no manager ledger: run manager start', false);
+
+  refuseFromUnit(state, context.cwd);
+
+  return { paths, state };
+};
+
+const recordManagerEvent = async (paths: ManagerPaths, event: Omit<ManagerEvent, 'ts'>) => {
+  await mkdir(paths.dir, { recursive: true });
+  await appendFile(paths.events, `${JSON.stringify({ ts: nowTimestamp(), ...event })}\n`);
+  const state = deriveManager(readManagerEvents(paths, false));
+  await writeFile(paths.state, `${JSON.stringify(state, null, 2)}\n`);
+
+  return state;
+};
+
+const limitDefaults: Readonly<Record<string, number>> = { 'manager.parallel': 4, 'manager.heartbeat': 15, 'manager.usage': 80 };
+
+const loadLimits = (context: Context, root: string): ManagerLimits => {
+  const home = context.env.HOME;
+  const files = [home === undefined ? undefined : join(home, '.agentic', 'config.json'), join(root, '.agentic.json')];
+  const limits = { ...limitDefaults };
+  for (const file of files) {
+    const config = file === undefined ? undefined : readJsonFile(file);
+    for (const [key, value] of Object.entries(recordField(isRecord(config) ? config : {}, 'limits'))) {
+      if (typeof value === 'number') limits[key] = value;
+    }
+  }
+
+  return { parallel: limits['manager.parallel'] ?? 4, heartbeat: limits['manager.heartbeat'] ?? 15, usage: limits['manager.usage'] ?? 80 };
+};
+
+const managerLimits = (context: Context) => loadLimits(context, mainCheckout(context.cwd));
+
+const relayProtocol = (id: string, attended: boolean) =>
+  [
+    '## Relay protocol',
+    'Run your own subagents and checks in the foreground, so each turn ends on question, sidequest, pr-ready, blocked or done.',
+    'Start the final message of every turn with one status line, then its block:',
+    '',
+    attended
+      ? `- \`Unit ${id}: question\` — unused: the owner answers you in this session directly.`
+      : `- \`Unit ${id}: question\` — numbered questions, each with options, your recommended one first. Use it wherever a skill asks the user or calls a question tool, then end your turn. The answer arrives as a message from the manager.`,
+    `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
+    `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
+    `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
+    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; one line with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
+    `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
+    '',
+    "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.",
+  ].join('\n');
+
+const briefTask = (unit: ManagerUnit) => {
+  const invocation = unit.kind === 'playbook' && unit.playbook !== null ? `/agentic-${unit.playbook} ${unit.input ?? ''}`.trim() : undefined;
+  const task = invocation ?? unit.input ?? unit.title;
+
+  return ['## Task', task, ...(unit.for === null ? [] : [`Raised by unit ${unit.for}.`])].join('\n');
+};
+
+const briefDependencies = (state: ManagerState, unit: ManagerUnit) =>
+  unit.deps
+    .map((dep) => {
+      const mode = unit.depMode ?? 'wait';
+      const advice =
+        mode === 'wait'
+          ? `Hold implementation until the manager relays that ${dep} merged: stop before writing code and report \`blocked\`.`
+          : `Your branch starts from ${state.units[dep]?.branch}; retarget your PR after ${dep} merges.`;
+
+      return `Depends on ${dep} (${mode}). ${advice}`;
+    })
+    .join('\n');
+
+const stackedBranch = (state: ManagerState, id: string, unit: ManagerUnit) => {
+  if (unit.depMode !== 'stacked') return undefined;
+
+  for (const dep of unit.deps) {
+    if (state.units[dep]?.branch == null) throw new CliError(1, `unit ${id}: stacked dep ${dep} has no branch recorded`, false);
+  }
+
+  return state.units[unit.deps[0] ?? '']?.branch ?? undefined;
+};
+
+const renderBrief = (state: ManagerState, id: string) => {
+  const unit = state.units[id];
+  if (unit === undefined) throw new CliError(1, `unknown unit "${id}"`, false);
+
+  const source = stackedBranch(state, id, unit);
+  const presets = Object.entries(unit.presets).map(([key, value]) => `- ${key}: ${value}`);
+  const siblings = orderedUnits(state)
+    .filter(([other, sibling]) => other !== id && !closedStates.includes(sibling.state))
+    .map(([other, sibling]) => `- ${other} (${sibling.state}): ${sibling.title}`);
+  const sections = [
+    `Manager unit: ${id}\nWork item: none`,
+    `You are work unit ${id} of an agents-manager session: ${unit.title}. The owner talks only to the manager; the manager relays.`,
+    briefTask(unit),
+    presets.length === 0 ? '' : ['Already decided by the owner; use these as answers and ask only what is still open:', ...presets].join('\n'),
+    briefDependencies(state, unit),
+    siblings.length === 0 ? '' : ['Other units in this repo; their areas are theirs:', ...siblings].join('\n'),
+    relayProtocol(id, unit.attended),
+  ];
+  const startLine = `start_session: model=${unit.model} effort=${unit.effort} use_worktree=true branch_name=${id}${source === undefined ? '' : ` source_branch=${source}`}`;
+
+  return { startLine, prompt: sections.filter((section) => section !== '').join('\n\n') };
+};
+
+const orderedUnits = (state: ManagerState) =>
+  state.order.flatMap((id): [string, ManagerUnit][] => {
+    const unit = state.units[id];
+
+    return unit === undefined ? [] : [[id, unit]];
+  });
+
+const activeCount = (state: ManagerState) => Object.values(state.units).filter((unit) => activeStates.includes(unit.state)).length;
+
+// A unit that ended failed or done never reaches `merged`, so whatever waits on it would hold forever.
+const closedUnmerged = (state: ManagerState, id: string) => state.units[id]?.state === 'failed' || state.units[id]?.state === 'done';
+
+const stackedDepsReady = (state: ManagerState, unit: ManagerUnit) =>
+  unit.depMode !== 'stacked' ||
+  unit.deps.every((dep) => state.units[dep]?.branch != null && state.units[dep]?.state !== 'queued' && !closedUnmerged(state, dep));
+
+const startableUnits = (state: ManagerState, parallel: number) => {
+  const started: string[] = [];
+  const queued = orderedUnits(state).filter(([, unit]) => unit.state === 'queued');
+  const sidequestsFirst = [...queued.filter(([, unit]) => unit.kind === 'sidequest'), ...queued.filter(([, unit]) => unit.kind !== 'sidequest')];
+  for (const [id, unit] of sidequestsFirst) {
+    if (!stackedDepsReady(state, unit)) continue;
+    if (activeCount(state) + started.length >= parallel) break;
+    started.push(id);
+  }
+
+  return started;
+};
+
+const activeWaiters = (state: ManagerState) =>
+  orderedUnits(state).filter(([, unit]) => activeStates.includes(unit.state) && unit.depMode === 'wait' && unit.deps.length > 0);
+
+const allMerged = (state: ManagerState, deps: readonly string[]) => deps.every((dep) => state.units[dep]?.state === 'merged');
+
+const openQuestionOf = (state: ManagerState, unitId: string) =>
+  Object.entries(state.questions).find(([, question]) => question.unit === unitId && question.answer === undefined)?.[0];
+
+const statusTable = (state: ManagerState) => {
+  const rows = orderedUnits(state).map(([id, unit]) =>
+    [
+      id, unit.state, unit.kind, `${unit.model}/${unit.effort}`, [unit.branch, unit.pr].filter(Boolean).join(' ') || '-',
+      unit.attended ? 'yes' : 'no', openQuestionOf(state, id) ?? '-',
+    ].join(' | '),
+  );
+
+  return ['unit | state | kind | model/effort | branch/PR | attended | question', ...rows];
+};
+
+const statusReport = (state: ManagerState, limits: ManagerLimits) => {
+  const released = activeWaiters(state)
+    .filter(([id, unit]) => allMerged(state, unit.deps) && !state.released.includes(id))
+    .map(([id]) => id);
+  const offered = Object.entries(state.backlog)
+    .filter(([, entry]) => entry.state === 'open' && (state.lastFinished > entry.lastOffered || entry.raised > entry.lastOffered))
+    .map(([id]) => id);
+  const units = orderedUnits(state);
+  const attention = [
+    ...Object.entries(state.questions)
+      .filter(([, question]) => question.answer === undefined)
+      .map(([id, question]) => `question ${id} ${question.unit}: ${question.text}`),
+    ...units.filter(([, unit]) => unit.state === 'running' && unit.misses >= 1).map(([id, unit]) => `stale ${id}: ${rungOf(unit.misses)}`),
+    ...units.filter(([, unit]) => unit.state === 'pr').map(([id, unit]) => `merge-yes ${id}: ${unit.pr}`),
+    ...startableUnits(state, limits.parallel).map((id) => `start ${id}`),
+    ...units
+      .filter(([, unit]) => unit.state === 'queued' || liveUnitStates.includes(unit.state))
+      .flatMap(([id, unit]) => unit.deps.filter((dep) => closedUnmerged(state, dep)).map((dep) => `stuck ${id}: dep ${dep} closed without merge`)),
+    ...activeWaiters(state)
+      .filter(([, unit]) => !allMerged(state, unit.deps))
+      .flatMap(([id, unit]) =>
+        unit.deps.filter((dep) => state.units[dep]?.state !== 'merged' && !closedUnmerged(state, dep)).map((dep) => `hold ${id}: implementation waits for ${dep}`),
+      ),
+    ...released.map((id) => `release ${id}: ${state.units[id]?.deps.join(', ')} merged, update onto the new base`),
+    ...units
+      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.length > 0 && allMerged(state, unit.pausedBy))
+      .map(([id, unit]) => `resume ${id}: ${unit.pausedBy.join(', ')} merged`),
+    ...units
+      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.some((sidequest) => closedUnmerged(state, sidequest)))
+      .flatMap(([id, unit]) => unit.pausedBy.filter((sidequest) => closedUnmerged(state, sidequest)).map((sidequest) => `stuck ${id}: paused by ${sidequest} closed without merge`)),
+    ...(state.usage !== null && state.usage >= limits.usage ? [`usage ${state.usage}%: ask owner before starting queued units`] : []),
+    ...offered.map((id) => `re-offer ${id}: ${state.backlog[id]?.title}`),
+    ...Object.entries(state.questions)
+      .filter(([, question]) => question.by === 'manager' && (question.answeredAt ?? -1) > state.lastStatus)
+      .map(([id, question]) => `answered ${id} ${question.unit} by manager: ${question.answer} (basis ${question.basis})`),
+  ];
+  const attentionText = attention.length === 0 ? 'attention: none' : ['attention:', ...attention.map((line) => `- ${line}`)].join('\n');
+
+  return { text: `${[...statusTable(state), attentionText].join('\n')}\n`, released, offered };
+};
+
+const renderStatus = (state: ManagerState, limits: ManagerLimits) => statusReport(state, limits).text;
+
+const nonEmptyFlag = (context: Context, name: string) => {
+  const value = flagText(context, name)?.trim();
+  if (value === undefined || value === '') throw new CliError(1, `--${name} must not be empty`, false);
+
+  return value;
+};
+
+const enumFlag = (context: Context, name: string, allowed: readonly string[]) => {
+  const value = flagText(context, name);
+  if (value !== undefined && !allowed.includes(value)) throw new CliError(1, `invalid --${name} "${value}": expected ${allowed.join('|')}`, false);
+
+  return value;
+};
+
+const existingUnit = (state: ManagerState, id: string) => {
+  const unit = state.units[id];
+  if (unit === undefined) throw new CliError(1, `unknown unit "${id}"`, false);
+
+  return unit;
+};
+
+const nextId = (prefix: string, existing: Record<string, unknown>) => `${prefix}${Object.keys(existing).length + 1}`;
+
+const managerStartCommand: Command = {
+  name: 'manager start',
+  usage: 'manager start   (creates or opens {output}/_manager/, records the cwd, prints heartbeat and status)',
+  arguments: 0,
+  flags: [],
+  required: [],
+  async run(context) {
+    const paths = managerPaths(context);
+    const cwd = realPathOrSelf(context.cwd);
+    let state = loadManagerState(paths);
+    if (state !== undefined) refuseFromUnit(state, context.cwd);
+    if (state === undefined) {
+      await mkdir(paths.dir, { recursive: true });
+      await writeFile(paths.decisions, '# Manager decisions\n');
+    }
+    if (state?.cwd !== cwd) state = await recordManagerEvent(paths, { type: 'start', cwd });
+
+    writeOut(`heartbeat: ${managerLimits(context).heartbeat}m\n${renderStatus(state, managerLimits(context))}`);
+  },
+};
+
+const parsePresets = (raw: readonly string[]) =>
+  Object.fromEntries(
+    raw.map((preset) => {
+      const separator = preset.indexOf('=');
+      if (separator < 1) throw new CliError(1, `invalid --preset "${preset}": expected key=value`, false);
+
+      return [preset.slice(0, separator), preset.slice(separator + 1)];
+    }),
+  );
+
+const playbookFlag = (context: Context, kind: string) => {
+  const raw = flagText(context, 'playbook');
+  if (kind !== 'playbook') {
+    if (raw !== undefined) throw new CliError(1, '--playbook only goes with --kind playbook', false);
+
+    return undefined;
+  }
+
+  const playbook = raw?.replace(/^agentic-/, '');
+  if (playbook === undefined || !playbooks.includes(playbook)) {
+    throw new CliError(1, `--kind playbook needs --playbook ${playbooks.join('|')}`, false);
+  }
+
+  return playbook;
+};
+
+const unitStepKey = (kind: string, playbook: string | undefined) => {
+  if (kind === 'sidequest') return 'unit.sidequest';
+
+  return playbook === undefined ? 'unit' : `unit.${playbook}`;
+};
+
+const unitAddCommand: Command = {
+  name: 'manager unit add',
+  usage:
+    'manager unit add <id> --title t --kind playbook|free|sidequest|adopted [--playbook p] [--input t] [--model m] [--effort e] [--deps a,b --dep-mode wait|stacked] [--preset k=v]... [--for unit]',
+  arguments: 1,
+  flags: ['title', 'kind', 'playbook', 'input', 'model', 'effort', 'deps', 'dep-mode', 'for'],
+  lists: ['preset'],
+  required: ['title', 'kind'],
+  async run(context) {
+    const [id = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    if (!unitIdShape.test(id)) throw new CliError(1, `invalid unit id "${id}": expected ${unitIdShape.source}`, false);
+    if (id === 'none') throw new CliError(1, 'unit id "none" is reserved', false);
+    if (state.units[id] !== undefined) throw new CliError(1, `unit "${id}" already exists`, false);
+
+    const title = nonEmptyFlag(context, 'title');
+    const kind = enumFlag(context, 'kind', unitKinds) ?? '';
+    const playbook = playbookFlag(context, kind);
+    const deps = (flagText(context, 'deps') ?? '').split(',').map((dep) => dep.trim()).filter(Boolean);
+    for (const dep of deps) existingUnit(state, dep);
+
+    const depMode = enumFlag(context, 'dep-mode', depModes);
+    if (deps.length > 0 && depMode === undefined) throw new CliError(1, '--deps needs --dep-mode wait|stacked', false);
+
+    const raiser = flagText(context, 'for');
+    if (raiser !== undefined) existingUnit(state, raiser);
+
+    const presets = parsePresets(flagList(context, 'preset'));
+    const resolved = resolveTier(loadStepConfig(context, mainCheckout(context.cwd)), 'claude', unitStepKey(kind, playbook));
+    const model = flagText(context, 'model') ?? resolved.model;
+    const effort = flagText(context, 'effort') ?? resolved.effort;
+
+    await recordManagerEvent(paths, {
+      type: 'unit-add', id, title, kind, playbook, input: flagText(context, 'input'), model, effort, deps, depMode: deps.length > 0 ? depMode : undefined,
+      presets, for: raiser,
+    });
+    writeOut(`unit ${id} queued model ${model} effort ${effort}\n`);
+  },
+};
+
+const unitSetCommand: Command = {
+  name: 'manager unit set',
+  usage:
+    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends; with --state paused replaces closed entries, keeps open ones)] [--deps a,b (subset of current; empty clears)] [--summary t]',
+  arguments: 1,
+  flags: ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'paused-by', 'deps', 'summary'],
+  required: [],
+  async run(context) {
+    const [id = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    const unit = existingUnit(state, id);
+
+    const path = flagText(context, 'path');
+    const pausedByText = flagText(context, 'paused-by');
+    if (pausedByText !== undefined) existingUnit(state, pausedByText);
+    const repause = pausedByText !== undefined && flagText(context, 'state') === 'paused';
+    const pausedBy = repause ? [...unit.pausedBy.filter((sidequest) => !closedUnmerged(state, sidequest)), pausedByText] : pausedByText;
+
+    const depsText = flagText(context, 'deps');
+    const deps = depsText?.split(',').map((dep) => dep.trim()).filter(Boolean);
+    for (const dep of deps ?? []) {
+      if (!unit.deps.includes(dep)) throw new CliError(1, `--deps only drops deps: ${dep} is not a dep of ${id}`, false);
+    }
+
+    const attended = enumFlag(context, 'attended', ['true', 'false']);
+    const changes: Record<string, unknown> = {
+      state: enumFlag(context, 'state', unitStates),
+      session: flagText(context, 'session'),
+      path: path === undefined ? undefined : realPathOrSelf(resolve(context.cwd, path)),
+      branch: flagText(context, 'branch'),
+      pr: flagText(context, 'pr'),
+      model: flagText(context, 'model'),
+      effort: flagText(context, 'effort'),
+      attended: attended === undefined ? undefined : attended === 'true',
+      pausedBy,
+      deps,
+      summary: flagText(context, 'summary'),
+    };
+    const given = Object.entries(changes).filter(([, value]) => value !== undefined);
+    if (given.length === 0) throw new CliError(2, 'manager unit set needs at least one field flag');
+
+    await recordManagerEvent(paths, { type: 'unit-set', id, ...Object.fromEntries(given) });
+    writeOut(`unit ${id} updated: ${given.map(([key]) => key).join(', ')}\n`);
+  },
+};
+
+const briefCommand: Command = {
+  name: 'manager brief',
+  usage: 'manager brief <id>   (prints the start_session parameters line and the exact prompt)',
+  arguments: 1,
+  flags: [],
+  required: [],
+  async run(context) {
+    const [id = ''] = context.positionals;
+    const { state } = requireManager(context);
+    const { startLine, prompt } = renderBrief(state, id);
+
+    writeOut(`${startLine}\n--- prompt ---\n${prompt}\n`);
+  },
+};
+
+const questionOpenCommand: Command = {
+  name: 'manager question open',
+  usage: 'manager question open <unit> --text t [--option o]...',
+  arguments: 1,
+  flags: ['text'],
+  lists: ['option'],
+  required: ['text'],
+  async run(context) {
+    const [unit = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    existingUnit(state, unit);
+
+    const id = nextId('Q', state.questions);
+    await recordManagerEvent(paths, { type: 'question-open', id, unit, text: nonEmptyFlag(context, 'text'), options: flagList(context, 'option') });
+    writeOut(`${id}\n`);
+  },
+};
+
+const basisHolds = (state: ManagerState, question: ManagerQuestion, basis: string) => {
+  if (/^R\d+$/.test(basis)) return state.rules[basis] !== undefined;
+  if (/^Q\d+$/.test(basis)) return state.questions[basis]?.answer !== undefined;
+  if (basis.startsWith('preset:')) return state.units[question.unit]?.presets[basis.slice('preset:'.length)] !== undefined;
+
+  return false;
+};
+
+const decisionEntry = (id: string, question: ManagerQuestion, answer: string, by: string, basis: string | undefined) =>
+  `\n## ${id} · ${question.unit} · ${by}\n**Q:** ${question.text}\n**A:** ${answer}\n**Basis:** ${basis ?? 'owner'}\n`;
+
+const questionAnswerCommand: Command = {
+  name: 'manager question answer',
+  usage: 'manager question answer <Qn> --answer a --by user|manager [--basis R<n>|Q<n>|preset:<key>]   (basis required for manager)',
+  arguments: 1,
+  flags: ['answer', 'by', 'basis'],
+  required: ['answer', 'by'],
+  async run(context) {
+    const [id = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    const question = state.questions[id];
+    if (question === undefined) throw new CliError(1, `unknown question "${id}"`, false);
+    if (question.answer !== undefined) throw new CliError(1, `${id} is already answered`, false);
+
+    const answer = nonEmptyFlag(context, 'answer');
+    const by = enumFlag(context, 'by', answerers) ?? '';
+    const basis = flagText(context, 'basis');
+    if (by === 'manager' && (basis === undefined || !basisHolds(state, question, basis))) {
+      throw new CliError(1, `a manager answer needs --basis: an existing R<n>, an answered Q<n>, or preset:<key> of unit ${question.unit}`, false);
+    }
+
+    await recordManagerEvent(paths, { type: 'question-answer', id, answer, by, basis });
+    if (!existsSync(paths.decisions)) await writeFile(paths.decisions, '# Manager decisions\n');
+    await appendFile(paths.decisions, decisionEntry(id, question, answer, by, basis));
+    writeOut(`${id} answered by ${by}\n`);
+  },
+};
+
+const ruleAddCommand: Command = {
+  name: 'manager rule add',
+  usage: 'manager rule add <text>   (standing owner rule, usable as auto-answer basis)',
+  arguments: 1,
+  flags: [],
+  required: [],
+  async run(context) {
+    const [text = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    if (text.trim() === '') throw new CliError(1, 'rule text must not be empty', false);
+
+    const id = nextId('R', state.rules);
+    await recordManagerEvent(paths, { type: 'rule-add', id, text });
+    writeOut(`${id}\n`);
+  },
+};
+
+const backlogAddCommand: Command = {
+  name: 'manager backlog add',
+  usage: 'manager backlog add --title t --from unit [--context c] [--ticket url]',
+  arguments: 0,
+  flags: ['title', 'from', 'context', 'ticket'],
+  required: ['title', 'from'],
+  async run(context) {
+    const { paths, state } = requireManager(context);
+    const title = nonEmptyFlag(context, 'title');
+    const from = nonEmptyFlag(context, 'from');
+    existingUnit(state, from);
+
+    const id = nextId('B', state.backlog);
+    await recordManagerEvent(paths, { type: 'backlog-add', id, title, from, context: flagText(context, 'context'), ticket: flagText(context, 'ticket') });
+    writeOut(`${id}\n`);
+  },
+};
+
+const backlogSetCommand: Command = {
+  name: 'manager backlog set',
+  usage: 'manager backlog set <Bn> [--state open|started|dropped] [--ticket url] [--from unit]',
+  arguments: 1,
+  flags: ['state', 'ticket', 'from'],
+  required: [],
+  async run(context) {
+    const [id = ''] = context.positionals;
+    const { paths, state } = requireManager(context);
+    if (state.backlog[id] === undefined) throw new CliError(1, `unknown backlog entry "${id}"`, false);
+
+    const from = flagText(context, 'from');
+    if (from !== undefined) existingUnit(state, from);
+
+    const changes = { state: enumFlag(context, 'state', backlogStates), ticket: flagText(context, 'ticket'), from };
+    if (Object.values(changes).every((value) => value === undefined)) throw new CliError(2, 'manager backlog set needs --state, --ticket or --from');
+
+    await recordManagerEvent(paths, { type: 'backlog-set', id, ...changes });
+    writeOut(`${id} updated\n`);
+  },
+};
+
+const parseSeen = (state: ManagerState, raw: readonly string[]) =>
+  Object.fromEntries(
+    raw.map((entry) => {
+      const separator = entry.indexOf('=');
+      const marker = entry.slice(separator + 1);
+      if (separator < 1 || marker === '') throw new CliError(1, `invalid --seen "${entry}": expected <unit>=<marker>`, false);
+      existingUnit(state, entry.slice(0, separator));
+
+      return [entry.slice(0, separator), marker];
+    }),
+  );
+
+const parseUsage = (context: Context) => {
+  const raw = flagText(context, 'usage');
+  if (raw === undefined) return undefined;
+
+  const usage = Number(raw);
+  if (raw.trim() === '' || !Number.isFinite(usage) || usage < 0 || usage > 100) throw new CliError(1, `invalid --usage "${raw}": expected 0-100`, false);
+
+  return usage;
+};
+
+const beatCommand: Command = {
+  name: 'manager beat',
+  usage: 'manager beat [--seen <unit>=<marker>]... [--usage pct]   (per unit: ok | nudge | stop-resume | ask)',
+  arguments: 0,
+  flags: ['usage'],
+  lists: ['seen'],
+  required: [],
+  async run(context) {
+    const { paths, state } = requireManager(context);
+    const seen = parseSeen(state, flagList(context, 'seen'));
+    const usage = parseUsage(context);
+
+    const next = await recordManagerEvent(paths, { type: 'beat', seen, usage });
+    const seenLines = Object.keys(seen).map((id) => {
+      const unit = existingUnit(next, id);
+
+      return unit.state === 'running' ? `${id} ${rungOf(unit.misses)} (misses ${unit.misses})` : `${id} idle ${unit.state}`;
+    });
+    const unseenLines = orderedUnits(next)
+      .filter(([id, unit]) => unit.state === 'running' && !Object.hasOwn(seen, id))
+      .map(([id]) => `${id} unseen`);
+    const { usage: limit } = managerLimits(context);
+    const usageLines =
+      usage !== undefined && usage >= limit
+        ? [`usage ${usage}% >= ${limit}%: ask owner before starting queued units (continue / pause queue / downgrade models)`]
+        : [];
+
+    writeOut(`${[...seenLines, ...unseenLines, ...usageLines].join('\n')}\n`);
+  },
+};
+
+const statusManagerCommand: Command = {
+  name: 'manager status',
+  usage: 'manager status   (unit table and attention list; records a status event)',
+  arguments: 0,
+  flags: [],
+  required: [],
+  async run(context) {
+    const { paths, state } = requireManager(context);
+    const { text, released, offered } = statusReport(state, managerLimits(context));
+
+    await recordManagerEvent(paths, { type: 'status', released, offered });
+    writeOut(text);
+  },
+};
+
+const managerCompactText = (context: Context, cwd: string) => {
+  const state = hookManagerState(context);
+  if (state === undefined) return undefined;
+  if (isManagerCwd(state, cwd)) return renderStatus(state, managerLimits(context));
+
+  const match = unitAt(state, cwd);
+
+  return match === undefined || match.unit.attended ? undefined : relayProtocol(match.id, false);
+};
+
+const hookAskCommand: Command = {
+  name: 'hook ask',
+  usage: 'hook ask [--harness claude]   (reads the harness hook payload on stdin)',
+  arguments: 0,
+  flags: ['harness'],
+  required: [],
+  async run(context) {
+    const harness = flagText(context, 'harness') ?? 'claude';
+    const adapter = hookAdapters[harness];
+    if (adapter === undefined) throw new CliError(2, `invalid harness "${harness}": expected ${harnesses.join('|')}`);
+
+    const payload = await readHookPayload();
+    const tool = payload === undefined ? undefined : textOf(payload.tool_name);
+    if (payload === undefined || (tool !== undefined && tool !== 'AskUserQuestion')) return;
+
+    const state = hookManagerState(context);
+    const cwd = hookCwd(context, payload);
+    if (state === undefined || isManagerCwd(state, cwd)) return;
+
+    const match = unitAt(state, cwd);
+    if (match === undefined || match.unit.attended || isManagerCwd(state, match.path)) return;
+
+    adapter.deny(
+      `relayed unit ${match.id}: end your turn with the question block (\`Unit ${match.id}: question\`, numbered questions with options, recommended first); the manager relays it to the owner.`,
+    );
   },
 };
 
@@ -2491,7 +3467,19 @@ const commands: readonly Command[] = [
   cleanupCheckCommand,
   hookSpawnCommand,
   hookCompactCommand,
+  hookAskCommand,
   hookSubagentStopCommand,
+  managerStartCommand,
+  unitAddCommand,
+  unitSetCommand,
+  briefCommand,
+  questionOpenCommand,
+  questionAnswerCommand,
+  ruleAddCommand,
+  backlogAddCommand,
+  backlogSetCommand,
+  beatCommand,
+  statusManagerCommand,
 ];
 
 const usageText = () =>
@@ -2522,6 +3510,7 @@ const parseCommandArgs = (command: Command, args: readonly string[]) => {
       options: {
         ...Object.fromEntries(flagNames.map((flag) => [flag, { type: 'string' as const }])),
         ...Object.fromEntries((command.switches ?? []).map((flag) => [flag, { type: 'boolean' as const }])),
+        ...Object.fromEntries((command.lists ?? []).map((flag) => [flag, { type: 'string' as const, multiple: true }])),
       },
     });
   } catch (err) {

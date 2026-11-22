@@ -98,7 +98,7 @@ sequenceDiagram
 - **Standing auto-merge**: rejected. Merge is an owner approval each time, naming the PR head sha (binding by relay protocol; `agentic.ts merge` takes no sha).
 - **Event-driven only, no heartbeat**: rejected. Nothing wakes the manager for a unit hung mid-turn or at a permission prompt; held wake notes (below) make the heartbeat the guaranteed channel.
 - **Conversation-only state**: rejected. Lost on compaction or a new session; hooks read the ledger on disk.
-- **Brief-only relay, no `AskUserQuestion` hook**: rejected. A pending interactive question leaves no event in work-item state: so the relay protocol is the only signal; the hook turns a unit's prompt back into the protocol's question block.
+- **Brief-only relay, no `AskUserQuestion` hook**: rejected. A pending interactive question leaves no event in work-item state, so the relay protocol is the only signal; the hook turns a unit's prompt back into the protocol's question block.
 - **Agentic-managed worktrees**: rejected. The app manages a worktree per session (`use_worktree`); playbook units use `workspace=current` instead of a second one.
 - **New top-level `manager` config key**: rejected. `unit*` step keys reuse the existing step resolution and parent fallback.
 

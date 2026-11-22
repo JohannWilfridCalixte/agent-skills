@@ -14,7 +14,7 @@ One session per work unit today: the owner starts each playbook or task by hand,
 - **Units and relay**
   - Unit = anything: playbook invocation, free-form brief, plain interactive session. Kinds: `playbook | free | sidequest | adopted` (hand-started session adopted on request).
   - Every unit question reaches the owner through the manager. A unit never prompts in its own UI: it ends its turn with a status line first (`Unit <id>: question | sidequest | pr-ready | blocked | working | done`), then the block. First, because the app's wake note is the first 400 chars of the final message.
-  - `working` = unit idle only because its own background work runs: that line alone, manager stays silent, the heartbeat still tracks progress.
+  - Units run their own subagents and checks in the foreground, so each turn ends on a status. `working` = only when background work can't be foregrounded keeps the unit idle: that line alone, with the reason. Manager stays silent, the heartbeat still tracks progress; each one costs a wake and a run of them can hold later notes (see Consequences).
   - Manager asks the owner (AskUserQuestion, batched across units, unit name in each question), sends the answer back (`SendMessage` to the unit's session id).
   - Per-unit opt-out `attended`: owner talks in the unit, manager only watches.
   - Protocol text has one source: the output of `manager brief`.

@@ -2882,6 +2882,7 @@ const relayProtocol = (id: string, attended: boolean) =>
   [
     '## Relay protocol',
     'Start the final message of every turn with one status line, then its block:',
+    'Run your own subagents and checks in the foreground, so each turn ends on question, sidequest, pr-ready, blocked or done.',
     '',
     attended
       ? `- \`Unit ${id}: question\` — unused: the owner answers you in this session directly.`
@@ -2889,7 +2890,7 @@ const relayProtocol = (id: string, attended: boolean) =>
     `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
     `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
     `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
-    `- \`Unit ${id}: working\` — you are idle only because your own background work runs; this line alone. The manager stays silent; the heartbeat still sees your progress.`,
+    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; this line alone, with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
     "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.",

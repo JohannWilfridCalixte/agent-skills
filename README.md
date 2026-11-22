@@ -70,6 +70,7 @@ Optional next step: `/agentic-configure` (`$agentic-configure` in Codex) detects
 | Tool | Needed for |
 |---|---|
 | Claude Code, Cursor or Codex | Running the skills |
+| Claude desktop app | `agentic-claude-agents-manager` (units run as app sessions) |
 | `git` | Worktrees, commits, cleanup |
 | `bun` | The helper CLI and the hooks. Required; the skills can still be read without it |
 | `gh`, or a Bitbucket/GitLab CLI or MCP | `agentic-babysit-pr`, `agentic-pr-review`, `agentic-cleanup`, and publishing audit issues to GitHub |
@@ -117,7 +118,7 @@ done
 
 ### Hooks
 
-Three hooks back the workflow: `hook spawn` blocks a subagent spawn or session start whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, and `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named. Details: [docs/configuration.md](docs/configuration.md#hooks).
+Four hooks back the workflow: `hook spawn` blocks a subagent spawn or session start whose brief wasn't produced by `agentic.ts step`, `hook compact` re-injects the resume summary after context compaction, `hook subagent-stop` (Claude Code only) sends a subagent back once when it stopped without loading a skill its brief named, and `hook ask` (Claude desktop app only, PreToolUse `AskUserQuestion`) tells a relayed manager unit to end its turn with its question block instead of prompting. From the agents manager's cwd, `hook spawn` also needs a `Manager unit:` line in the brief, and `hook compact` re-injects the manager status (or a unit's relay block). Details: [docs/configuration.md](docs/configuration.md#hooks).
 
 - **Plugins** (Claude Code, Cursor, Codex) ship them. Codex: review and trust the plugin hooks with `/hooks`.
 - **skills CLI installs** get no hooks. Wire them by hand, adjusting the path if the skills landed elsewhere than `.agents/skills`.
@@ -152,7 +153,7 @@ Claude Code, `.claude/settings.json`:
 }
 ```
 
-Codex, `.codex/hooks.json`: same shape without `SubagentStop`, with `--harness codex`.
+Codex, `.codex/hooks.json`: same shape without `SubagentStop` and the `AskUserQuestion` entry, with `--harness codex`.
 
 Cursor, `.cursor/hooks.json`:
 
@@ -220,6 +221,7 @@ Playbooks are user-invoked: the model never starts them on its own.
 | `agentic-pr-review` | Reviewing a PR once, with no fixes. Output is a local report or one posted review | `/agentic-pr-review 42` |
 | `agentic-security-audit` | Running a whole-repo or path-scoped security audit that files issues, with no fixes | `/agentic-security-audit src/api` |
 | `agentic-configure` | Writing your config: models, reviewers, folders, profiles, limits | `/agentic-configure --project` |
+| `agentic-claude-agents-manager` (Claude desktop app only) | Running several units (playbooks, free tasks) in parallel from one session that relays their questions, watches them and orders merges | `/agentic-claude-agents-manager resume` |
 
 Arguments:
 
@@ -230,11 +232,13 @@ Arguments:
 | `agentic-pr-review` | `[<PR number \| URL>]`. With none, it uses the current branch's PR |
 | `agentic-security-audit` | `[<paths> \| <slug>]` |
 | `agentic-configure` | `[--global \| --project]` |
+| `agentic-claude-agents-manager` | `[resume \| <units>]` |
 
 Per harness:
 
 - **Claude Code / Cursor**: `/agentic-…`. With the Claude Code plugin: `/agentic:agentic-…`.
 - **Codex**: `$agentic-…`. Playbooks and `agentic-configure` set `policy.allow_implicit_invocation: false` in `agents/openai.yaml`.
+- `agentic-claude-agents-manager` is listed only in the Claude plugin (`.claude-plugin/plugin.json`), not in Codex or Cursor.
 
 #### Playbook details
 
@@ -259,6 +263,11 @@ Per harness:
   - Walks through reviewers (offering to install new ones), then the model table (from `agent models`, `codex debug models`, Claude aliases), folders, profiles and limits.
   - Writes only what differs from the defaults, and only after a yes, then validates. Models go in global config, everything else in project config.
   - Opens no work item.
+- **`agentic-claude-agents-manager`** (Claude desktop app only):
+  - The manager session runs units (playbooks, free tasks, sidequests) as separate app sessions, up to `manager.parallel`.
+  - Relay: a unit's questions reach you through the manager; the manager auto-answers only from decisions you recorded. A heartbeat (`manager.heartbeat` minutes) checks for stalled units.
+  - Merges go in order, each on your yes for one PR at one head sha. A sidequest raised by a unit can pause its raiser.
+  - State lives in the ledger `{output}/_manager/`. The rest: [SKILL.md](skills/playbooks/agentic-claude-agents-manager/SKILL.md), [ADR-0008](docs/tech/adr/0008-agents-manager.md).
 
 ### Light vs full mode
 
@@ -321,7 +330,7 @@ It works on the same machine only: work items live in the gitignored `output` fo
 
 ### Where outputs land
 
-Each run gets one work item folder, `.agentic/work/{YYYYMMDD}-{slug}/`, which stays in the main checkout even when the code is built in a worktree. Code goes to the workspace branch and the PR. Decisions promoted at gates are committed to the knowledge base (`knowledge.root`, default `docs/`). See [Work item, state, audit log](#work-item-state-audit-log).
+Each run gets one work item folder, `.agentic/work/{YYYYMMDD}-{slug}/`, which stays in the main checkout even when the code is built in a worktree. Code goes to the workspace branch and the PR. Decisions promoted at gates are committed to the knowledge base (`knowledge.root`, default `docs/`). The agents manager keeps its ledger in `{output}/_manager/`, beside the work items. See [Work item, state, audit log](#work-item-state-audit-log).
 
 ## How it works
 

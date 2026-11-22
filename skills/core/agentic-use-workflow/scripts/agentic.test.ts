@@ -4029,6 +4029,34 @@ describe('manager unit set', () => {
   test('no field given exits 2', () => {
     expect(manager(['unit', 'set', 'a']).code).toBe(2);
   });
+
+  test('--state paused with --paused-by replaces the list, bare --paused-by appends', () => {
+    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'b']);
+    managerOk(['unit', 'set', 'a', '--paused-by', 'a']);
+    expect(managerState().units.a.pausedBy).toEqual(['b', 'a']);
+
+    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'b']);
+    expect(managerState().units.a.pausedBy).toEqual(['b']);
+  });
+
+  test('--deps replaces the deps list and an empty value clears it', () => {
+    startedLedger([unitAdd('a'), unitAdd('b'), unitAdd('c', { deps: ['a'], depMode: 'wait' })]);
+    managerOk(['unit', 'set', 'c', '--deps', 'a,b']);
+    expect(managerState().units.c).toMatchObject({ deps: ['a', 'b'], depMode: 'wait' });
+
+    managerOk(['unit', 'set', 'c', '--deps', '']);
+    expect(managerState().units.c.deps).toEqual([]);
+  });
+
+  test.each([
+    ['unknown dep', ['a', '--deps', 'ghost']],
+    ['self dep', ['a', '--deps', 'a']],
+  ])('%s exits 1', (_label, args) => {
+    const before = managerLog().length;
+
+    expect(manager(['unit', 'set', ...args]).code).toBe(1);
+    expect(managerLog()).toHaveLength(before);
+  });
 });
 
 describe('manager brief', () => {
@@ -4439,7 +4467,7 @@ describe('manager status', () => {
     startedLedger([unitAdd('side', { state: 'failed' }), unitAdd('a', { state: 'paused', pausedBy: 'side' })]);
 
     const text = status();
-    expect(text).toContain('stuck a: paused by failed side');
+    expect(text).toContain('stuck a: paused by side closed without merge');
     expect(text).not.toContain('resume a');
   });
 
@@ -4452,8 +4480,52 @@ describe('manager status', () => {
     managerOk(['unit', 'set', 'a', '--paused-by', 'sq2']);
 
     const text = status();
-    expect(text).toContain('stuck a: paused by failed sq2');
+    expect(text).toContain('stuck a: paused by sq2 closed without merge');
     expect(text).not.toContain('resume a');
+  });
+
+  test.each(['failed', 'done'])('stuck, not hold, for a wait dep closed %s', (closed) => {
+    startedLedger([unitAdd('base', { state: closed }), unitAdd('w', { state: 'running', deps: ['base'], depMode: 'wait' })]);
+
+    const text = status();
+    expect(text).toContain('stuck w: dep base closed without merge');
+    expect(text).not.toContain('hold w');
+  });
+
+  test('stuck, not start, for a stacked dep that failed', () => {
+    startedLedger([unitAdd('base', { state: 'failed', branch: 'feat-base' }), unitAdd('s', { deps: ['base'], depMode: 'stacked' })]);
+
+    const text = status();
+    expect(text).toContain('stuck s: dep base closed without merge');
+    expect(text).not.toContain('start s');
+  });
+
+  test('stuck, not resume, for a unit paused by a done sidequest', () => {
+    startedLedger([unitAdd('sq', { state: 'done' }), unitAdd('a', { state: 'paused', pausedBy: 'sq' })]);
+
+    const text = status();
+    expect(text).toContain('stuck a: paused by sq closed without merge');
+    expect(text).not.toContain('resume a');
+  });
+
+  test('keep paused under a new sidequest resumes once that one merged', () => {
+    startedLedger([unitAdd('sq1', { state: 'failed' }), unitAdd('sq2', { state: 'running' }), unitAdd('a', { state: 'paused', pausedBy: 'sq1' })]);
+    managerOk(['unit', 'set', 'a', '--state', 'paused', '--paused-by', 'sq2']);
+    managerOk(['unit', 'set', 'sq2', '--state', 'merged']);
+
+    const text = status();
+    expect(text).toContain('resume a: sq2 merged');
+    expect(text).not.toContain('stuck');
+  });
+
+  test('clearing deps removes the stuck line', () => {
+    startedLedger([unitAdd('base', { state: 'failed' }), unitAdd('w', { state: 'running', deps: ['base'], depMode: 'wait' })]);
+    expect(status()).toContain('stuck w');
+
+    managerOk(['unit', 'set', 'w', '--deps', '']);
+    const text = status();
+    expect(text).not.toContain('stuck');
+    expect(text).not.toContain('hold w');
   });
 
   test('all merged gives resume only, no stuck', () => {

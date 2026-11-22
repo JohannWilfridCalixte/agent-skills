@@ -46,6 +46,15 @@ From `manager status`:
 
 Done when every released, resumed and stacked unit got its message and is `running`.
 
+## Stuck
+
+`stuck <id>` line: a dep or a sidequest ended `failed` or `done` without merging, so nothing releases or resumes the unit. Ask the owner per unit:
+
+- `dep <ref>` line → continue without it: `manager unit set <id> --deps <remaining deps>` (empty clears), then `SendMessage` the unit: update from the default branch, proceed (SKILL.md Hand-off). Or fail the unit: `manager unit set <id> --state failed --summary …`.
+- `paused by <ref>` line → resume with its workaround: `SendMessage` the unit (update, workaround, its held answers), `manager unit set <id> --state running`. Or keep paused under a new sidequest: [sidequests.md](sidequests.md) Yes, then `manager unit set <id> --state paused --paused-by <new sq>` (replaces the list). Or fail the unit as above.
+
+Done when the owner answered and the unit is `running`, `paused` by a new sidequest or `failed`.
+
 ## Conflicts
 
 The owning unit resolves them. Non-mechanical (a behaviour choice) → question to the owner ([relay.md](relay.md)).

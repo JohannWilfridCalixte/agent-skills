@@ -44,7 +44,7 @@ Done when every unit with a `start` line is `running` with session, path and bra
 
 ## 4. Wake loop
 
-Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**, once. `release`, `re-offer` and `answered` print once: act in this wake. A line already put to the owner (`merge-yes`, `usage`, `question`) waits for the answer; the answer stands for that PR head, and for `usage` until a status prints no `usage` line and it comes back. `start` in a turn that cannot launch → launch.md Launch refused; under a paused queue → skip it.
+Idle between wakes. A wake is a unit's **note** (first 400 chars of its final message, status line `Unit <id>: <status>` first), the heartbeat cron, or an owner message. Per wake: act on the trigger, then `manager status` and act on every **attention line**, once. `release`, `re-offer` and `answered` print once: act in this wake. A line already put to the owner (`merge-yes`, `usage`, `question`, `stuck`) waits for the answer; the answer stands for that PR head, and for `usage` until a status prints no `usage` line and it comes back. `start` in a turn that cannot launch → launch.md Launch refused; under a paused queue → skip it.
 
 **Hand-off**: a message that gives a unit work (answer, unblock, what its PR misses, release, resume, merge, rebase) → `manager unit set <id> --state running` in the same wake, so the heartbeat watches that turn.
 
@@ -54,8 +54,8 @@ Idle between wakes. A wake is a unit's **note** (first 400 chars of its final me
 |---|---|
 | `question`, `blocked`, `done`, no status line; `question Q<n>` | [references/relay.md](references/relay.md) |
 | `working` | stay idle: the heartbeat tracks its progress |
-| `sidequest`; `re-offer`, `stuck` | [references/sidequests.md](references/sidequests.md) |
-| `pr-ready`; `merge-yes`, `hold`, `release`, `resume` | [references/merges.md](references/merges.md) |
+| `sidequest`; `re-offer` | [references/sidequests.md](references/sidequests.md) |
+| `pr-ready`; `merge-yes`, `hold`, `release`, `resume`, `stuck` | [references/merges.md](references/merges.md) |
 | cron fire; `usage` | [references/heartbeat.md](references/heartbeat.md) |
 | `stale` | nothing: the cron wake's `beat` acted on its rung |
 | `start` | step 3 |

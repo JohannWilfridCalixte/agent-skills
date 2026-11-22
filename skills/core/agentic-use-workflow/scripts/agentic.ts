@@ -2666,7 +2666,8 @@ const blankUnit = (): ManagerUnit => ({
 const applyUnitChanges = (unit: ManagerUnit, event: ManagerEvent) => {
   const { pausedBy, ...fields } = event;
   Object.assign(unit, Object.fromEntries(settableUnitKeys.filter((key) => key !== 'pausedBy' && key in fields).map((key) => [key, fields[key]])));
-  if (typeof event.state === 'string' && event.state !== 'paused') unit.pausedBy = [];
+  if (event.type === 'unit-set' && Array.isArray(event.deps)) unit.deps = stringsOf(event.deps);
+  if (typeof event.state === 'string' && (event.state !== 'paused' || pausedBy !== undefined)) unit.pausedBy = [];
   for (const blocker of typeof pausedBy === 'string' ? [pausedBy] : stringsOf(pausedBy)) {
     if (!unit.pausedBy.includes(blocker)) unit.pausedBy.push(blocker);
   }
@@ -2970,8 +2971,12 @@ const orderedUnits = (state: ManagerState) =>
 
 const activeCount = (state: ManagerState) => Object.values(state.units).filter((unit) => activeStates.includes(unit.state)).length;
 
+// A unit that ended failed or done never reaches `merged`, so whatever waits on it would hold forever.
+const closedUnmerged = (state: ManagerState, id: string) => state.units[id]?.state === 'failed' || state.units[id]?.state === 'done';
+
 const stackedDepsReady = (state: ManagerState, unit: ManagerUnit) =>
-  unit.depMode !== 'stacked' || unit.deps.every((dep) => state.units[dep]?.branch != null && state.units[dep]?.state !== 'queued');
+  unit.depMode !== 'stacked' ||
+  unit.deps.every((dep) => state.units[dep]?.branch != null && state.units[dep]?.state !== 'queued' && !closedUnmerged(state, dep));
 
 const startableUnits = (state: ManagerState, parallel: number) => {
   const started: string[] = [];
@@ -3020,16 +3025,21 @@ const statusReport = (state: ManagerState, limits: ManagerLimits) => {
     ...units.filter(([, unit]) => unit.state === 'running' && unit.misses >= 1).map(([id, unit]) => `stale ${id}: ${rungOf(unit.misses)}`),
     ...units.filter(([, unit]) => unit.state === 'pr').map(([id, unit]) => `merge-yes ${id}: ${unit.pr}`),
     ...startableUnits(state, limits.parallel).map((id) => `start ${id}`),
+    ...[...activeWaiters(state), ...units.filter(([, unit]) => unit.state === 'queued' && unit.depMode === 'stacked')].flatMap(([id, unit]) =>
+      unit.deps.filter((dep) => closedUnmerged(state, dep)).map((dep) => `stuck ${id}: dep ${dep} closed without merge`),
+    ),
     ...activeWaiters(state)
       .filter(([, unit]) => !allMerged(state, unit.deps))
-      .flatMap(([id, unit]) => unit.deps.filter((dep) => state.units[dep]?.state !== 'merged').map((dep) => `hold ${id}: implementation waits for ${dep}`)),
+      .flatMap(([id, unit]) =>
+        unit.deps.filter((dep) => state.units[dep]?.state !== 'merged' && !closedUnmerged(state, dep)).map((dep) => `hold ${id}: implementation waits for ${dep}`),
+      ),
     ...released.map((id) => `release ${id}: ${state.units[id]?.deps.join(', ')} merged, update onto the new base`),
     ...units
       .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.length > 0 && allMerged(state, unit.pausedBy))
       .map(([id, unit]) => `resume ${id}: ${unit.pausedBy.join(', ')} merged`),
     ...units
-      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.some((sidequest) => state.units[sidequest]?.state === 'failed'))
-      .map(([id, unit]) => `stuck ${id}: paused by failed ${unit.pausedBy.filter((sidequest) => state.units[sidequest]?.state === 'failed').join(', ')}`),
+      .filter(([, unit]) => unit.state === 'paused' && unit.pausedBy.some((sidequest) => closedUnmerged(state, sidequest)))
+      .flatMap(([id, unit]) => unit.pausedBy.filter((sidequest) => closedUnmerged(state, sidequest)).map((sidequest) => `stuck ${id}: paused by ${sidequest} closed without merge`)),
     ...(state.usage !== null && state.usage >= limits.usage ? [`usage ${state.usage}%: ask owner before starting queued units`] : []),
     ...offered.map((id) => `re-offer ${id}: ${state.backlog[id]?.title}`),
     ...Object.entries(state.questions)
@@ -3162,9 +3172,9 @@ const unitAddCommand: Command = {
 const unitSetCommand: Command = {
   name: 'manager unit set',
   usage:
-    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends)] [--summary t]',
+    'manager unit set <id> [--state queued|running|waiting|paused|pr|merged|done|failed] [--session s] [--path dir] [--branch b] [--pr url] [--model m] [--effort e] [--attended true|false] [--paused-by unit (appends; replaces with --state paused)] [--deps a,b (replaces; empty clears)] [--summary t]',
   arguments: 1,
-  flags: ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'paused-by', 'summary'],
+  flags: ['state', 'session', 'path', 'branch', 'pr', 'model', 'effort', 'attended', 'paused-by', 'deps', 'summary'],
   required: [],
   async run(context) {
     const [id = ''] = context.positionals;
@@ -3174,6 +3184,13 @@ const unitSetCommand: Command = {
     const path = flagText(context, 'path');
     const pausedBy = flagText(context, 'paused-by');
     if (pausedBy !== undefined) existingUnit(state, pausedBy);
+
+    const depsText = flagText(context, 'deps');
+    const deps = depsText?.split(',').map((dep) => dep.trim()).filter(Boolean);
+    for (const dep of deps ?? []) {
+      if (dep === id) throw new CliError(1, `unit "${id}" cannot depend on itself`, false);
+      existingUnit(state, dep);
+    }
 
     const attended = enumFlag(context, 'attended', ['true', 'false']);
     const changes: Record<string, unknown> = {
@@ -3186,6 +3203,7 @@ const unitSetCommand: Command = {
       effort: flagText(context, 'effort'),
       attended: attended === undefined ? undefined : attended === 'true',
       pausedBy,
+      deps,
       summary: flagText(context, 'summary'),
     };
     const given = Object.entries(changes).filter(([, value]) => value !== undefined);

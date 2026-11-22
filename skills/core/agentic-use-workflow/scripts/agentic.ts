@@ -956,6 +956,14 @@ const mergeRefusal = (review: ReviewVerdict, view: Record<string, unknown>) => {
   return undefined;
 };
 
+const refuseUnboundRelayedMerge = (context: Context, approved: string | undefined) => {
+  const ledger = hookManagerState(context);
+  const match = ledger === undefined || isManagerCwd(ledger, context.cwd) ? undefined : unitAt(ledger, context.cwd);
+  if (match !== undefined && !match.unit.attended && approved === undefined) {
+    throw new CliError(1, `merge: manager unit ${match.id} needs --head <approved sha>`, false);
+  }
+};
+
 const mergeCommand: Command = {
   name: 'merge',
   usage: 'merge [--head <sha>] [--work <slug>]   (squash-merges the PR when its head is the approved --head, review is clean, no conflict, CI proof for head; else exit 1)',
@@ -965,6 +973,7 @@ const mergeCommand: Command = {
   async run(context) {
     const approved = flagText(context, 'head');
     if (approved !== undefined && !/^[0-9a-f]{7,40}$/i.test(approved)) throw new CliError(1, 'merge: --head must be 7-40 hex chars', false);
+    refuseUnboundRelayedMerge(context, approved);
     const item = await resolveWorkItem(context, { allowCreate: false });
     const events = await readEvents(item);
     const state = deriveState(item.name, events);
@@ -2884,8 +2893,8 @@ const managerLimits = (context: Context) => loadLimits(context, mainCheckout(con
 const relayProtocol = (id: string, attended: boolean) =>
   [
     '## Relay protocol',
-    'Start the final message of every turn with one status line, then its block:',
     'Run your own subagents and checks in the foreground, so each turn ends on question, sidequest, pr-ready, blocked or done.',
+    'Start the final message of every turn with one status line, then its block:',
     '',
     attended
       ? `- \`Unit ${id}: question\` — unused: the owner answers you in this session directly.`
@@ -2893,7 +2902,7 @@ const relayProtocol = (id: string, attended: boolean) =>
     `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
     `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
     `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
-    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; this line alone, with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
+    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; one line with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
     "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.",

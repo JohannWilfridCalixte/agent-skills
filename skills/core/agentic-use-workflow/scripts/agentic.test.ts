@@ -3775,6 +3775,39 @@ describe('merge', () => {
     expect(readLog(name).some((event) => event.step === 'merge')).toBe(false);
   });
 
+  describe('from a manager unit checkout', () => {
+    const relayed = (extra: Record<string, unknown> = {}) => startedLedger([unitAdd('a', { state: 'running', path: repo, ...extra })]);
+
+    test('a relayed unit without --head refuses before gh and logs nothing', () => {
+      relayed();
+      const before = readLog(name).length;
+
+      const result = merge();
+
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('merge: manager unit a needs --head <approved sha>');
+      expect(ghCalls()).toEqual([]);
+      expect(readLog(name)).toHaveLength(before);
+    });
+
+    test('a relayed unit with the matching --head merges', () => {
+      relayed();
+
+      expect(merge(view(), undefined, ['--head', head]).code).toBe(0);
+      expect(mergeCalls()).toEqual([`pr merge 7 --squash --match-head-commit ${head}`]);
+    });
+
+    test('an attended unit merges without --head', () => {
+      relayed({ attended: true });
+
+      expect(merge().code).toBe(0);
+    });
+
+    test('no ledger merges without --head', () => {
+      expect(merge().code).toBe(0);
+    });
+  });
+
   test('arguments are a usage error', () => {
     expect(agentic(['merge', 'extra', '--work', 'demo']).code).toBe(2);
   });
@@ -4003,14 +4036,14 @@ describe('manager brief', () => {
     "Merge a PR only at the head sha a manager message relays the owner's yes for: playbook units `agentic.ts merge --head <sha>`, others `gh pr merge <url> --squash --match-head-commit <sha>`; refused or head moved → report `pr-ready` again.";
   const relayLines = (id: string) => [
     '## Relay protocol',
-    'Start the final message of every turn with one status line, then its block:',
     'Run your own subagents and checks in the foreground, so each turn ends on question, sidequest, pr-ready, blocked or done.',
+    'Start the final message of every turn with one status line, then its block:',
     '',
     `- \`Unit ${id}: question\` — numbered questions, each with options, your recommended one first. Use it wherever a skill asks the user or calls a question tool, then end your turn. The answer arrives as a message from the manager.`,
     `- \`Unit ${id}: sidequest\` — a project-global problem outside your scope: what, where, whether it blocks you, your workaround if you continue. Report it; its fix belongs to another unit.`,
     `- \`Unit ${id}: pr-ready\` — PR url, checks and review state.`,
     `- \`Unit ${id}: blocked\` — what stopped you, what you need.`,
-    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; this line alone, with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
+    `- \`Unit ${id}: working\` — only when background work you cannot run in the foreground keeps you idle; one line with the reason. Each one costs the manager a wake, and a run of them can hold your later notes.`,
     `- \`Unit ${id}: done\` — what changed, commits or PR, anything unverified.`,
     '',
     MERGE_LINE,

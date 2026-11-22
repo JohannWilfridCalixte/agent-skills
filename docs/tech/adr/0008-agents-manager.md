@@ -20,8 +20,8 @@ One session per work unit today: the owner starts each playbook or task by hand,
   - Protocol text has one source: the output of `manager brief`.
 - **Authority**
   - Auto-answer only from the owner's recorded decisions: launch presets, standing rules, the identical question already answered for another unit. Each one logged in `decisions.md` and shown in the manager chat. Anything else → owner, recommended answer first.
-  - Merges: manager computes the order, asks per PR (green + reviewed); same question offers archiving the session after cleanup. The yes is bound to the PR head sha: the unit merges only at the sha the relayed yes names; head moved → unit reports `pr-ready` again, new yes. On yes the owning unit merges with its own tooling (playbook: `agentic.ts merge`; others: squash with head match), manager verifies, tells waiting units to update onto the new base. Conflicts: owning unit resolves; non-mechanical → owner. Manager never edits code.
-  - Stale ladder: heartbeat (`manager.heartbeat`, session cron). Armed exactly while at least one unit is `running`, deleted otherwise, re-armed on resume. Each beat first reads an idle unit's last message for a status line not yet handled (the wake note may have been held, see Consequences), then compares progress markers. Rungs on unchanged markers: first beat ok, then nudge, stop + resume with recap, ask owner. Destructive moves (restart, archive, discard work) always ask. Unit waiting on a permission prompt → owner told at once with the session link.
+  - Merges: manager computes the order, asks per PR (green + reviewed); same question offers archiving the session after cleanup. The yes names the PR head sha. Binding is protocol, not helper-enforced: manager re-reads the head before relaying (moved → ask again) and checks the merged sha after. On yes the owning unit merges with its own tooling (playbook: `agentic.ts merge`, no sha flag: merges the current head with `--match-head-commit` of that head; others: `gh pr merge --squash --match-head-commit <approved sha>`), manager verifies, tells waiting units to update onto the new base. Conflicts: owning unit resolves; non-mechanical → owner. Manager never edits code.
+  - Stale ladder: heartbeat (`manager.heartbeat`, session cron). Armed exactly while at least one unit is `running`, deleted otherwise, re-armed on resume. Each beat first reads an idle unit's last message for a status line not yet handled (the wake note may have been held, see Consequences), then compares progress markers. Rungs on unchanged markers: first beat ok, then nudge, stop + resume with recap, ask owner. Destructive moves (restart, archive, discard work) always ask. Unit waiting on a permission prompt → found by the heartbeat (nothing wakes the manager), owner then told at once with the session link.
 - **Sidequests and dependencies**
   - A unit hitting a project-global problem outside its scope reports it, never fixes it. Manager asks "address now?".
   - Yes → surfacing unit pauses, owner picks which other affected units pause, sidequest unit launched. Accepted sidequest units start first, ahead of other queued units, still under the parallel cap. A unit can be paused by several sidequests: `--paused-by` appends; `resume` once every listed sidequest merged; leaving `paused` clears the list. After the PR merges each paused unit updates onto the new base and resumes.
@@ -34,7 +34,9 @@ One session per work unit today: the owner starts each playbook or task by hand,
   - `manager` commands are refused (exit 1) from a unit's cwd, except for a unit whose path equals the manager cwd.
   - Unit matching (hooks and the refusal above): cwd inside a live unit's recorded path (`running | waiting | paused | pr`) first, then current branch against unit id (+ app hex suffix) or the recorded branch.
   - Ledger read: hooks lenient (unparseable lines skipped, read error = no ledger → allow), CLI strict (bad line → exit 1). Exception: a `Manager unit: <id>` spawn fails closed.
-  - `hook spawn`: strict from the manager's cwd. A `start_session` from the recorded manager cwd needs a `Manager unit: <id>` line, or `Manager unit: none` for a session outside the ledger; else deny. `Manager unit: <id>` checks: unit in ledger, `Work item: none`, relay block verbatim, ledger model (alias-normalised) and effort; fails closed with no readable ledger or unknown unit. Fix = `manager brief <id>`. The line never disables the existing work-item checks.
+  - `hook spawn`: strict from the manager's cwd.
+    - A `start_session` from the recorded manager cwd needs a `Manager unit: <id>` line, or `Manager unit: none` for a session outside the ledger; else deny.
+    - `Manager unit: <id>` checks: unit in ledger, `Work item: none`, relay block verbatim, ledger model (alias-normalised) and effort; fails closed with no readable ledger or unknown unit. Fix = `manager brief <id>`. The line never disables the existing work-item checks.
   - `hook compact`: manager cwd → prints `manager status`; non-attended unit path → re-prints the protocol.
   - `hook ask` (PreToolUse `AskUserQuestion`): cwd matches a non-attended unit → deny, "end your turn with the question block".
 - **Model, effort, capacity**
@@ -93,10 +95,10 @@ sequenceDiagram
 
 - **Manager merges itself**: rejected. The owning unit merges with its own tooling (playbook: `agentic.ts merge`); the manager never edits code.
 - **Manager never merges**: rejected. Merges release waiting units and resume paused ones, so the manager orders them, asks per PR and verifies.
-- **Standing auto-merge**: rejected. Merge is an owner approval each time, now bound to the PR head sha.
+- **Standing auto-merge**: rejected. Merge is an owner approval each time, naming the PR head sha (binding by relay protocol; `agentic.ts merge` takes no sha).
 - **Event-driven only, no heartbeat**: rejected. Nothing wakes the manager for a unit hung mid-turn or at a permission prompt; held wake notes (below) make the heartbeat the guaranteed channel.
 - **Conversation-only state**: rejected. Lost on compaction or a new session; hooks read the ledger on disk.
-- **Brief-only relay, no `AskUserQuestion` hook**: rejected. A pending interactive question leaves no event in work-item state: the relay protocol is the only signal.
+- **Brief-only relay, no `AskUserQuestion` hook**: rejected. A pending interactive question leaves no event in work-item state: so the relay protocol is the only signal; the hook turns a unit's prompt back into the protocol's question block.
 - **Agentic-managed worktrees**: rejected. The app manages a worktree per session (`use_worktree`); playbook units use `workspace=current` instead of a second one.
 - **New top-level `manager` config key**: rejected. `unit*` step keys reuse the existing step resolution and parent fallback.
 
@@ -109,8 +111,8 @@ sequenceDiagram
 - Every manager brief carries `Work item: none`, else the existing `hook spawn` denies it. A non-unit session started from the manager cwd carries `Manager unit: none`.
 - A unit turn woken by another session's message cannot `start_session`: its steps fall back to subagents.
 - Anything enumerating work items in `{output}` must skip `_manager`.
-- Wake limit seen live: after many child notes in a row with no owner message, the app holds further notes until the owner's next turn (a held `done` note arrived with the owner's next message). `working` turn-ends spend that budget, so units keep their own subagents in the foreground where possible and the heartbeat is the guaranteed channel.
-- Unit matching by branch is loose (hex suffix pattern may over-match; unit id used unescaped in a pattern). Spawn check ignores unit state.
+- Wake limit seen live: after many child notes in a row with no owner message, the app holds further notes until the owner's next turn (a held `done` note arrived with the owner's next message). `working` turn-ends spend that budget; a later `question` or `done` note can be held, so the heartbeat (which reads an idle unit's last message) is the guaranteed channel.
+- Branch fallback matches non-attended units that are `queued` or live. Unit matching by branch is loose (hex suffix pattern may over-match; unit id used unescaped in a pattern). Spawn check ignores unit state.
 
 ## History
 
